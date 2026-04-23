@@ -44,3 +44,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local external MCP clone (keep out of this repo)
+tools/mcp/web-search-mcp/
