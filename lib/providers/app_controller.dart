@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:agreeo/models/app_models.dart';
+import 'package:agreeo/models/neo4j/neo4j_models.dart';
 import 'package:agreeo/services/backend_service.dart';
 import 'package:agreeo/services/notification_service.dart';
+import 'package:agreeo/services/neo4j_service.dart';
+import 'package:agreeo/services/auth_service.dart';
+import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/utils/recommendation_engine.dart';
 import 'package:agreeo/utils/sample_catalog.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -139,6 +142,10 @@ class AppState {
 
 class AppController extends StateNotifier<AppState> {
   AppController(this._ref) : super(AppState.initial()) {
+    _backendService = BackendService(
+      neo4jService: _neo4jService,
+      config: BackendConfig.fromEnv(),
+    );
     Future.microtask(_bootstrap);
   }
 
@@ -154,15 +161,28 @@ class AppController extends StateNotifier<AppState> {
   static const String _activeEventKey = 'agreeo.activeEventId';
 
   final Ref _ref;
-  final BackendService _backendService = BackendService();
+  final Neo4jService _neo4jService = Neo4jService();
+  late final BackendService _backendService;
+  final AuthService _authService = AuthService();
   final RecommendationEngine _recommendationEngine =
       const RecommendationEngine();
   final Uuid _uuid = const Uuid();
 
+  BackendService get backendService => _backendService;
+  AuthService get authService => _authService;
+
   Future<void> _bootstrap() async {
     await NotificationService.instance.initialize();
+    // Neo4jService is for backend only - Flutter doesn't use it directly
+    // await _neo4jService.initialize();
+    await _backendService.initialize();
     final prefs = await SharedPreferences.getInstance();
-    final session = _readSession(prefs);
+
+    // CLEAR all local user data - users are managed by backend only
+    await _clearAllLocalData(prefs);
+
+    final session =
+        null; // Never load session from local storage - backend is source of truth
     final preferences = _readPreferences(prefs);
     final queue = _readMovies(prefs, _dailyQueueKey);
     final feedback = _readFeedback(prefs, _feedbackKey);
@@ -212,25 +232,12 @@ class AppController extends StateNotifier<AppState> {
 
     state = state.copyWith(session: session);
     await _persistState();
-
-    try {
-      final auth = FirebaseAuth.instance;
-      if (auth.currentUser == null) {
-        await auth.signInAnonymously();
-      }
-    } catch (_) {
-      // Local demo mode does not require Firebase Auth.
-    }
   }
 
   Future<void> signOut() async {
     state = AppState.initial().copyWith(hydrated: true);
     await _persistState();
-    try {
-      await FirebaseAuth.instance.signOut();
-    } catch (_) {
-      // Ignore when Firebase Auth is not configured.
-    }
+    await _authService.logout();
   }
 
   Future<void> completeOnboarding({
@@ -249,6 +256,72 @@ class AppController extends StateNotifier<AppState> {
     await _persistState();
     await _backendSyncPreferences();
     await regenerateDailyQueue();
+  }
+
+  // Simple Email/Password Auth MVP
+  Future<bool> registerWithEmail(String email, String password) async {
+    final ok = await _authService.register(email, password);
+    if (!ok) return false;
+    final token = await _authService.login(email, password);
+    if (token == null) return false;
+
+    final session = AppSession(
+      uid: _uuid.v4(),
+      displayName: email.split('@').first,
+      email: email,
+      isGuest: false,
+      createdAt: DateTime.now(),
+    );
+
+    state = state.copyWith(session: session);
+    await _persistState();
+
+    return true;
+  }
+
+  Future<bool> loginWithEmail(String email, String password) async {
+    final token = await _authService.login(email, password);
+    if (token == null) return false;
+
+    // Decode JWT to extract userId (sub)
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        print('[AppController] Invalid JWT format');
+        return false;
+      }
+
+      // Decode payload (second part)
+      final payload = parts[1];
+      // Add padding if needed
+      final paddedPayload = payload + ('=' * (4 - payload.length % 4));
+      final decoded = utf8.decode(base64Url.decode(paddedPayload));
+      final json = jsonDecode(decoded) as Map<String, dynamic>;
+      final uid = json['sub'] as String?;
+
+      if (uid == null) {
+        print('[AppController] No sub in JWT');
+        return false;
+      }
+
+      print('[AppController] Extracted uid from JWT: $uid');
+
+      final session = AppSession(
+        uid: uid, // Use the userId from JWT, not a random UUID
+        displayName: email.split('@').first,
+        email: email,
+        isGuest: false,
+        createdAt: DateTime.now(),
+      );
+
+      state = state.copyWith(session: session);
+      await _persistState();
+
+      return true;
+    } catch (e) {
+      print('[AppController] Error extracting uid from JWT: $e');
+      return false;
+    }
   }
 
   Future<void> setDailyRecommendationsEnabled(bool enabled) async {
@@ -580,12 +653,9 @@ class AppController extends StateNotifier<AppState> {
 
   Future<void> _persistState() async {
     final prefs = await SharedPreferences.getInstance();
-    final session = state.session;
-    if (session == null) {
-      await prefs.remove(_sessionKey);
-    } else {
-      await prefs.setString(_sessionKey, jsonEncode(session.toJson()));
-    }
+
+    // NEVER persist session to local storage - backend OAuth/JWT is the source of truth
+    // Sessions are in-memory only during active app session
 
     await prefs.setString(
       _preferencesKey,
@@ -627,6 +697,21 @@ class AppController extends StateNotifier<AppState> {
     } else {
       await prefs.setString(_activeEventKey, state.activeEventId!);
     }
+  }
+
+  Future<void> _clearAllLocalData(SharedPreferences prefs) async {
+    print('[AppController] Clearing all local user and session data...');
+    await prefs.remove(_sessionKey);
+    await prefs.remove(_preferencesKey);
+    await prefs.remove(_dailyQueueKey);
+    await prefs.remove(_feedbackKey);
+    await prefs.remove(_savedWatchlistKey);
+    await prefs.remove(_groupsKey);
+    await prefs.remove(_eventsKey);
+    await prefs.remove(_votesKey);
+    await prefs.remove(_activeGroupKey);
+    await prefs.remove(_activeEventKey);
+    print('[AppController] Local data cleared ✓');
   }
 
   AppSession? _readSession(SharedPreferences prefs) {

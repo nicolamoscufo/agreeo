@@ -45,5 +45,15 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Node.js dependencies
+backend/node_modules/
+node_modules/
+npm-debug.log
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+
 # Local external MCP clone (keep out of this repo)
 tools/mcp/web-search-mcp/

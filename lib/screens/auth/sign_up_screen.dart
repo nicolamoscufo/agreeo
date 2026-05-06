@@ -31,16 +31,40 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      await ref
-          .read(appControllerProvider.notifier)
-          .createOrUpdateSession(
-            displayName: _nameController.text.trim(),
-            email: _emailController.text.trim(),
-            isGuest: false,
+      final appController = ref.read(appControllerProvider.notifier);
+
+      try {
+        final email = _emailController.text.trim();
+        final password = _passwordController.text;
+
+        final registered = await appController.authService.register(
+          email,
+          password,
+        );
+        if (!registered) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email already registered.')),
           );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Account created locally.')));
+          return;
+        }
+
+        await appController.createOrUpdateSession(
+          displayName: _nameController.text.trim(),
+          email: email,
+          isGuest: false,
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully!')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      }
     }
   }
 

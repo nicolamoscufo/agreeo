@@ -1,4 +1,7 @@
 import 'package:agreeo/providers/app_controller.dart';
+import 'package:agreeo/screens/onboarding/onboarding_screen.dart';
+import 'package:agreeo/screens/home/home_shell.dart';
+import 'package:agreeo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,17 +29,49 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      final displayName = _emailController.text.split('@').first;
-      await ref
-          .read(appControllerProvider.notifier)
-          .createOrUpdateSession(
-            displayName: displayName.isEmpty ? 'Agreeo user' : displayName,
-            email: _emailController.text.trim(),
-            isGuest: false,
-          );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Signed in locally.')));
+      final appController = ref.read(appControllerProvider.notifier);
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      // Verify local auth first
+      final authService = AuthService();
+      final token = await authService.login(email, password);
+
+      if (token == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid email or password.')),
+        );
+        return;
+      }
+
+      // Login with sync to Neo4j
+      final success = await appController.loginWithEmail(email, password);
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signed in successfully!')),
+        );
+
+        // Check if user has completed onboarding
+        final hasCompletedOnboarding = ref
+            .read(appControllerProvider)
+            .onboardingComplete;
+
+        final destination = hasCompletedOnboarding
+            ? const HomeShell()
+            : const OnboardingScreen();
+
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (context) => destination));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in failed. Please try again.')),
+        );
+      }
     }
   }
 
@@ -154,19 +189,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       child: const Text('Sign In'),
                     ),
                     const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: () async {
-                        await ref
-                            .read(appControllerProvider.notifier)
-                            .createOrUpdateSession(
-                              displayName: 'Guest',
-                              email: 'guest@agreeo.app',
-                              isGuest: true,
-                            );
-                      },
-                      child: const Text('Continue as guest'),
-                    ),
-                    const SizedBox(height: 16),
                     TextButton(
                       onPressed: () {
                         Navigator.of(context).pushReplacement(

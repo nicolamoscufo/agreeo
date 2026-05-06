@@ -29,9 +29,16 @@ ThemeData _buildTheme(Brightness brightness) {
   );
 
   return ThemeData(
-    colorScheme: colorScheme,
     useMaterial3: true,
-    textTheme: GoogleFonts.spaceGroteskTextTheme(),
+    colorScheme: colorScheme,
+    // FIX 1: Ensure text theme explicitly uses the colorScheme colors
+    textTheme: GoogleFonts.spaceGroteskTextTheme(
+      TextTheme(
+        bodyLarge: TextStyle(color: colorScheme.onSurface),
+        bodyMedium: TextStyle(color: colorScheme.onSurface),
+        bodySmall: TextStyle(color: colorScheme.onSurface),
+      ),
+    ),
     scaffoldBackgroundColor: colorScheme.surface,
     appBarTheme: AppBarTheme(
       centerTitle: false,
@@ -42,7 +49,20 @@ ThemeData _buildTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: colorScheme.surface.withOpacity(0.04),
+      // FIX 2: Use a slightly more visible surface tint for dark mode
+      fillColor: brightness == Brightness.dark
+          ? colorScheme.surfaceVariant.withOpacity(
+              0.3,
+            ) // More visible in dark mode
+          : colorScheme.surfaceVariant.withOpacity(0.3),
+
+      // FIX 3: Explicitly set the text color inside the field
+      // This ensures that what you type is always 'onSurface' (white in dark mode)
+      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      hintStyle: TextStyle(
+        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+      ),
+
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
@@ -57,6 +77,7 @@ ThemeData _buildTheme(Brightness brightness) {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     ),
+    // ... rest of your button themes remain the same
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         minimumSize: const Size.fromHeight(52),

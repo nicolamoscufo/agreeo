@@ -1,0 +1,7 @@
+{
+  "editor.fontFamily": "ui-monospace, \"SF Mono\", Menlo, Consolas, monospace",
+  "editor.fontSize": 15,
+  "editor.fontLigatures": false,
+  "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font Mono, 'JetBrains Mono', 'Fira Code', monospace",
+  "terminal.integrated.fontSize": 13
+}

@@ -69,19 +69,6 @@ class AuthWelcomeScreen extends ConsumerWidget {
                     ),
                     child: const Text('Create account'),
                   ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () async {
-                      await ref
-                          .read(appControllerProvider.notifier)
-                          .createOrUpdateSession(
-                            displayName: 'Guest',
-                            email: 'guest@agreeo.app',
-                            isGuest: true,
-                          );
-                    },
-                    child: const Text('Continue as guest'),
-                  ),
                 ],
               ),
             ),

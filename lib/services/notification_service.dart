@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+//
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -34,18 +33,7 @@ class NotificationService {
         // Mantenuto qui solo come placeholder del debug mode.
     }
 
-    if (Firebase.apps.isNotEmpty) {
-      try {
-        await FirebaseMessaging.instance.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-          provisional: true,
-        );
-      } catch (_) {
-        // FCM is optional during local demo mode or configuration issues.
-      }
-    }
+    // Local notifications only; skip push permissions
 
     _initialized = true;
   }

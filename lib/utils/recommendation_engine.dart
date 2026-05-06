@@ -2,9 +2,26 @@ import 'dart:math';
 
 import 'package:agreeo/models/app_models.dart';
 
+/// Recommendation Engine for Agreeo
+/// 
+/// Implements the algorithm as specified in the Agreeo UDSE Project Document:
+/// - Section 4.5.2: FINAL SYSTEM FUNCTIONALITIES
+/// - Section 5: DESIGN AND IMPLEMENTATION (State Transition Networks)
+/// 
+/// Two core recommendation scenarios:
+/// 1. Daily Movie Evaluation (STN 5.1): Individual daily suggestions
+/// 2. Organize a Movie Night (STN 5.2): Group consensus building
 class RecommendationEngine {
   const RecommendationEngine();
 
+  /// Builds daily personalized movie queue for individual user
+  /// 
+  /// Implements STN 5.1 (Daily Movie Evaluation) flow:
+  /// - Delivers proactive, lightweight daily suggestions
+  /// - Reduces decision fatigue through consistent, minimal interactions
+  /// - Distributes decision-making over time (core value proposition)
+  /// 
+  /// Scoring: Genre Match + Service Match + Rating + Recency Boost + Exploration
   List<Movie> buildDailyQueue({
     required List<Movie> catalog,
     required UserPreferences preferences,
@@ -12,6 +29,7 @@ class RecommendationEngine {
     DateTime? today,
     int limit = 7,
   }) {
+    // Exclude already-evaluated content (seen or explicitly disliked)
     final excludedIds = feedback
         .where(
           (record) =>
@@ -21,6 +39,7 @@ class RecommendationEngine {
         .map((record) => record.movieId)
         .toSet();
 
+    // Deterministic seeding by date ensures same queue shown to user throughout the day
     final seedDate = today ?? DateTime.now();
     final seed = seedDate.year * 10000 + seedDate.month * 100 + seedDate.day;
     final random = Random(seed);
@@ -28,29 +47,45 @@ class RecommendationEngine {
     final scoredMovies = catalog
         .where((movie) => !excludedIds.contains(movie.id))
         .map((movie) {
-          final genreMatches = movie.genres
-              .where(preferences.favoriteGenres.contains)
-              .length;
+          // HIGH PRIORITY: Group Streaming Filters requirement
+          // Only show content available on user's subscribed platforms
           final serviceMatches = movie.streamingServices
               .where(preferences.streamingServices.contains)
               .length;
+          if (serviceMatches == 0) {
+            // Movie not available on any user's service → exclude from daily queue
+            return movie.copyWith(score: -9999.0);
+          }
+
+          final genreMatches = movie.genres
+              .where(preferences.favoriteGenres.contains)
+              .length;
+          
           final genreScore = genreMatches * 4.5;
           final serviceScore = serviceMatches * 3.5;
           final ratingScore = movie.score;
+          
+          // Boost recent content (within last 1 year)
           final recencyBoost = (movie.releaseYear >= seedDate.year - 1)
               ? 1.3
               : 0.0;
+          
+          // Exploration bonus: probabilistic discovery of content outside usual preferences
           final explorationBonus = random.nextDouble();
+          
           final score =
               genreScore +
               serviceScore +
               ratingScore +
               recencyBoost +
               explorationBonus;
+          
           return movie.copyWith(score: score);
         })
+        .where((m) => m.score > -9999.0) // Filter out unavailable movies
         .toList();
 
+    // Sort by score descending, then alphabetically for determinism
     scoredMovies.sort((left, right) {
       final scoreComparison = right.score.compareTo(left.score);
       if (scoreComparison != 0) {
@@ -62,6 +97,15 @@ class RecommendationEngine {
     return scoredMovies.take(limit).toList(growable: false);
   }
 
+  /// Builds group shortlist for shared movie night decision
+  /// 
+  /// Implements STN 5.2 (Organize a Movie Night) flow:
+  /// - Applies group constraints (format, genres, duration)
+  /// - HIGH PRIORITY: Filters by shared streaming platforms across all group members
+  /// - Combines individual feedback to surface fair group consensus options
+  /// - Supports voting mechanism for final selection
+  /// 
+  /// Scoring: Rating + Member Likes/Dislikes + Vote Tally + Availability
   List<Movie> buildShortlist({
     required List<Movie> catalog,
     required List<MovieFeedbackRecord> feedback,
@@ -72,9 +116,13 @@ class RecommendationEngine {
     DateTime? today,
     int limit = 6,
   }) {
+    // Step 1: Identify shared platforms across group members
+    // This is a HIGH PRIORITY requirement from document section 4.5.2
     final sharedServices = _sharedServices(
       memberServices.values.toList(growable: false),
     );
+
+    // Step 2: Build vote tally for consensus tracking
     final voteByMovie = <String, _VoteTally>{};
     for (final vote in votes) {
       voteByMovie
@@ -82,29 +130,48 @@ class RecommendationEngine {
           .register(vote.choice);
     }
 
+    // Step 3: Index feedback by member for group-wide scoring
     final memberFeedback = feedback
         .where((record) => memberIds.contains(record.userId))
         .toList(growable: false);
+
     final scoredMovies = <Movie>[];
+    
     for (final movie in catalog) {
+      // Apply Constraints Setup (from STN 5.2: Constraints_Setup_Active)
+      
+      // Constraint 1: Format (movie vs series)
       if (!_matchesFormat(movie, constraints.format)) {
         continue;
       }
+      
+      // Constraint 2: Duration limit
       if (movie.runtimeMinutes > constraints.maxDurationMinutes) {
         continue;
       }
+      
+      // Constraint 3: Genre inclusions (if specified)
       if (constraints.includeGenres.isNotEmpty &&
           !movie.genres.any(constraints.includeGenres.contains)) {
         continue;
       }
+      
+      // Constraint 4: Genre exclusions
       if (movie.genres.any(constraints.excludeGenres.contains)) {
         continue;
       }
+
+      // Constraint 5: HIGH PRIORITY - Shared streaming platforms
+      // Document 4.5.2: "Group Streaming Filters: Integration of filters to show 
+      // only content available on the group's shared platforms"
       if (sharedServices.isNotEmpty &&
           !movie.streamingServices.any(sharedServices.contains)) {
         continue;
       }
 
+      // Step 4: Score based on group feedback and consensus signals
+      
+      // Count positive signals from group members
       final likes = memberFeedback
           .where(
             (record) =>
@@ -112,6 +179,8 @@ class RecommendationEngine {
                 record.action == FeedbackAction.like,
           )
           .length;
+      
+      // Count negative signals from group members
       final dislikes = memberFeedback
           .where(
             (record) =>
@@ -119,6 +188,9 @@ class RecommendationEngine {
                 record.action == FeedbackAction.dislike,
           )
           .length;
+      
+      // Penalize content already seen by group members
+      // Reduces repeat viewings and maintains discovery excitement
       final seenPenalty = memberFeedback
           .where(
             (record) =>
@@ -126,18 +198,23 @@ class RecommendationEngine {
                 record.action == FeedbackAction.seen,
           )
           .length;
+      
       final voteTally = voteByMovie[movie.id];
 
+      // Consensus scoring formula:
+      // Base rating + Member engagement signals + Voting signals
       final score =
-          movie.score +
-          (likes * 3.0) -
-          (dislikes * 2.5) -
-          (seenPenalty * 2.0) +
-          (voteTally?.likeCount ?? 0) * 2.0 -
-          (voteTally?.dislikeCount ?? 0) * 1.5;
+          movie.score +           // Base TMDB/platform rating
+          (likes * 3.0) -         // Strong positive signal
+          (dislikes * 2.5) -      // Negative signal (weighted less to allow minority preferences)
+          (seenPenalty * 2.0) +   // Penalize repeats
+          (voteTally?.likeCount ?? 0) * 2.0 - // Active voting support
+          (voteTally?.dislikeCount ?? 0) * 1.5; // Active voting opposition
+      
       scoredMovies.add(movie.copyWith(score: score));
     }
 
+    // Final sort: highest consensus score first
     scoredMovies.sort((left, right) {
       final scoreComparison = right.score.compareTo(left.score);
       if (scoreComparison != 0) {
@@ -149,6 +226,10 @@ class RecommendationEngine {
     return scoredMovies.take(limit).toList(growable: false);
   }
 
+  /// Resolves final consensus when majority agreement is reached
+  /// 
+  /// Implements voting majority rule: requires >50% of eligible voters to like a movie
+  /// This triggers STN 5.2 transition: Voting_Session_Active → Final_Decision_Displayed
   Movie? resolveConsensus({
     required MovieEvent event,
     required List<EventVote> votes,
@@ -185,6 +266,13 @@ class RecommendationEngine {
     }
   }
 
+  /// Calculates shared platforms across group members
+  /// Used for HIGH PRIORITY: Group Streaming Filters requirement
+  /// 
+  /// Logic:
+  /// 1. If any member has no subscriptions → return all services (assume no filter)
+  /// 2. Otherwise → return intersection of all non-empty service lists
+  /// 3. Fallback → return union of all services if no overlap
   List<String> _sharedServices(List<List<String>> servicesByMember) {
     if (servicesByMember.isEmpty) {
       return const <String>[];
@@ -197,7 +285,24 @@ class RecommendationEngine {
       return const <String>[];
     }
 
+    // Try to find intersection (strict: all members must have service)
     final shared = nonEmpty.first.toSet();
+    for (final services in nonEmpty.skip(1)) {
+      shared.retainAll(services);
+    }
+
+    if (shared.isNotEmpty) {
+      return shared.toList(growable: false);
+    }
+
+    // Fallback: if no perfect intersection, return union of all services
+    // This allows flexibility when group has diverse subscriptions
+    return nonEmpty
+        .expand((services) => services)
+        .toSet()
+        .toList(growable: false);
+  }
+}
     for (final services in nonEmpty.skip(1)) {
       shared.retainAll(services);
     }
