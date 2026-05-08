@@ -38,16 +38,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
       state.moviesByIds(mockPopularWithFriendsIds),
       query,
     );
-    final platforms = _applyFilters(
-      state.catalog
-          .where(
-            (movie) => movie.providers.any(
-              state.profilePreferences.streamingPlatforms.contains,
-            ),
-          )
-          .toList(growable: false),
-      query,
-    );
     final shortTonight = _applyFilters(
       state.catalog
           .where((movie) => movie.runtime <= 110)
@@ -93,7 +83,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                     context,
                     initialFilters: _filters,
                     genres: agreeoGenreOptions,
-                    providers: agreeoPlatforms,
                   );
                   if (updated != null) {
                     setState(() {
@@ -160,12 +149,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                 title: 'Popular with your friends',
                 subtitle: 'A social placeholder for titles your circle keeps circling back to.',
                 movies: friends,
-              ),
-              const SizedBox(height: 22),
-              _CollectionSection(
-                title: 'Available on your platforms',
-                subtitle: 'Filtered to the services in your profile preferences.',
-                movies: platforms,
               ),
               const SizedBox(height: 22),
               _CollectionSection(

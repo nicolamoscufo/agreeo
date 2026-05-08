@@ -1,6 +1,5 @@
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -95,26 +94,6 @@ class AgreeoProfileScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 24),
           const SectionHeader(
-            title: 'Streaming platforms',
-            subtitle: 'Used to populate the home shelf with easy-to-watch options.',
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: agreeoPlatforms
-                .map(
-                  (platform) => SelectableChip(
-                    label: platform,
-                    selected: state.profilePreferences.streamingPlatforms
-                        .contains(platform),
-                    onTap: () => controller.toggleStreamingPlatform(platform),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-          const SizedBox(height: 24),
-          const SectionHeader(
             title: 'Recent activity',
             subtitle: 'A quick personal feed built from the local movie state history.',
           ),
@@ -158,11 +137,6 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.category_outlined),
                   title: const Text('Manage favorite genres'),
                   subtitle: const Text('Currently driven by onboarding selections.'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.tv_outlined),
-                  title: const Text('Manage streaming platforms'),
-                  subtitle: const Text('Use the chips above to tune availability.'),
                 ),
                 const Divider(height: 1),
                 SwitchListTile.adaptive(

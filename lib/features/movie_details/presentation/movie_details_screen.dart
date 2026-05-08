@@ -152,9 +152,9 @@ class AgreeoMovieDetailsScreen extends ConsumerWidget {
               spacing: 10,
               runSpacing: 10,
               children: <Widget>[
-                ProviderBadge(label: '${movie.rating.toStringAsFixed(1)} rating'),
-                ProviderBadge(label: movie.director),
-                ...movie.genres.map((genre) => ProviderBadge(label: genre)),
+                InfoBadge(label: '${movie.rating.toStringAsFixed(1)} rating'),
+                InfoBadge(label: movie.director),
+                ...movie.genres.map((genre) => InfoBadge(label: genre)),
               ],
             ),
           ),
@@ -167,25 +167,25 @@ class AgreeoMovieDetailsScreen extends ConsumerWidget {
           ),
           _DetailsSection(
             title: 'Cast',
-            child: SizedBox(
-              height: 46,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                        itemBuilder: (context, index) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest
-                                .withValues(alpha: 0.6),
-                          ),
-                          child: Text(movie.cast[index]),
-                        ),
-                        separatorBuilder: (context, index) => const SizedBox(width: 10),
-                itemCount: movie.cast.length,
+              child: SizedBox(
+                height: 46,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemBuilder: (context, index) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                    ),
+                    child: Text(movie.cast[index]),
+                  ),
+                  separatorBuilder: (context, index) => const SizedBox(width: 10),
+                  itemCount: movie.cast.length,
+                ),
               ),
-            ),
           ),
           _DetailsSection(
             title: 'Trailer',
@@ -242,16 +242,6 @@ class AgreeoMovieDetailsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            ),
-          ),
-          _DetailsSection(
-            title: 'Where to watch',
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: movie.providers
-                  .map((provider) => ProviderBadge(label: provider))
-                  .toList(growable: false),
             ),
           ),
           _DetailsSection(

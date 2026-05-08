@@ -4,10 +4,10 @@
 Phase 1 - Core MVP prototype
 
 ## Last Updated
-2026-05-08 - Full repo cleanup and smoke build completed
+2026-05-08 - Swipe card controls embedded in card
 
 ## Current Status
-The repo now has a dedicated Agreeo Phase 1 prototype flow connected end-to-end at the app level: new bootstrap gate, mock auth welcome screen, onboarding steps, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, and a Friends placeholder tab. The full repo now passes `flutter analyze` with no issues, the full Flutter test suite passes, and a smoke `flutter build web` succeeds. A true desktop smoke run on Windows is still blocked locally by the missing Visual Studio toolchain.
+The repo now has a dedicated Agreeo Phase 1 prototype flow connected end-to-end at the app level: new bootstrap gate, mock auth welcome screen, onboarding steps, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, and a Friends placeholder tab. The full repo passes `flutter analyze` and the Flutter test suite passes. The Swipe card now keeps all core interactions inside the card itself, with a near full-screen cinematic layout and animated horizontal swipe gestures for like/dislike. A true desktop smoke run on Windows is still blocked locally by the missing Visual Studio toolchain.
 
 ## Completed
 - [x] Read project docs and root config (`README.md`, `pubspec.yaml`, `analysis_options.yaml`).
@@ -38,6 +38,13 @@ The repo now has a dedicated Agreeo Phase 1 prototype flow connected end-to-end 
 - [x] Cleaned legacy analyzer warnings in old unused files outside the new Phase 1 flow.
 - [x] Re-ran full-project `flutter analyze` successfully with no issues.
 - [x] Ran a smoke `flutter build web` successfully.
+- [x] Removed all streaming-platform references from the Phase 1 prototype flow.
+- [x] Reduced the custom bottom navigation height and visual footprint.
+- [x] Refined Swipe so the card occupies almost the whole screen and supports animated right/left swipe gestures for like/dislike.
+- [x] Fixed the Home carousel card overflow by simplifying card metadata and resizing the carousel.
+- [x] Re-ran full-project `flutter analyze` and `flutter test` after the UX refinement pass.
+- [x] Moved Swipe actions directly inside the swipe card and aligned the layout closer to the provided reference.
+- [x] Re-ran full-project `flutter analyze` and `flutter test` after embedding the swipe controls into the card.
 
 ## In Progress
 - [ ] Manual device/emulator walkthrough of the full Phase 1 flow for visual polish and interaction tuning.
@@ -52,7 +59,7 @@ The repo now has a dedicated Agreeo Phase 1 prototype flow connected end-to-end 
 - [ ] Windows desktop smoke run/build is blocked locally because the Visual Studio toolchain is not installed/configured for Flutter desktop builds.
 
 ## Next Steps
-- Open the app in Chrome or Edge and do a manual pass through auth, onboarding, swipe actions, library updates, details, and profile.
+- Open the app in Chrome or Edge and do a manual pass through auth, onboarding, swipe card gestures, embedded controls, library updates, details, and profile.
 - Optionally install/fix the Visual Studio desktop toolchain if Windows desktop verification is required.
 - If the prototype feels stable after manual QA, either remove or refactor the old legacy flow before starting Phase 2.
 

@@ -222,8 +222,8 @@ class GenreChip extends StatelessWidget {
   }
 }
 
-class ProviderBadge extends StatelessWidget {
-  const ProviderBadge({super.key, required this.label});
+class InfoBadge extends StatelessWidget {
+  const InfoBadge({super.key, required this.label});
 
   final String label;
 
@@ -292,12 +292,14 @@ class ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.isPrimary = false,
+    this.compact = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool isPrimary;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -314,18 +316,21 @@ class ActionButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 14,
+            vertical: compact ? 9 : 12,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, color: foreground),
-              const SizedBox(height: 6),
+              Icon(icon, color: foreground, size: compact ? 20 : 24),
+              SizedBox(height: compact ? 4 : 6),
               Text(
                 label,
                 style: TextStyle(
                   color: foreground,
                   fontWeight: FontWeight.w700,
-                  fontSize: 12,
+                  fontSize: compact ? 11 : 12,
                 ),
               ),
             ],

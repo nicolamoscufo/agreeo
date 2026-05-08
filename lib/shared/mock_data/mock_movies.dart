@@ -19,15 +19,6 @@ const List<String> agreeoGenreOptions = <String>[
   'History',
 ];
 
-const List<String> agreeoPlatforms = <String>[
-  'Netflix',
-  'Prime Video',
-  'Disney+',
-  'Max',
-  'Apple TV+',
-  'Hulu',
-];
-
 const List<String> mockPopularWithFriendsIds = <String>[
   'dune-2',
   'spider-verse',
@@ -61,7 +52,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     rating: 7.9,
     mediaType: CatalogMediaType.movie,
     trailerUrl: 'https://www.youtube.com/results?search_query=Arrival+trailer',
-    providers: const <String>['Netflix', 'Prime Video'],
   ),
   Movie(
     id: 'dune-2',
@@ -81,7 +71,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Dune+Part+Two+trailer',
-    providers: const <String>['Max', 'Prime Video'],
   ),
   Movie(
     id: 'spider-verse',
@@ -101,7 +90,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Across+the+Spider-Verse+trailer',
-    providers: const <String>['Netflix', 'Disney+'],
   ),
   Movie(
     id: 'past-lives',
@@ -121,7 +109,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Past+Lives+trailer',
-    providers: const <String>['Prime Video', 'Apple TV+'],
   ),
   Movie(
     id: 'knives-out',
@@ -141,7 +128,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Knives+Out+trailer',
-    providers: const <String>['Netflix', 'Prime Video'],
   ),
   Movie(
     id: 'the-batman',
@@ -161,7 +147,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=The+Batman+trailer',
-    providers: const <String>['Max'],
   ),
   Movie(
     id: 'barbie',
@@ -180,7 +165,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     rating: 7.2,
     mediaType: CatalogMediaType.movie,
     trailerUrl: 'https://www.youtube.com/results?search_query=Barbie+trailer',
-    providers: const <String>['Max', 'Prime Video'],
   ),
   Movie(
     id: 'inside-out-2',
@@ -200,7 +184,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Inside+Out+2+trailer',
-    providers: const <String>['Disney+'],
   ),
   Movie(
     id: 'palm-springs',
@@ -220,7 +203,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Palm+Springs+trailer',
-    providers: const <String>['Hulu'],
   ),
   Movie(
     id: 'get-out',
@@ -240,7 +222,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Get+Out+trailer',
-    providers: const <String>['Netflix', 'Prime Video'],
   ),
   Movie(
     id: 'oppenheimer',
@@ -260,7 +241,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Oppenheimer+trailer',
-    providers: const <String>['Prime Video', 'Apple TV+'],
   ),
   Movie(
     id: 'the-bear',
@@ -280,7 +260,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=The+Bear+trailer',
-    providers: const <String>['Disney+', 'Hulu'],
   ),
   Movie(
     id: 'severance',
@@ -300,7 +279,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Severance+trailer',
-    providers: const <String>['Apple TV+'],
   ),
   Movie(
     id: 'shogun',
@@ -319,7 +297,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     rating: 8.6,
     mediaType: CatalogMediaType.tv,
     trailerUrl: 'https://www.youtube.com/results?search_query=Shogun+trailer',
-    providers: const <String>['Disney+', 'Hulu'],
   ),
   Movie(
     id: 'the-last-of-us',
@@ -339,7 +316,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=The+Last+of+Us+trailer',
-    providers: const <String>['Max'],
   ),
   Movie(
     id: 'only-murders',
@@ -359,7 +335,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Only+Murders+in+the+Building+trailer',
-    providers: const <String>['Disney+'],
   ),
   Movie(
     id: 'andor',
@@ -378,7 +353,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     rating: 8.4,
     mediaType: CatalogMediaType.tv,
     trailerUrl: 'https://www.youtube.com/results?search_query=Andor+trailer',
-    providers: const <String>['Disney+'],
   ),
   Movie(
     id: 'blue-eye-samurai',
@@ -398,7 +372,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Blue+Eye+Samurai+trailer',
-    providers: const <String>['Netflix'],
   ),
   Movie(
     id: 'fallout',
@@ -418,7 +391,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Fallout+series+trailer',
-    providers: const <String>['Prime Video'],
   ),
   Movie(
     id: 'poor-things',
@@ -438,7 +410,6 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Poor+Things+trailer',
-    providers: const <String>['Disney+', 'Prime Video'],
   ),
   Movie(
     id: 'the-gentlemen',
@@ -458,6 +429,5 @@ final List<Movie> mockMovieCatalog = <Movie>[
     mediaType: CatalogMediaType.tv,
     trailerUrl:
         'https://www.youtube.com/results?search_query=The+Gentlemen+series+trailer',
-    providers: const <String>['Netflix'],
   ),
 ];

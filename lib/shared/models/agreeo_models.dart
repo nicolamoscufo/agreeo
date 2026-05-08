@@ -77,7 +77,6 @@ class Movie {
     required this.rating,
     required this.mediaType,
     required this.trailerUrl,
-    required this.providers,
   });
 
   final String id;
@@ -95,7 +94,6 @@ class Movie {
   final double rating;
   final CatalogMediaType mediaType;
   final String trailerUrl;
-  final List<String> providers;
 
   String get typeLabel => mediaType.label;
   String get runtimeLabel => '${runtime}m';
@@ -118,7 +116,6 @@ class Movie {
     double? rating,
     CatalogMediaType? mediaType,
     String? trailerUrl,
-    List<String>? providers,
   }) {
     return Movie(
       id: id ?? this.id,
@@ -136,7 +133,6 @@ class Movie {
       rating: rating ?? this.rating,
       mediaType: mediaType ?? this.mediaType,
       trailerUrl: trailerUrl ?? this.trailerUrl,
-      providers: providers ?? this.providers,
     );
   }
 
@@ -157,7 +153,6 @@ class Movie {
       'rating': rating,
       'mediaType': mediaType.name,
       'trailerUrl': trailerUrl,
-      'providers': providers,
     };
   }
 
@@ -178,7 +173,6 @@ class Movie {
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       mediaType: CatalogMediaTypeX.fromJson(json['mediaType']),
       trailerUrl: _stringValue(json['trailerUrl']),
-      providers: _stringList(json['providers']),
     );
   }
 }
@@ -190,7 +184,6 @@ class MovieSearchFilters {
     this.maxRuntimeMinutes,
     this.minReleaseYear,
     this.minRating,
-    this.provider,
   });
 
   final CatalogMediaType? mediaType;
@@ -198,15 +191,13 @@ class MovieSearchFilters {
   final int? maxRuntimeMinutes;
   final int? minReleaseYear;
   final double? minRating;
-  final String? provider;
 
   bool get hasActiveFilters {
     return mediaType != null ||
         genre != null ||
         maxRuntimeMinutes != null ||
         minReleaseYear != null ||
-        minRating != null ||
-        provider != null;
+        minRating != null;
   }
 
   MovieSearchFilters copyWith({
@@ -220,8 +211,6 @@ class MovieSearchFilters {
     bool clearMinReleaseYear = false,
     double? minRating,
     bool clearMinRating = false,
-    String? provider,
-    bool clearProvider = false,
   }) {
     return MovieSearchFilters(
       mediaType: clearMediaType ? null : mediaType ?? this.mediaType,
@@ -233,7 +222,6 @@ class MovieSearchFilters {
           ? null
           : minReleaseYear ?? this.minReleaseYear,
       minRating: clearMinRating ? null : minRating ?? this.minRating,
-      provider: clearProvider ? null : provider ?? this.provider,
     );
   }
 
@@ -251,9 +239,6 @@ class MovieSearchFilters {
       return false;
     }
     if (minRating != null && movie.rating < minRating!) {
-      return false;
-    }
-    if (provider != null && !movie.providers.contains(provider)) {
       return false;
     }
     return true;
@@ -377,7 +362,6 @@ class OnboardingState {
 
 class ProfilePreferences {
   const ProfilePreferences({
-    required this.streamingPlatforms,
     required this.showWatchedToFriends,
     required this.showLikedToFriends,
     required this.showWatchlistToFriends,
@@ -388,7 +372,6 @@ class ProfilePreferences {
     required this.finalDecisionReached,
   });
 
-  final List<String> streamingPlatforms;
   final bool showWatchedToFriends;
   final bool showLikedToFriends;
   final bool showWatchlistToFriends;
@@ -400,7 +383,6 @@ class ProfilePreferences {
 
   factory ProfilePreferences.initial() {
     return const ProfilePreferences(
-      streamingPlatforms: <String>['Netflix', 'Disney+', 'Prime Video'],
       showWatchedToFriends: true,
       showLikedToFriends: true,
       showWatchlistToFriends: false,
@@ -413,7 +395,6 @@ class ProfilePreferences {
   }
 
   ProfilePreferences copyWith({
-    List<String>? streamingPlatforms,
     bool? showWatchedToFriends,
     bool? showLikedToFriends,
     bool? showWatchlistToFriends,
@@ -424,7 +405,6 @@ class ProfilePreferences {
     bool? finalDecisionReached,
   }) {
     return ProfilePreferences(
-      streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
       showWatchedToFriends:
           showWatchedToFriends ?? this.showWatchedToFriends,
       showLikedToFriends: showLikedToFriends ?? this.showLikedToFriends,
@@ -442,7 +422,6 @@ class ProfilePreferences {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
-      'streamingPlatforms': streamingPlatforms,
       'showWatchedToFriends': showWatchedToFriends,
       'showLikedToFriends': showLikedToFriends,
       'showWatchlistToFriends': showWatchlistToFriends,
@@ -456,7 +435,6 @@ class ProfilePreferences {
 
   factory ProfilePreferences.fromJson(Map<String, dynamic> json) {
     return ProfilePreferences(
-      streamingPlatforms: _stringList(json['streamingPlatforms']),
       showWatchedToFriends: json['showWatchedToFriends'] != false,
       showLikedToFriends: json['showLikedToFriends'] != false,
       showWatchlistToFriends: json['showWatchlistToFriends'] == true,

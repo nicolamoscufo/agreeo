@@ -24,11 +24,11 @@ class AgreeoBottomNavigation extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
         child: Row(
@@ -46,14 +46,14 @@ class AgreeoBottomNavigation extends StatelessWidget {
                   borderRadius: BorderRadius.circular(22),
                   onTap: () => onSelected(index),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          width: centerItem ? 52 : 40,
-                          height: centerItem ? 52 : 40,
+                          width: centerItem ? 42 : 34,
+                          height: centerItem ? 42 : 34,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: centerItem
@@ -71,6 +71,7 @@ class AgreeoBottomNavigation extends StatelessWidget {
                           alignment: Alignment.center,
                           child: Icon(
                             item.icon,
+                            size: centerItem ? 21 : 19,
                             color: centerItem
                                 ? Colors.white
                                 : selected
@@ -78,7 +79,7 @@ class AgreeoBottomNavigation extends StatelessWidget {
                                 : colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           item.label,
                           style: TextStyle(
@@ -88,7 +89,7 @@ class AgreeoBottomNavigation extends StatelessWidget {
                             fontWeight: selected || centerItem
                                 ? FontWeight.w700
                                 : FontWeight.w500,
-                            fontSize: 12,
+                            fontSize: 10.5,
                           ),
                         ),
                       ],

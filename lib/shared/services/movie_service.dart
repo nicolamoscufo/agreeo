@@ -16,7 +16,5 @@ abstract class MovieService {
 
   Future<List<Movie>> getMoviesByGenre(String genre);
 
-  Future<List<Movie>> getMoviesByProvider(String provider);
-
   Future<List<Movie>> getMockShortMovies();
 }

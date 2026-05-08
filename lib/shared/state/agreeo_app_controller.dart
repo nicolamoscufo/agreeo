@@ -334,21 +334,6 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     await _persist();
   }
 
-  Future<void> toggleStreamingPlatform(String provider) async {
-    final platforms = state.profilePreferences.streamingPlatforms.toSet();
-    if (platforms.contains(provider)) {
-      platforms.remove(provider);
-    } else {
-      platforms.add(provider);
-    }
-    state = state.copyWith(
-      profilePreferences: state.profilePreferences.copyWith(
-        streamingPlatforms: platforms.toList(growable: false),
-      ),
-    );
-    await _persist();
-  }
-
   Future<void> setPrivacyPreference({
     bool? showWatchedToFriends,
     bool? showLikedToFriends,

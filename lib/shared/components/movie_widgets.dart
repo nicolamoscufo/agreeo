@@ -8,7 +8,7 @@ class MoviePosterCard extends StatelessWidget {
     super.key,
     required this.movie,
     required this.onTap,
-    this.width = 156,
+    this.width = 150,
   });
 
   final Movie movie;
@@ -53,14 +53,6 @@ class MoviePosterCard extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: movie.providers.take(2)
-                    .map((provider) => ProviderBadge(label: provider))
-                    .toList(growable: false),
-              ),
             ],
           ),
         ),
@@ -82,7 +74,7 @@ class MovieHorizontalCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 286,
+      height: 294,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: movies.length,
@@ -103,102 +95,123 @@ class MovieSwipeCard extends StatelessWidget {
     super.key,
     required this.movie,
     required this.onInfoTap,
+    this.expand = false,
+    this.header,
+    this.footer,
+    this.footerReservedSpace = 0,
   });
 
   final Movie movie;
   final VoidCallback onInfoTap;
+  final bool expand;
+  final Widget? header;
+  final Widget? footer;
+  final double footerReservedSpace;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final content = Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        _MovieArtwork(imageUrl: movie.posterUrl, fallbackSeed: movie.title),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.12),
+                Colors.black.withValues(alpha: 0.82),
+              ],
+              stops: const <double>[0.0, 0.42, 1.0],
+            ),
+          ),
+        ),
+        if (header != null)
+          Positioned(
+            top: 18,
+            left: 18,
+            right: 72,
+            child: header!,
+          ),
+        Positioned(
+          top: 18,
+          right: 18,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.35),
+            shape: const CircleBorder(),
+            child: IconButton(
+              onPressed: onInfoTap,
+              icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: footer == null ? 20 : footerReservedSpace + 28,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: movie.genres
+                    .take(3)
+                    .map((genre) => GenreChip(label: genre))
+                    .toList(growable: false),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                movie.title,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.7,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                movie.subtitleLine,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.78),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Directed by ${movie.director}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.72),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                movie.overview,
+                maxLines: expand ? 4 : 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.88),
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (footer != null)
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 18,
+            child: footer!,
+          ),
+      ],
+    );
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(34),
-      child: AspectRatio(
-        aspectRatio: 0.74,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            _MovieArtwork(imageUrl: movie.posterUrl, fallbackSeed: movie.title),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: <Color>[
-                    Colors.black.withValues(alpha: 0.1),
-                    Colors.black.withValues(alpha: 0.12),
-                    Colors.black.withValues(alpha: 0.82),
-                  ],
-                  stops: const <double>[0.0, 0.42, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 18,
-              right: 18,
-              child: Material(
-                color: Colors.black.withValues(alpha: 0.35),
-                shape: const CircleBorder(),
-                child: IconButton(
-                  onPressed: onInfoTap,
-                  icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: movie.genres
-                        .take(3)
-                        .map((genre) => GenreChip(label: genre))
-                        .toList(growable: false),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    movie.title,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.7,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    movie.subtitleLine,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.78),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Directed by ${movie.director}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    movie.overview,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.88),
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: expand ? content : AspectRatio(aspectRatio: 0.74, child: content),
     );
   }
 }
@@ -281,25 +294,9 @@ class MovieDetailsHeader extends StatelessWidget {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: movie.providers
-                            .map((provider) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(999),
-                                    color: Colors.white.withValues(alpha: 0.14),
-                                  ),
-                                  child: Text(
-                                    provider,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ))
+                        children: movie.genres
+                            .take(3)
+                            .map((genre) => GenreChip(label: genre))
                             .toList(growable: false),
                       ),
                     ],

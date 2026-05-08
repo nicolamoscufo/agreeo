@@ -6,7 +6,6 @@ Future<MovieSearchFilters?> showMovieFilterBottomSheet(
   BuildContext context, {
   required MovieSearchFilters initialFilters,
   required List<String> genres,
-  required List<String> providers,
 }) {
   return showModalBottomSheet<MovieSearchFilters>(
     context: context,
@@ -16,7 +15,6 @@ Future<MovieSearchFilters?> showMovieFilterBottomSheet(
     builder: (_) => _MovieFilterBottomSheet(
       initialFilters: initialFilters,
       genres: genres,
-      providers: providers,
     ),
   );
 }
@@ -25,12 +23,10 @@ class _MovieFilterBottomSheet extends StatefulWidget {
   const _MovieFilterBottomSheet({
     required this.initialFilters,
     required this.genres,
-    required this.providers,
   });
 
   final MovieSearchFilters initialFilters;
   final List<String> genres;
-  final List<String> providers;
 
   @override
   State<_MovieFilterBottomSheet> createState() => _MovieFilterBottomSheetState();
@@ -214,35 +210,6 @@ class _MovieFilterBottomSheetState extends State<_MovieFilterBottomSheet> {
                         _filters = _filters.copyWith(minRating: 8.5);
                       });
                     }),
-                  ],
-                ),
-              ),
-              _FilterSection(
-                title: 'Platform',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    SelectableChip(
-                      label: 'Any',
-                      selected: _filters.provider == null,
-                      onTap: () {
-                        setState(() {
-                          _filters = _filters.copyWith(clearProvider: true);
-                        });
-                      },
-                    ),
-                    ...widget.providers.map(
-                      (provider) => SelectableChip(
-                        label: provider,
-                        selected: _filters.provider == provider,
-                        onTap: () {
-                          setState(() {
-                            _filters = _filters.copyWith(provider: provider);
-                          });
-                        },
-                      ),
-                    ),
                   ],
                 ),
               ),

@@ -67,13 +67,6 @@ class MockMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getMoviesByProvider(String provider) async {
-    return mockMovieCatalog
-        .where((movie) => movie.providers.contains(provider))
-        .toList(growable: false);
-  }
-
-  @override
   Future<List<Movie>> getMockShortMovies() async {
     final shortMovies = mockMovieCatalog
         .where((movie) => movie.runtime <= 110)
