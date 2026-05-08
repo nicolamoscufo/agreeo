@@ -14,9 +14,9 @@ class SplashScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              colorScheme.primary.withOpacity(0.12),
+              colorScheme.primary.withValues(alpha: 0.12),
               colorScheme.surface,
-              colorScheme.tertiary.withOpacity(0.14),
+              colorScheme.tertiary.withValues(alpha: 0.14),
             ],
           ),
         ),
@@ -28,7 +28,7 @@ class SplashScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: colorScheme.primaryContainer.withOpacity(0.55),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.55),
                 ),
                 child: Icon(
                   Icons.handshake_rounded,

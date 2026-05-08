@@ -3,14 +3,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:agreeo/models/app_models.dart';
-import 'package:agreeo/models/neo4j/neo4j_models.dart';
 import 'package:agreeo/services/backend_service.dart';
 import 'package:agreeo/services/notification_service.dart';
-import 'package:agreeo/services/neo4j_service.dart';
 import 'package:agreeo/services/auth_service.dart';
-import 'package:agreeo/config/backend_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:agreeo/utils/recommendation_engine.dart';
-import 'package:agreeo/utils/sample_catalog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -141,11 +138,8 @@ class AppState {
 }
 
 class AppController extends StateNotifier<AppState> {
-  AppController(this._ref) : super(AppState.initial()) {
-    _backendService = BackendService(
-      neo4jService: _neo4jService,
-      config: BackendConfig.fromEnv(),
-    );
+  AppController(Ref ref) : super(AppState.initial()) {
+    _backendService = BackendService();
     Future.microtask(_bootstrap);
   }
 
@@ -160,8 +154,6 @@ class AppController extends StateNotifier<AppState> {
   static const String _activeGroupKey = 'agreeo.activeGroupId';
   static const String _activeEventKey = 'agreeo.activeEventId';
 
-  final Ref _ref;
-  final Neo4jService _neo4jService = Neo4jService();
   late final BackendService _backendService;
   final AuthService _authService = AuthService();
   final RecommendationEngine _recommendationEngine =
@@ -173,16 +165,8 @@ class AppController extends StateNotifier<AppState> {
 
   Future<void> _bootstrap() async {
     await NotificationService.instance.initialize();
-    // Neo4jService is for backend only - Flutter doesn't use it directly
-    // await _neo4jService.initialize();
-    await _backendService.initialize();
     final prefs = await SharedPreferences.getInstance();
-
-    // CLEAR all local user data - users are managed by backend only
-    await _clearAllLocalData(prefs);
-
-    final session =
-        null; // Never load session from local storage - backend is source of truth
+    final session = _readSession(prefs);
     final preferences = _readPreferences(prefs);
     final queue = _readMovies(prefs, _dailyQueueKey);
     final feedback = _readFeedback(prefs, _feedbackKey);
@@ -242,12 +226,10 @@ class AppController extends StateNotifier<AppState> {
 
   Future<void> completeOnboarding({
     required List<String> favoriteGenres,
-    required List<String> streamingServices,
     bool dailyRecommendationsEnabled = true,
   }) async {
     final nextPreferences = state.preferences.copyWith(
       favoriteGenres: favoriteGenres,
-      streamingServices: streamingServices,
       dailyRecommendationsEnabled: dailyRecommendationsEnabled,
       onboardingComplete: true,
     );
@@ -287,7 +269,7 @@ class AppController extends StateNotifier<AppState> {
     try {
       final parts = token.split('.');
       if (parts.length != 3) {
-        print('[AppController] Invalid JWT format');
+        debugPrint('[AppController] Invalid JWT format');
         return false;
       }
 
@@ -300,11 +282,11 @@ class AppController extends StateNotifier<AppState> {
       final uid = json['sub'] as String?;
 
       if (uid == null) {
-        print('[AppController] No sub in JWT');
+        debugPrint('[AppController] No sub in JWT');
         return false;
       }
 
-      print('[AppController] Extracted uid from JWT: $uid');
+      debugPrint('[AppController] Extracted uid from JWT: $uid');
 
       final session = AppSession(
         uid: uid, // Use the userId from JWT, not a random UUID
@@ -319,7 +301,7 @@ class AppController extends StateNotifier<AppState> {
 
       return true;
     } catch (e) {
-      print('[AppController] Error extracting uid from JWT: $e');
+      debugPrint('[AppController] Error extracting uid from JWT: $e');
       return false;
     }
   }
@@ -426,9 +408,6 @@ class AppController extends StateNotifier<AppState> {
       inviteCode: _generateInviteCode(),
       ownerId: session.uid,
       memberIds: <String>[session.uid],
-      memberServices: <String, List<String>>{
-        session.uid: state.preferences.streamingServices,
-      },
       sharedWatchlist: <Movie>[],
       createdAt: DateTime.now(),
     );
@@ -462,11 +441,8 @@ class AppController extends StateNotifier<AppState> {
       ...group.memberIds,
       session.uid,
     }.toList(growable: false);
-    final memberServices = Map<String, List<String>>.from(group.memberServices);
-    memberServices[session.uid] = state.preferences.streamingServices;
     final updatedGroup = group.copyWith(
       memberIds: memberIds,
-      memberServices: memberServices,
     );
 
     final updatedGroups = [...state.groups];
@@ -697,21 +673,6 @@ class AppController extends StateNotifier<AppState> {
     } else {
       await prefs.setString(_activeEventKey, state.activeEventId!);
     }
-  }
-
-  Future<void> _clearAllLocalData(SharedPreferences prefs) async {
-    print('[AppController] Clearing all local user and session data...');
-    await prefs.remove(_sessionKey);
-    await prefs.remove(_preferencesKey);
-    await prefs.remove(_dailyQueueKey);
-    await prefs.remove(_feedbackKey);
-    await prefs.remove(_savedWatchlistKey);
-    await prefs.remove(_groupsKey);
-    await prefs.remove(_eventsKey);
-    await prefs.remove(_votesKey);
-    await prefs.remove(_activeGroupKey);
-    await prefs.remove(_activeEventKey);
-    print('[AppController] Local data cleared ✓');
   }
 
   AppSession? _readSession(SharedPreferences prefs) {

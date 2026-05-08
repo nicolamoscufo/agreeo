@@ -114,7 +114,6 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     inviteCode: '',
                     ownerId: '',
                     memberIds: const <String>[],
-                    memberServices: const <String, List<String>>{},
                     sharedWatchlist: const <Movie>[],
                     createdAt: DateTime.now(),
                   ),
@@ -370,8 +369,7 @@ class _StepCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        // Nota sulla deprecation di .withOpacity(): La manteniamo per la coerenza con il progetto, ma si segnala che Flutter suggerirebbe alternative come Color.fromRGBO o manipolazione diretta dei valori RGB/Alpha.
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.65), 
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

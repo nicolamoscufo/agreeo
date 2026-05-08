@@ -16,7 +16,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _pageIndex = 0;
   final Set<String> _genres = <String>{};
-  final Set<String> _services = <String>{};
   bool _dailyRecommendationsEnabled = true;
 
   static const List<String> _genreOptions = <String>[
@@ -28,15 +27,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     'Sci-Fi',
     'Thriller',
     'Adventure',
-  ];
-
-  static const List<String> _serviceOptions = <String>[
-    'Netflix',
-    'Prime Video',
-    'Disney+',
-    'Max',
-    'Apple TV+',
-    'Paramount+',
   ];
 
   @override
@@ -59,9 +49,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       favoriteGenres: _genres.isEmpty
           ? <String>{'Drama', 'Comedy'}.toList()
           : _genres.toList(),
-      streamingServices: _services.isEmpty
-          ? <String>{'Netflix', 'Prime Video'}.toList()
-          : _services.toList(),
       dailyRecommendationsEnabled: _dailyRecommendationsEnabled,
     );
 
@@ -75,7 +62,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    if (_pageIndex < 2) {
+    if (_pageIndex < 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
@@ -125,17 +112,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     },
                   ),
                   _ChoiceStep(
-                    title: 'Choose streaming services',
-                    message: 'Only show options your group can actually watch.',
-                    options: _serviceOptions,
-                    selectedValues: _services,
-                    onChanged: (service, selected) {
-                      setState(() {
-                        selected
-                            ? _services.add(service)
-                            : _services.remove(service);
-                      });
-                    },
+                    title: 'Daily recommendations',
+                    message:
+                        'Pick what you like and we will suggest films without filtering by platform.',
+                    options: const <String>[],
+                    selectedValues: const <String>{},
+                    onChanged: (value, selected) {},
                     footer: SwitchListTile.adaptive(
                       value: _dailyRecommendationsEnabled,
                       onChanged: (value) {
@@ -155,7 +137,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _next,
-              child: Text(_pageIndex < 2 ? 'Continue' : 'Finish setup'),
+               child: Text(_pageIndex < 1 ? 'Continue' : 'Finish setup'),
             ),
             if (_pageIndex > 0) ...<Widget>[
               const SizedBox(height: 10),
@@ -199,7 +181,7 @@ class _IntroStep extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[accent.withOpacity(0.62), colorScheme.surface],
+          colors: <Color>[accent.withValues(alpha: 0.62), colorScheme.surface],
         ),
       ),
       child: Column(
@@ -254,7 +236,7 @@ class _ChoiceStep extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

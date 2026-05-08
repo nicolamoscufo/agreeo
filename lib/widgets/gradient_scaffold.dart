@@ -25,9 +25,9 @@ class GradientScaffold extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              colorScheme.primary.withOpacity(0.10),
+              colorScheme.primary.withValues(alpha: 0.10),
               colorScheme.surface,
-              colorScheme.tertiary.withOpacity(0.08),
+              colorScheme.tertiary.withValues(alpha: 0.08),
             ],
           ),
         ),

@@ -1,4 +1,3 @@
-import 'package:agreeo/providers/app_controller.dart';
 import 'package:agreeo/screens/auth/sign_in_screen.dart';
 import 'package:agreeo/screens/auth/sign_up_screen.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +23,7 @@ class AuthWelcomeScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer.withOpacity(0.45),
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.45),
                       borderRadius: BorderRadius.circular(28),
                     ),
                     child: Column(

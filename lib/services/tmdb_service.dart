@@ -8,19 +8,17 @@ class TmdbService {
     http.Client? client,
     String? apiKey,
     Uri? baseUri,
-    this.watchRegion = 'US',
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null,
        _apiKey =
-           apiKey ??
-           const String.fromEnvironment('TMDB_API_KEY', defaultValue: ''),
-       _baseUri = baseUri ?? Uri.parse('https://api.themoviedb.org/3/');
+            apiKey ??
+            const String.fromEnvironment('TMDB_API_KEY', defaultValue: ''),
+        _baseUri = baseUri ?? Uri.parse('https://api.themoviedb.org/3/');
 
   final http.Client _client;
   final bool _ownsClient;
   final String _apiKey;
   final Uri _baseUri;
-  final String watchRegion;
 
   bool get isConfigured => _apiKey.trim().isNotEmpty;
 
@@ -28,7 +26,6 @@ class TmdbService {
     MediaType? mediaType,
     required List<String> includeGenres,
     required List<String> excludeGenres,
-    required List<String> streamingServices,
     int limit = 20,
   }) async {
     if (!isConfigured || limit <= 0) {
@@ -37,7 +34,7 @@ class TmdbService {
 
     final targetTypes = mediaType == null
         ? MediaType.values
-        : <MediaType>[mediaType!];
+        : <MediaType>[mediaType];
     final discovered = <Movie>[];
     final seenIds = <String>{};
 
@@ -46,7 +43,6 @@ class TmdbService {
         mediaType: type,
         includeGenres: includeGenres,
         excludeGenres: excludeGenres,
-        streamingServices: streamingServices,
         limit: limit - discovered.length,
       );
       for (final movie in entries) {
@@ -66,7 +62,6 @@ class TmdbService {
     required MediaType mediaType,
     required List<String> includeGenres,
     required List<String> excludeGenres,
-    required List<String> streamingServices,
     required int limit,
   }) async {
     if (limit <= 0) {
@@ -78,7 +73,6 @@ class TmdbService {
         mediaType: mediaType,
         includeGenres: includeGenres,
         excludeGenres: excludeGenres,
-        streamingServices: streamingServices,
       ),
     );
 
@@ -98,7 +92,6 @@ class TmdbService {
       final movie = await _hydrateMovie(
         mediaType: mediaType,
         result: result,
-        fallbackServices: streamingServices,
       );
       if (movie != null) {
         movies.add(movie);
@@ -114,7 +107,6 @@ class TmdbService {
   Future<Movie?> _hydrateMovie({
     required MediaType mediaType,
     required Map<String, dynamic> result,
-    required List<String> fallbackServices,
   }) async {
     final tmdbId = result['id']?.toString();
     if (tmdbId == null || tmdbId.isEmpty) {
@@ -126,10 +118,6 @@ class TmdbService {
     final releaseYear = _releaseYearFor(detailJson);
     final runtimeMinutes = _runtimeMinutesFor(detailJson, mediaType);
     final genres = _genresFor(detailJson);
-    final streamingServices = _streamingServicesFor(
-      detailJson,
-      fallbackServices,
-    );
     final trailerUrl = _trailerUrlFor(detailJson, title);
 
     return Movie(
@@ -140,7 +128,6 @@ class TmdbService {
       releaseYear: releaseYear,
       runtimeMinutes: runtimeMinutes,
       genres: genres,
-      streamingServices: streamingServices,
       mediaType: mediaType,
       trailerUrl: trailerUrl,
       score: _voteScoreFor(detailJson),
@@ -166,7 +153,6 @@ class TmdbService {
     required MediaType mediaType,
     required List<String> includeGenres,
     required List<String> excludeGenres,
-    required List<String> streamingServices,
   }) {
     final params = <String, String>{
       'api_key': _apiKey,
@@ -186,12 +172,6 @@ class TmdbService {
       params['without_genres'] = excludeGenreIds.join(',');
     }
 
-    final providerIds = _providerIds(streamingServices);
-    if (providerIds.isNotEmpty) {
-      params['with_watch_providers'] = providerIds.join(',');
-      params['watch_region'] = watchRegion;
-    }
-
     final path = mediaType == MediaType.movie
         ? 'discover/movie'
         : 'discover/tv';
@@ -203,7 +183,7 @@ class TmdbService {
     return _buildUri(path, <String, String>{
       'api_key': _apiKey,
       'language': 'en-US',
-      'append_to_response': 'videos,watch/providers',
+      'append_to_response': 'videos',
     });
   }
 
@@ -296,45 +276,6 @@ class TmdbService {
     return const <String>[];
   }
 
-  List<String> _streamingServicesFor(
-    Map<String, dynamic> json,
-    List<String> fallbackServices,
-  ) {
-    final providersObject = _asMap(json['watch/providers']);
-    final results = _asMap(providersObject?['results']);
-    final regionInfo = _asMap(results?[watchRegion]);
-    if (regionInfo != null) {
-      final collected = <String>{};
-      for (final section in <String>[
-        'flatrate',
-        'free',
-        'ads',
-        'rent',
-        'buy',
-      ]) {
-        final entries = regionInfo[section];
-        if (entries is List) {
-          for (final provider in entries.whereType<Map>()) {
-            final name = provider['provider_name']?.toString();
-            if (name != null && name.isNotEmpty) {
-              collected.add(name.trim());
-            }
-          }
-        }
-      }
-
-      if (collected.isNotEmpty) {
-        return collected.toList(growable: false);
-      }
-    }
-
-    if (fallbackServices.isNotEmpty) {
-      return fallbackServices.toList(growable: false);
-    }
-
-    return const <String>[];
-  }
-
   String _trailerUrlFor(Map<String, dynamic> json, String title) {
     final videosObject = _asMap(json['videos']);
     final results = videosObject?['results'];
@@ -367,14 +308,6 @@ class TmdbService {
   List<int> _genreIds(List<String> genres) {
     return genres
         .map((genre) => _genreIdsByName[genre.trim().toLowerCase()])
-        .whereType<int>()
-        .toSet()
-        .toList(growable: false);
-  }
-
-  List<int> _providerIds(List<String> providers) {
-    return providers
-        .map((provider) => _providerIdsByName[provider.trim().toLowerCase()])
         .whereType<int>()
         .toSet()
         .toList(growable: false);
@@ -440,19 +373,6 @@ class TmdbService {
     53: 'Thriller',
     52: 'War',
     37: 'Western',
-  };
-
-  static const Map<String, int> _providerIdsByName = <String, int>{
-    'amazon prime video': 9,
-    'apple tv+': 350,
-    'disney+': 337,
-    'max': 1899,
-    'netflix': 8,
-    'paramount+': 531,
-    'paramount plus': 531,
-    'peacock': 387,
-    'hulu': 15,
-    'youtube': 192,
   };
 
   String? _releaseDateFor(Map<String, dynamic> json) {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:agreeo/config/backend_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
@@ -14,14 +15,14 @@ class AuthService {
 
   Future<bool> register(String email, String password) async {
     try {
-      print('[AuthService] Registering with backend: $email');
+      debugPrint('[AuthService] Registering with backend: $email');
       final response = await http.post(
         Uri.parse(_config.registerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
 
-      print('[AuthService] Register response: ${response.statusCode}');
+      debugPrint('[AuthService] Register response: ${response.statusCode}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -30,30 +31,30 @@ class AuthService {
 
         if (accessToken != null && refreshToken != null) {
           await _storeTokens(accessToken, refreshToken);
-          print('[AuthService] Registration successful, tokens stored');
+          debugPrint('[AuthService] Registration successful, tokens stored');
           return true;
         }
       } else {
         final error = jsonDecode(response.body);
-        print('[AuthService] Register error: ${error['error']}');
+        debugPrint('[AuthService] Register error: ${error['error']}');
       }
       return false;
     } catch (e) {
-      print('[AuthService] Register exception: $e');
+      debugPrint('[AuthService] Register exception: $e');
       return false;
     }
   }
 
   Future<String?> login(String email, String password) async {
     try {
-      print('[AuthService] Logging in with backend: $email');
+      debugPrint('[AuthService] Logging in with backend: $email');
       final response = await http.post(
         Uri.parse(_config.loginUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
 
-      print('[AuthService] Login response: ${response.statusCode}');
+      debugPrint('[AuthService] Login response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -62,16 +63,16 @@ class AuthService {
 
         if (accessToken != null && refreshToken != null) {
           await _storeTokens(accessToken, refreshToken);
-          print('[AuthService] Login successful, tokens stored');
+          debugPrint('[AuthService] Login successful, tokens stored');
           return accessToken;
         }
       } else {
         final error = jsonDecode(response.body);
-        print('[AuthService] Login error: ${error['error']}');
+        debugPrint('[AuthService] Login error: ${error['error']}');
       }
       return null;
     } catch (e) {
-      print('[AuthService] Login exception: $e');
+      debugPrint('[AuthService] Login exception: $e');
       return null;
     }
   }
@@ -80,7 +81,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshTokenKey);
-    print('[AuthService] Logged out, tokens cleared');
+    debugPrint('[AuthService] Logged out, tokens cleared');
   }
 
   Future<void> _storeTokens(String accessToken, String refreshToken) async {

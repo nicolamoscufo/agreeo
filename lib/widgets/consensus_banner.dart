@@ -21,8 +21,8 @@ class ConsensusBanner extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: <Color>[
-            colorScheme.primary.withOpacity(0.95),
-            colorScheme.tertiary.withOpacity(0.85),
+            colorScheme.primary.withValues(alpha: 0.95),
+            colorScheme.tertiary.withValues(alpha: 0.85),
           ],
         ),
         borderRadius: BorderRadius.circular(22),
@@ -32,7 +32,7 @@ class ConsensusBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.16),
+              color: Colors.white.withValues(alpha: 0.16),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: Colors.white),
@@ -53,7 +53,7 @@ class ConsensusBanner extends StatelessWidget {
                 Text(
                   message,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                   ),
                 ),
               ],

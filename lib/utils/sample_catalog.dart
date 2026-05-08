@@ -10,7 +10,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2024,
     runtimeMinutes: 166,
     genres: <String>['Sci-Fi', 'Adventure', 'Drama'],
-    streamingServices: <String>['Max', 'Prime Video'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Dune+Part+Two+trailer',
@@ -25,7 +24,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2023,
     runtimeMinutes: 118,
     genres: <String>['Drama', 'Comedy', 'Romance'],
-    streamingServices: <String>['Netflix', 'Prime Video'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Inner+Space+movie+trailer',
@@ -40,7 +38,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2022,
     runtimeMinutes: 101,
     genres: <String>['Thriller', 'Mystery'],
-    streamingServices: <String>['Netflix', 'Disney+'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Night+Shift+trailer',
@@ -55,7 +52,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2024,
     runtimeMinutes: 109,
     genres: <String>['Drama', 'Romance'],
-    streamingServices: <String>['Apple TV+', 'Netflix'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Echoes+of+Us+trailer',
@@ -70,7 +66,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2021,
     runtimeMinutes: 127,
     genres: <String>['Action', 'Thriller'],
-    streamingServices: <String>['Prime Video', 'Disney+'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Velocity+Run+trailer',
@@ -85,7 +80,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2024,
     runtimeMinutes: 48,
     genres: <String>['Drama', 'Music'],
-    streamingServices: <String>['Netflix'],
     mediaType: MediaType.series,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Counterpoint+series+trailer',
@@ -100,7 +94,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2023,
     runtimeMinutes: 52,
     genres: <String>['Mystery', 'Sci-Fi'],
-    streamingServices: <String>['Prime Video', 'Max'],
     mediaType: MediaType.series,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Labyrinth+Code+trailer',
@@ -115,7 +108,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2020,
     runtimeMinutes: 95,
     genres: <String>['Comedy', 'Slice of Life'],
-    streamingServices: <String>['Netflix', 'Apple TV+'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Sunlit+Saturdays+trailer',
@@ -130,7 +122,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2022,
     runtimeMinutes: 114,
     genres: <String>['Mystery', 'Thriller'],
-    streamingServices: <String>['Disney+', 'Prime Video'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Midnight+Theory+trailer',
@@ -145,7 +136,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2024,
     runtimeMinutes: 42,
     genres: <String>['Drama', 'Comedy'],
-    streamingServices: <String>['Apple TV+', 'Netflix'],
     mediaType: MediaType.series,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Bloom+Room+series+trailer',
@@ -160,7 +150,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2019,
     runtimeMinutes: 112,
     genres: <String>['Comedy', 'Adventure'],
-    streamingServices: <String>['Prime Video', 'Netflix'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Arcade+Ghosts+trailer',
@@ -175,7 +164,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2023,
     runtimeMinutes: 123,
     genres: <String>['Drama', 'Adventure'],
-    streamingServices: <String>['Max', 'Apple TV+'],
     mediaType: MediaType.movie,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Horizon+After+Dark+trailer',
@@ -190,7 +178,6 @@ final List<Movie> demoMovieCatalog = <Movie>[
     releaseYear: 2021,
     runtimeMinutes: 44,
     genres: <String>['Drama', 'Mystery'],
-    streamingServices: <String>['Netflix', 'Disney+'],
     mediaType: MediaType.series,
     trailerUrl:
         'https://www.youtube.com/results?search_query=Noise+Floor+series+trailer',

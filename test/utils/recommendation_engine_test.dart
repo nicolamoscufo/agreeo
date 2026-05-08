@@ -6,7 +6,6 @@ Movie _movie({
   required String id,
   required String title,
   required List<String> genres,
-  required List<String> services,
   double score = 7.0,
 }) {
   return Movie(
@@ -17,7 +16,6 @@ Movie _movie({
     releaseYear: 2026,
     runtimeMinutes: 120,
     genres: genres,
-    streamingServices: services,
     mediaType: MediaType.movie,
     trailerUrl: 'https://www.youtube.com/watch?v=$id',
     score: score,
@@ -30,7 +28,6 @@ void main() {
   test('buildDailyQueue excludes seen and disliked titles', () {
     final preferences = UserPreferences.initial().copyWith(
       favoriteGenres: <String>['Drama'],
-      streamingServices: <String>['Netflix'],
       onboardingComplete: true,
     );
 
@@ -39,21 +36,18 @@ void main() {
         id: 'match',
         title: 'Match',
         genres: <String>['Drama'],
-        services: <String>['Netflix'],
         score: 8.0,
       ),
       _movie(
         id: 'seen',
         title: 'Seen',
         genres: <String>['Drama'],
-        services: <String>['Netflix'],
         score: 10.0,
       ),
       _movie(
         id: 'disliked',
         title: 'Disliked',
         genres: <String>['Drama'],
-        services: <String>['Netflix'],
         score: 9.0,
       ),
     ];
@@ -92,21 +86,18 @@ void main() {
             id: 'first',
             title: 'First',
             genres: <String>['Drama'],
-            services: <String>['Netflix'],
             score: 7.0,
           ),
           _movie(
             id: 'second',
             title: 'Second',
             genres: <String>['Drama'],
-            services: <String>['Netflix'],
             score: 9.0,
           ),
           _movie(
             id: 'excluded',
             title: 'Excluded',
             genres: <String>['Horror'],
-            services: <String>['Netflix'],
             score: 10.0,
           ),
         ],
@@ -126,10 +117,6 @@ void main() {
         ],
         votes: const <EventVote>[],
         memberIds: const <String>['user-1', 'user-2'],
-        memberServices: <String, List<String>>{
-          'user-1': <String>['Netflix'],
-          'user-2': <String>['Netflix'],
-        },
         constraints: EventConstraints(
           groupId: 'group-1',
           format: MediaType.movie,

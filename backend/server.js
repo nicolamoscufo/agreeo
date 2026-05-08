@@ -2,8 +2,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const authController = require('./authController');
-const preferencesController = require('./preferencesController');
-const { verifyMiddleware, verifyRefresh } = require('./jwtUtils');
+const neo4jService = require('./neo4jService');
+const { verifyMiddleware } = require('./jwtUtils');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -26,9 +26,18 @@ app.post('/auth/refresh', (req, res) => {
 app.get('/me', verifyMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
-// User Preferences endpoints
-app.post('/user/:uid/preferences', verifyMiddleware, preferencesController.updateUserPreferences);
-app.get('/user/:uid/preferences', verifyMiddleware, preferencesController.getUserPreferences);
+
+app.get('/health/db', async (_, res) => {
+  try {
+    await neo4jService.verifyConnection();
+    res.status(200).json({ ok: true, neo4jUri: neo4jService.uri });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
 
 
 app.listen(port, () => console.log(`Auth server listening on port ${port}`));

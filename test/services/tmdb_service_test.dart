@@ -10,7 +10,6 @@ void main() {
   test('discoverCatalog hydrates TMDb responses into app movies', () async {
     final client = MockClient((request) async {
       if (request.url.path.endsWith('/discover/movie')) {
-        expect(request.url.queryParameters['with_watch_providers'], '8');
         return http.Response(
           jsonEncode(<String, dynamic>{
             'results': <Map<String, dynamic>>[
@@ -32,7 +31,7 @@ void main() {
       if (request.url.path.endsWith('/movie/603')) {
         expect(
           request.url.queryParameters['append_to_response'],
-          'videos,watch/providers',
+          'videos',
         );
         return http.Response(
           jsonEncode(<String, dynamic>{
@@ -56,15 +55,6 @@ void main() {
                 },
               ],
             },
-            'watch/providers': <String, dynamic>{
-              'results': <String, dynamic>{
-                'US': <String, dynamic>{
-                  'flatrate': <Map<String, dynamic>>[
-                    <String, dynamic>{'provider_name': 'Netflix'},
-                  ],
-                },
-              },
-            },
           }),
           200,
         );
@@ -83,7 +73,6 @@ void main() {
       mediaType: MediaType.movie,
       includeGenres: <String>['Action'],
       excludeGenres: const <String>[],
-      streamingServices: <String>['Netflix'],
       limit: 1,
     );
 
@@ -93,7 +82,6 @@ void main() {
     expect(movie.title, 'The Matrix');
     expect(movie.posterUrl, startsWith('https://image.tmdb.org/t/p/w780'));
     expect(movie.runtimeMinutes, 136);
-    expect(movie.streamingServices, contains('Netflix'));
     expect(movie.trailerUrl, contains('youtube.com/watch?v=vKQi3bBA1y8'));
   });
 }

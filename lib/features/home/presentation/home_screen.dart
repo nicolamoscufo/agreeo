@@ -1,0 +1,268 @@
+import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
+import 'package:agreeo/shared/components/filter_bottom_sheet.dart';
+import 'package:agreeo/shared/components/movie_widgets.dart';
+import 'package:agreeo/shared/components/primitives.dart';
+import 'package:agreeo/shared/mock_data/mock_movies.dart';
+import 'package:agreeo/shared/models/agreeo_models.dart';
+import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class AgreeoHomeScreen extends ConsumerStatefulWidget {
+  const AgreeoHomeScreen({super.key});
+
+  @override
+  ConsumerState<AgreeoHomeScreen> createState() => _AgreeoHomeScreenState();
+}
+
+class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  MovieSearchFilters _filters = const MovieSearchFilters();
+  String _activeQuickFilter = 'Any';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(agreeoAppControllerProvider);
+    final session = state.session;
+    final query = _searchController.text.trim().toLowerCase();
+
+    final recommended = _applyFilters(state.remainingDailySuggestions, query);
+    final trending = _applyFilters(_buildTrending(state.catalog), query);
+    final friends = _applyFilters(
+      state.moviesByIds(mockPopularWithFriendsIds),
+      query,
+    );
+    final platforms = _applyFilters(
+      state.catalog
+          .where(
+            (movie) => movie.providers.any(
+              state.profilePreferences.streamingPlatforms.contains,
+            ),
+          )
+          .toList(growable: false),
+      query,
+    );
+    final shortTonight = _applyFilters(
+      state.catalog
+          .where((movie) => movie.runtime <= 110)
+          .toList(growable: false),
+      query,
+    );
+    final searchResults = _applyFilters(state.catalog, query);
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[Color(0xFF08111F), Color(0xFF0B1120), Color(0xFF111827)],
+        ),
+      ),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 120),
+          children: <Widget>[
+            Text(
+              'Hi, ${session?.displayName ?? 'there'}',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.8,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'What should we discover today?',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 18),
+            AgreeoSearchBar(
+              controller: _searchController,
+              hintText: 'Search a title, genre, or vibe',
+              onChanged: (_) => setState(() {}),
+              trailing: IconButton.filledTonal(
+                onPressed: () async {
+                  final updated = await showMovieFilterBottomSheet(
+                    context,
+                    initialFilters: _filters,
+                    genres: agreeoGenreOptions,
+                    providers: agreeoPlatforms,
+                  );
+                  if (updated != null) {
+                    setState(() {
+                      _filters = updated;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.tune_rounded),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 42,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: <Widget>[
+                  _quickChip('Any', null),
+                  _quickChip(
+                    'Movies',
+                    const MovieSearchFilters(mediaType: CatalogMediaType.movie),
+                  ),
+                  _quickChip(
+                    'TV Series',
+                    const MovieSearchFilters(mediaType: CatalogMediaType.tv),
+                  ),
+                  _quickChip(
+                    'Under 2h',
+                    const MovieSearchFilters(maxRuntimeMinutes: 120),
+                  ),
+                  _quickChip(
+                    'Sci-Fi',
+                    const MovieSearchFilters(genre: 'Sci-Fi'),
+                  ),
+                  _quickChip(
+                    'Comedy',
+                    const MovieSearchFilters(genre: 'Comedy'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            if (query.isNotEmpty || _filters.hasActiveFilters)
+              _CollectionSection(
+                title: query.isNotEmpty ? 'Search results' : 'Filtered picks',
+                subtitle: query.isNotEmpty
+                    ? 'A tighter slice of the catalog for your current search.'
+                    : 'The catalog after your current discovery filters.',
+                movies: searchResults,
+              )
+            else ...<Widget>[
+              _CollectionSection(
+                title: 'Recommended for you',
+                subtitle: 'Based on your favorite genres and saved taste profile.',
+                movies: recommended,
+              ),
+              const SizedBox(height: 22),
+              _CollectionSection(
+                title: 'Trending now',
+                subtitle: 'Fresh, high-heat picks for a low-friction start.',
+                movies: trending,
+              ),
+              const SizedBox(height: 22),
+              _CollectionSection(
+                title: 'Popular with your friends',
+                subtitle: 'A social placeholder for titles your circle keeps circling back to.',
+                movies: friends,
+              ),
+              const SizedBox(height: 22),
+              _CollectionSection(
+                title: 'Available on your platforms',
+                subtitle: 'Filtered to the services in your profile preferences.',
+                movies: platforms,
+              ),
+              const SizedBox(height: 22),
+              _CollectionSection(
+                title: 'Short movies for tonight',
+                subtitle: 'Good when the group wants something strong without a long runtime.',
+                movies: shortTonight,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quickChip(String label, MovieSearchFilters? filters) {
+    final selected = _activeQuickFilter == label;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: SelectableChip(
+        label: label,
+        selected: selected,
+        onTap: () {
+          setState(() {
+            if (selected || filters == null) {
+              _activeQuickFilter = 'Any';
+              _filters = const MovieSearchFilters();
+            } else {
+              _activeQuickFilter = label;
+              _filters = filters;
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  List<Movie> _buildTrending(List<Movie> catalog) {
+    final items = List<Movie>.from(catalog)
+      ..sort((left, right) {
+        final yearCompare = right.releaseYear.compareTo(left.releaseYear);
+        if (yearCompare != 0) {
+          return yearCompare;
+        }
+        return right.rating.compareTo(left.rating);
+      });
+    return items.take(10).toList(growable: false);
+  }
+
+  List<Movie> _applyFilters(List<Movie> movies, String query) {
+    final filtered = movies.where((movie) {
+      final matchesSearch = query.isEmpty ||
+          movie.title.toLowerCase().contains(query) ||
+          movie.genres.any((genre) => genre.toLowerCase().contains(query));
+      return matchesSearch && _filters.matches(movie);
+    }).toList(growable: false);
+
+    return filtered;
+  }
+}
+
+class _CollectionSection extends StatelessWidget {
+  const _CollectionSection({
+    required this.title,
+    required this.subtitle,
+    required this.movies,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Movie> movies;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SectionHeader(title: title, subtitle: subtitle),
+        const SizedBox(height: 14),
+        if (movies.isEmpty)
+          const EmptyState(
+            icon: Icons.movie_filter_rounded,
+            title: 'No picks match that filter',
+            message:
+                'Try relaxing one filter or switch back to a broader discovery view.',
+          )
+        else
+          MovieHorizontalCarousel(
+            movies: movies,
+            onMovieTap: (movie) {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}

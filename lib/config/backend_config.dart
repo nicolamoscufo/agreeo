@@ -12,5 +12,4 @@ class BackendConfig {
   String get loginUrl => '$baseUrl/auth/login';
   String get refreshUrl => '$baseUrl/auth/refresh';
   String get meUrl => '$baseUrl/me';
-  String preferencesUrl(String uid) => '$baseUrl/user/$uid/preferences';
 }

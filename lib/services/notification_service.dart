@@ -20,17 +20,15 @@ class NotificationService {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-    // Uso esplicito e corretto dei parametri richiesti dal plugin.
     const initSettings = InitializationSettings(
-        android: androidSettings, 
-        iOS: IOSInitializationSettings()
+      android: androidSettings,
+      iOS: IOSInitializationSettings(),
     );
 
     try {
-
+      await _localNotifications.initialize(settings: initSettings);
     } catch (e) {
-        // Utilizzo di log o un meccanismo di gestione degli errori più sofisticato per il codice in produzione.
-        // Mantenuto qui solo come placeholder del debug mode.
+      // Ignore local notification init failures during prototype startup.
     }
 
     // Local notifications only; skip push permissions
@@ -56,25 +54,25 @@ class NotificationService {
     required String body,
   }) async {
     try {
-        const details = NotificationDetails(
-          android: AndroidNotificationDetails(
-            'agreeo_updates',
-            'Agreeo Updates',
-            channelDescription: 'Group events and recommendation reminders',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-        );
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          'agreeo_updates',
+          'Agreeo Updates',
+          channelDescription: 'Group events and recommendation reminders',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      );
 
-        // Chiamata esplicita di show con tutti i parametri nomeati e tipi corretti.
-        await _localNotifications.show(
-            id: id, 
-            title: title, 
-            body: body, 
-            payload: null, 
-            notificationDetails: details); 
+      await _localNotifications.show(
+        id: id,
+        title: title,
+        body: body,
+        payload: null,
+        notificationDetails: details,
+      );
     } catch (e) {
-        // Gestione dell'errore senza log print per aderire ai standard di produzione.
+      // Ignore local notification failures during prototype runs.
     }
   }
 }

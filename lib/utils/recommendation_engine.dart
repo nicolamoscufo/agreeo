@@ -47,22 +47,11 @@ class RecommendationEngine {
     final scoredMovies = catalog
         .where((movie) => !excludedIds.contains(movie.id))
         .map((movie) {
-          // HIGH PRIORITY: Group Streaming Filters requirement
-          // Only show content available on user's subscribed platforms
-          final serviceMatches = movie.streamingServices
-              .where(preferences.streamingServices.contains)
-              .length;
-          if (serviceMatches == 0) {
-            // Movie not available on any user's service → exclude from daily queue
-            return movie.copyWith(score: -9999.0);
-          }
-
           final genreMatches = movie.genres
               .where(preferences.favoriteGenres.contains)
               .length;
-
+          
           final genreScore = genreMatches * 4.5;
-          final serviceScore = serviceMatches * 3.5;
           final ratingScore = movie.score;
 
           // Boost recent content (within last 1 year)
@@ -75,15 +64,12 @@ class RecommendationEngine {
 
           final score =
               genreScore +
-              serviceScore +
               ratingScore +
               recencyBoost +
               explorationBonus;
 
           return movie.copyWith(score: score);
-        })
-        .where((m) => m.score > -9999.0) // Filter out unavailable movies
-        .toList();
+        }).toList();
 
     // Sort by score descending, then alphabetically for determinism
     scoredMovies.sort((left, right) {
@@ -101,7 +87,6 @@ class RecommendationEngine {
   ///
   /// Implements STN 5.2 (Organize a Movie Night) flow:
   /// - Applies group constraints (format, genres, duration)
-  /// - HIGH PRIORITY: Filters by shared streaming platforms across all group members
   /// - Combines individual feedback to surface fair group consensus options
   /// - Supports voting mechanism for final selection
   ///
@@ -111,18 +96,11 @@ class RecommendationEngine {
     required List<MovieFeedbackRecord> feedback,
     required List<EventVote> votes,
     required List<String> memberIds,
-    required Map<String, List<String>> memberServices,
     required EventConstraints constraints,
     DateTime? today,
     int limit = 6,
   }) {
-    // Step 1: Identify shared platforms across group members
-    // This is a HIGH PRIORITY requirement from document section 4.5.2
-    final sharedServices = _sharedServices(
-      memberServices.values.toList(growable: false),
-    );
-
-    // Step 2: Build vote tally for consensus tracking
+    // Step 1: Build vote tally for consensus tracking
     final voteByMovie = <String, _VoteTally>{};
     for (final vote in votes) {
       voteByMovie
@@ -130,7 +108,7 @@ class RecommendationEngine {
           .register(vote.choice);
     }
 
-    // Step 3: Index feedback by member for group-wide scoring
+    // Step 2: Index feedback by member for group-wide scoring
     final memberFeedback = feedback
         .where((record) => memberIds.contains(record.userId))
         .toList(growable: false);
@@ -161,15 +139,7 @@ class RecommendationEngine {
         continue;
       }
 
-      // Constraint 5: HIGH PRIORITY - Shared streaming platforms
-      // Document 4.5.2: "Group Streaming Filters: Integration of filters to show
-      // only content available on the group's shared platforms"
-      if (sharedServices.isNotEmpty &&
-          !movie.streamingServices.any(sharedServices.contains)) {
-        continue;
-      }
-
-      // Step 4: Score based on group feedback and consensus signals
+      // Step 3: Score based on group feedback and consensus signals
 
       // Count positive signals from group members
       final likes = memberFeedback
@@ -267,42 +237,6 @@ class RecommendationEngine {
     }
   }
 
-  /// Calculates shared platforms across group members
-  /// Used for HIGH PRIORITY: Group Streaming Filters requirement
-  ///
-  /// Logic:
-  /// 1. If any member has no subscriptions → return all services (assume no filter)
-  /// 2. Otherwise → return intersection of all non-empty service lists
-  /// 3. Fallback → return union of all services if no overlap
-  List<String> _sharedServices(List<List<String>> servicesByMember) {
-    if (servicesByMember.isEmpty) {
-      return const <String>[];
-    }
-
-    final nonEmpty = servicesByMember
-        .where((services) => services.isNotEmpty)
-        .toList(growable: false);
-    if (nonEmpty.isEmpty) {
-      return const <String>[];
-    }
-
-    // Try to find intersection (strict: all members must have service)
-    final shared = nonEmpty.first.toSet();
-    for (final services in nonEmpty.skip(1)) {
-      shared.retainAll(services);
-    }
-
-    if (shared.isNotEmpty) {
-      return shared.toList(growable: false);
-    }
-
-    // Fallback: if no perfect intersection, return union of all services
-    // This allows flexibility when group has diverse subscriptions
-    return nonEmpty
-        .expand((services) => services)
-        .toSet()
-        .toList(growable: false);
-  }
 }
 
 class _VoteTally {

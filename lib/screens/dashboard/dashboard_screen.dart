@@ -21,7 +21,6 @@ class DashboardScreen extends ConsumerWidget {
     final currentUser = state.session;
     final activeEvent = state.activeEvent;
     final activeGroup = state.activeGroup;
-    final movieOfTheDay = state.movieOfTheDay;
 
     return GradientScaffold(
       child: ListView(
@@ -205,7 +204,7 @@ class _ActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Material(
-      color: colorScheme.surfaceContainerHighest.withOpacity(0.55),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -254,7 +253,7 @@ class _GroupSummary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.65),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(

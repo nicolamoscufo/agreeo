@@ -1,8 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
-
-String _encodeList(List<String> values) => jsonEncode(values);
 List<String> _decodeList(Object? value) {
   if (value is List) {
     return value.map((item) => item.toString()).toList(growable: false);
@@ -121,14 +118,12 @@ class AppSession {
 class UserPreferences {
   const UserPreferences({
     required this.favoriteGenres,
-    required this.streamingServices,
     required this.dailyRecommendationsEnabled,
     required this.onboardingComplete,
     required this.darkModeEnabled,
   });
 
   final List<String> favoriteGenres;
-  final List<String> streamingServices;
   final bool dailyRecommendationsEnabled;
   final bool onboardingComplete;
   final bool darkModeEnabled;
@@ -136,7 +131,6 @@ class UserPreferences {
   factory UserPreferences.initial() {
     return const UserPreferences(
       favoriteGenres: <String>[],
-      streamingServices: <String>[],
       dailyRecommendationsEnabled: true,
       onboardingComplete: false,
       darkModeEnabled: false,
@@ -145,14 +139,12 @@ class UserPreferences {
 
   UserPreferences copyWith({
     List<String>? favoriteGenres,
-    List<String>? streamingServices,
     bool? dailyRecommendationsEnabled,
     bool? onboardingComplete,
     bool? darkModeEnabled,
   }) {
     return UserPreferences(
       favoriteGenres: favoriteGenres ?? this.favoriteGenres,
-      streamingServices: streamingServices ?? this.streamingServices,
       dailyRecommendationsEnabled:
           dailyRecommendationsEnabled ?? this.dailyRecommendationsEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
@@ -162,7 +154,6 @@ class UserPreferences {
 
   Map<String, dynamic> toJson() => {
     'favoriteGenres': favoriteGenres,
-    'streamingServices': streamingServices,
     'dailyRecommendationsEnabled': dailyRecommendationsEnabled,
     'onboardingComplete': onboardingComplete,
     'darkModeEnabled': darkModeEnabled,
@@ -171,7 +162,6 @@ class UserPreferences {
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
     return UserPreferences(
       favoriteGenres: json.listOf('favoriteGenres'),
-      streamingServices: json.listOf('streamingServices'),
       dailyRecommendationsEnabled: json['dailyRecommendationsEnabled'] != false,
       onboardingComplete: json['onboardingComplete'] == true,
       darkModeEnabled: json['darkModeEnabled'] == true,
@@ -188,7 +178,6 @@ class Movie {
     required this.releaseYear,
     required this.runtimeMinutes,
     required this.genres,
-    required this.streamingServices,
     required this.mediaType,
     required this.trailerUrl,
     required this.score,
@@ -201,7 +190,6 @@ class Movie {
   final int releaseYear;
   final int runtimeMinutes;
   final List<String> genres;
-  final List<String> streamingServices;
   final MediaType mediaType;
   final String trailerUrl;
   final double score;
@@ -217,7 +205,6 @@ class Movie {
     int? releaseYear,
     int? runtimeMinutes,
     List<String>? genres,
-    List<String>? streamingServices,
     MediaType? mediaType,
     String? trailerUrl,
     double? score,
@@ -230,7 +217,6 @@ class Movie {
       releaseYear: releaseYear ?? this.releaseYear,
       runtimeMinutes: runtimeMinutes ?? this.runtimeMinutes,
       genres: genres ?? this.genres,
-      streamingServices: streamingServices ?? this.streamingServices,
       mediaType: mediaType ?? this.mediaType,
       trailerUrl: trailerUrl ?? this.trailerUrl,
       score: score ?? this.score,
@@ -245,7 +231,6 @@ class Movie {
     'releaseYear': releaseYear,
     'runtimeMinutes': runtimeMinutes,
     'genres': genres,
-    'streamingServices': streamingServices,
     'mediaType': mediaType.name,
     'trailerUrl': trailerUrl,
     'score': score,
@@ -261,7 +246,6 @@ class Movie {
           (json['releaseYear'] as num?)?.toInt() ?? DateTime.now().year,
       runtimeMinutes: (json['runtimeMinutes'] as num?)?.toInt() ?? 0,
       genres: _decodeList(json['genres']),
-      streamingServices: _decodeList(json['streamingServices']),
       mediaType: MediaTypeX.fromJson(json['mediaType']),
       trailerUrl: json['trailerUrl']?.toString() ?? '',
       score: (json['score'] as num?)?.toDouble() ?? 0,
@@ -306,7 +290,6 @@ class MovieGroup {
     required this.inviteCode,
     required this.ownerId,
     required this.memberIds,
-    required this.memberServices,
     required this.sharedWatchlist,
     required this.createdAt,
   });
@@ -316,7 +299,6 @@ class MovieGroup {
   final String inviteCode;
   final String ownerId;
   final List<String> memberIds;
-  final Map<String, List<String>> memberServices;
   final List<Movie> sharedWatchlist;
   final DateTime createdAt;
 
@@ -326,7 +308,6 @@ class MovieGroup {
     String? inviteCode,
     String? ownerId,
     List<String>? memberIds,
-    Map<String, List<String>>? memberServices,
     List<Movie>? sharedWatchlist,
     DateTime? createdAt,
   }) {
@@ -336,7 +317,6 @@ class MovieGroup {
       inviteCode: inviteCode ?? this.inviteCode,
       ownerId: ownerId ?? this.ownerId,
       memberIds: memberIds ?? this.memberIds,
-      memberServices: memberServices ?? this.memberServices,
       sharedWatchlist: sharedWatchlist ?? this.sharedWatchlist,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -348,20 +328,11 @@ class MovieGroup {
     'inviteCode': inviteCode,
     'ownerId': ownerId,
     'memberIds': memberIds,
-    'memberServices': memberServices.map((key, value) => MapEntry(key, value)),
     'sharedWatchlist': sharedWatchlist.map((movie) => movie.toJson()).toList(),
     'createdAt': _encodeDateTime(createdAt),
   };
 
   factory MovieGroup.fromJson(Map<String, dynamic> json) {
-    final rawMemberServices = json['memberServices'];
-    final services = <String, List<String>>{};
-    if (rawMemberServices is Map) {
-      rawMemberServices.forEach((key, value) {
-        services[key.toString()] = _decodeList(value);
-      });
-    }
-
     final rawWatchlist = json['sharedWatchlist'];
     final watchlist = <Movie>[];
     if (rawWatchlist is List) {
@@ -380,7 +351,6 @@ class MovieGroup {
       inviteCode: json['inviteCode']?.toString() ?? '',
       ownerId: json['ownerId']?.toString() ?? '',
       memberIds: _decodeList(json['memberIds']),
-      memberServices: services,
       sharedWatchlist: watchlist,
       createdAt: _decodeDateTime(json['createdAt']),
     );

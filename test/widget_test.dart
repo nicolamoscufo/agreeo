@@ -5,28 +5,31 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:agreeo/app.dart';
 
 void main() {
   testWidgets('renders the auth landing screen', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
     await tester.pumpWidget(const ProviderScope(child: AgreeoApp()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Agreeo'), findsOneWidget);
-    expect(find.text('Welcome back'), findsOneWidget);
-    expect(find.text('Sign In'), findsWidgets);
-
-    await tester.scrollUntilVisible(
-      find.text("Don't have an account? Sign Up"),
-      300,
-      scrollable: find.byType(Scrollable).first,
+    expect(
+      find.text('Spend less time choosing. More time watching.'),
+      findsOneWidget,
     );
-    await tester.tap(find.text("Don't have an account? Sign Up"));
+    expect(find.text('Sign up'), findsOneWidget);
+    expect(find.text('Log in'), findsOneWidget);
+
+    await tester.tap(find.text('Sign up'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Create your account'), findsOneWidget);
+    expect(find.text('Create your Agreeo profile'), findsOneWidget);
   });
 }

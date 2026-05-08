@@ -49,8 +49,7 @@ class WatchlistScreen extends ConsumerWidget {
                           .toggleSavedWatchlist(movie, add: false),
                     ),
                   ),
-                )
-                .toList(growable: false),
+                ),
           const SizedBox(height: 18),
           SectionHeader(
             title: 'Shared groups',
@@ -237,8 +236,8 @@ class _GroupCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: active
-              ? colorScheme.primaryContainer.withOpacity(0.55)
-              : colorScheme.surfaceContainerHighest.withOpacity(0.62),
+              ? colorScheme.primaryContainer.withValues(alpha: 0.55)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.62),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: active ? colorScheme.primary : Colors.transparent,

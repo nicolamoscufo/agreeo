@@ -1,7 +1,6 @@
 import 'package:agreeo/providers/app_controller.dart';
 import 'package:agreeo/screens/onboarding/onboarding_screen.dart';
 import 'package:agreeo/screens/home/home_shell.dart';
-import 'package:agreeo/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,19 +32,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Verify local auth first
-      final authService = AuthService();
-      final token = await authService.login(email, password);
-
-      if (token == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid email or password.')),
-        );
-        return;
-      }
-
-      // Login with sync to Neo4j
       final success = await appController.loginWithEmail(email, password);
 
       if (!mounted) return;
@@ -94,7 +80,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withOpacity(0.45),
+                        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
                         borderRadius: BorderRadius.circular(28),
                       ),
                       child: Column(

@@ -19,7 +19,6 @@ class _FakeTmdbService extends TmdbService {
     MediaType? mediaType,
     required List<String> includeGenres,
     required List<String> excludeGenres,
-    required List<String> streamingServices,
     int limit = 20,
   }) async {
     return catalog;
@@ -30,7 +29,6 @@ Movie _movie({
   required String id,
   required String title,
   required List<String> genres,
-  required List<String> services,
   double score = 7.0,
 }) {
   return Movie(
@@ -41,7 +39,6 @@ Movie _movie({
     releaseYear: 2026,
     runtimeMinutes: 120,
     genres: genres,
-    streamingServices: services,
     mediaType: MediaType.movie,
     trailerUrl: 'https://www.youtube.com/watch?v=$id',
     score: score,
@@ -56,7 +53,6 @@ void main() {
           id: 'tmdb-match',
           title: 'TMDb Match',
           genres: <String>['Drama'],
-          services: <String>['Netflix'],
           score: 8.9,
         ),
       ]),
@@ -72,7 +68,6 @@ void main() {
       ),
       preferences: UserPreferences.initial().copyWith(
         favoriteGenres: <String>['Drama'],
-        streamingServices: <String>['Netflix'],
         onboardingComplete: true,
       ),
       feedback: const <MovieFeedbackRecord>[],
