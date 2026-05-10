@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 
 class Neo4jConfig {
   const Neo4jConfig({
@@ -14,10 +17,21 @@ class Neo4jConfig {
   final String database;
 
   factory Neo4jConfig.fromEnv() {
-    return const Neo4jConfig(
-      uri: 'http://localhost:7475',
-      username: 'neo4j',
-      password: 'password',
+    const configuredUri = String.fromEnvironment('NEO4J_HTTP_URI');
+    const configuredUsername = String.fromEnvironment('NEO4J_USERNAME');
+    const configuredPassword = String.fromEnvironment('NEO4J_PASSWORD');
+    const configuredDatabase = String.fromEnvironment('NEO4J_DATABASE');
+
+    String host = 'localhost';
+    if (!kIsWeb && Platform.isAndroid) {
+      host = '10.0.2.2';
+    }
+
+    return Neo4jConfig(
+      uri: configuredUri.isNotEmpty ? configuredUri : 'http://$host:7474',
+      username: configuredUsername.isNotEmpty ? configuredUsername : 'neo4j',
+      password: configuredPassword.isNotEmpty ? configuredPassword : 'password',
+      database: configuredDatabase.isNotEmpty ? configuredDatabase : 'neo4j',
     );
   }
 

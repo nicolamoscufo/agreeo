@@ -1,4 +1,6 @@
 import 'package:agreeo/providers/app_controller.dart';
+import 'package:agreeo/screens/home/home_shell.dart';
+import 'package:agreeo/screens/onboarding/onboarding_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,29 +38,35 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       try {
         final email = _emailController.text.trim();
         final password = _passwordController.text;
+        final displayName = _nameController.text.trim();
 
-        final registered = await appController.authService.register(
+        final registered = await appController.registerWithEmail(
           email,
           password,
+          displayName: displayName,
         );
         if (!registered) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Email already registered.')),
+            const SnackBar(
+              content: Text('Unable to create the account. Please try again.'),
+            ),
           );
           return;
         }
 
-        await appController.createOrUpdateSession(
-          displayName: _nameController.text.trim(),
-          email: email,
-          isGuest: false,
-        );
-
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully!')),
-        );
+        final hasCompletedOnboarding = ref
+            .read(appControllerProvider)
+            .onboardingComplete;
+
+        final destination = hasCompletedOnboarding
+            ? const HomeShell()
+            : const OnboardingScreen();
+
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (context) => destination));
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -87,7 +95,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer.withValues(alpha: 0.45),
+                        color: colorScheme.secondaryContainer.withValues(
+                          alpha: 0.45,
+                        ),
                         borderRadius: BorderRadius.circular(28),
                       ),
                       child: Column(

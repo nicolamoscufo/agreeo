@@ -79,18 +79,16 @@ class AgreeoAppState {
   int get watchlistCount =>
       movieStates.values.where((state) => state.inWatchlist).length;
 
-  int get likedCount =>
-      movieStates.values
-          .where((state) => state.preference == MoviePreference.liked)
-          .length;
+  int get likedCount => movieStates.values
+      .where((state) => state.preference == MoviePreference.liked)
+      .length;
 
   int get watchedCount =>
       movieStates.values.where((state) => state.watched).length;
 
-  int get hiddenCount =>
-      movieStates.values
-          .where((state) => state.preference == MoviePreference.disliked)
-          .length;
+  int get hiddenCount => movieStates.values
+      .where((state) => state.preference == MoviePreference.disliked)
+      .length;
 
   int get reviewCount =>
       movieStates.values.where((state) => state.hasReview).length;
@@ -177,7 +175,8 @@ class AgreeoAppState {
       catalog: const <Movie>[],
       movieStates: movieStateItems,
       undoStack: undoItems,
-      dailySuggestionIds: (json['dailySuggestionIds'] as List?)
+      dailySuggestionIds:
+          (json['dailySuggestionIds'] as List?)
               ?.map((value) => value.toString())
               .toList(growable: false) ??
           const <String>[],
@@ -215,9 +214,9 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       if (decoded is Map<String, dynamic>) {
         state = AgreeoAppState.fromJson(decoded).copyWith(catalog: catalog);
       } else if (decoded is Map) {
-        state = AgreeoAppState.fromJson(decoded.cast<String, dynamic>()).copyWith(
-          catalog: catalog,
-        );
+        state = AgreeoAppState.fromJson(
+          decoded.cast<String, dynamic>(),
+        ).copyWith(catalog: catalog);
       } else {
         state = state.copyWith(hydrated: true, catalog: catalog);
       }
@@ -253,10 +252,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     await _persist();
   }
 
-  Future<void> logIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> logIn({required String email, required String password}) async {
     final session = await _authService.logIn(email: email, password: password);
     state = state.copyWith(
       session: session,
@@ -270,6 +266,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   }
 
   Future<void> logOut() async {
+    await _authService.logOut();
     state = AgreeoAppState.initial().copyWith(
       hydrated: true,
       catalog: state.catalog,
@@ -343,13 +340,16 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     state = state.copyWith(
       profilePreferences: state.profilePreferences.copyWith(
         showWatchedToFriends:
-            showWatchedToFriends ?? state.profilePreferences.showWatchedToFriends,
+            showWatchedToFriends ??
+            state.profilePreferences.showWatchedToFriends,
         showLikedToFriends:
             showLikedToFriends ?? state.profilePreferences.showLikedToFriends,
-        showWatchlistToFriends: showWatchlistToFriends ??
+        showWatchlistToFriends:
+            showWatchlistToFriends ??
             state.profilePreferences.showWatchlistToFriends,
         showReviewsToFriends:
-            showReviewsToFriends ?? state.profilePreferences.showReviewsToFriends,
+            showReviewsToFriends ??
+            state.profilePreferences.showReviewsToFriends,
       ),
     );
     await _persist();
@@ -363,12 +363,14 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   }) async {
     state = state.copyWith(
       profilePreferences: state.profilePreferences.copyWith(
-        dailySuggestionReminder: dailySuggestionReminder ??
+        dailySuggestionReminder:
+            dailySuggestionReminder ??
             state.profilePreferences.dailySuggestionReminder,
         movieNightInvites:
             movieNightInvites ?? state.profilePreferences.movieNightInvites,
         votingStarted: votingStarted ?? state.profilePreferences.votingStarted,
-        finalDecisionReached: finalDecisionReached ??
+        finalDecisionReached:
+            finalDecisionReached ??
             state.profilePreferences.finalDecisionReached,
       ),
     );
@@ -377,7 +379,11 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
   Future<String> likeMovie(String movieId) async {
     return _applyMutation(
-      _userMovieStateService.likeMovie(state.movieStates, state.undoStack, movieId),
+      _userMovieStateService.likeMovie(
+        state.movieStates,
+        state.undoStack,
+        movieId,
+      ),
     );
   }
 
@@ -491,8 +497,9 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       favoriteMovieIds: state.onboarding.favoriteMovieIds,
     );
     state = state.copyWith(
-      dailySuggestionIds:
-          suggestions.map((movie) => movie.id).toList(growable: false),
+      dailySuggestionIds: suggestions
+          .map((movie) => movie.id)
+          .toList(growable: false),
     );
   }
 

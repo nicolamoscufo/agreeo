@@ -7,6 +7,11 @@ class BackendConfig {
   final String baseUrl;
 
   factory BackendConfig.fromEnv() {
+    const configuredBaseUrl = String.fromEnvironment('BACKEND_BASE_URL');
+    if (configuredBaseUrl.isNotEmpty) {
+      return const BackendConfig(baseUrl: configuredBaseUrl);
+    }
+
     // Dev: local Node.js server (use 10.0.2.2 for Android Emulator, otherwise localhost)
     String host = 'localhost';
     if (!kIsWeb && Platform.isAndroid) {

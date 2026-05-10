@@ -6,7 +6,6 @@ import 'package:agreeo/models/app_models.dart';
 import 'package:agreeo/services/backend_service.dart';
 import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/services/auth_service.dart';
-import 'package:flutter/foundation.dart';
 import 'package:agreeo/utils/recommendation_engine.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -248,8 +247,16 @@ class AppController extends StateNotifier<AppState> {
     await regenerateDailyQueue();
   }
 
-  Future<bool> registerWithEmail(String email, String password) async {
-    final ok = await _authService.register(email, password);
+  Future<bool> registerWithEmail(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
+    final ok = await _authService.register(
+      email,
+      password,
+      displayName: displayName,
+    );
     if (!ok) return false;
 
     return await _syncSessionWithBackend();

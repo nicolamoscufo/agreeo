@@ -14,15 +14,30 @@ class AuthService {
     : _config = config ?? BackendConfig.fromEnv();
 
   final BackendConfig _config;
+  String? _lastErrorMessage;
 
-  Future<bool> register(String email, String password) async {
+  String? get lastErrorMessage => _lastErrorMessage;
+
+  Future<bool> register(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
     try {
+      _lastErrorMessage = null;
       debugPrint('[AuthService] Registering with backend: $email');
+
+      final normalizedDisplayName = displayName?.trim();
 
       final response = await http.post(
         Uri.parse(_config.registerUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          if (normalizedDisplayName != null && normalizedDisplayName.isNotEmpty)
+            'displayName': normalizedDisplayName,
+        }),
       );
 
       debugPrint('[AuthService] Register response: ${response.statusCode}');
@@ -35,17 +50,11 @@ class AuthService {
 
         if (accessToken == null || refreshToken == null) {
           debugPrint('[AuthService] Register failed: missing tokens');
+          _lastErrorMessage = 'Missing auth tokens in register response.';
           return false;
         }
 
         await _storeTokens(accessToken, refreshToken);
-
-        final user = _buildNeo4jUser(
-          email: email,
-          accessToken: accessToken,
-          responseData: data,
-          isNewUser: true,
-        );
 
         // Populate current user by calling backend /me (no direct Neo4j writes)
         await _fetchMe(accessToken);
@@ -57,6 +66,7 @@ class AuthService {
       _logBackendError('Register', response.body);
       return false;
     } catch (e) {
+      _lastErrorMessage = e.toString();
       debugPrint('[AuthService] Register exception: $e');
       return false;
     }
@@ -64,6 +74,7 @@ class AuthService {
 
   Future<String?> login(String email, String password) async {
     try {
+      _lastErrorMessage = null;
       debugPrint('[AuthService] Logging in with backend: $email');
 
       final response = await http.post(
@@ -82,17 +93,11 @@ class AuthService {
 
         if (accessToken == null || refreshToken == null) {
           debugPrint('[AuthService] Login failed: missing tokens');
+          _lastErrorMessage = 'Missing auth tokens in login response.';
           return null;
         }
 
         await _storeTokens(accessToken, refreshToken);
-
-        final user = _buildNeo4jUser(
-          email: email,
-          accessToken: accessToken,
-          responseData: data,
-          isNewUser: false,
-        );
 
         // Populate current user by calling backend /me (no direct Neo4j writes)
         await _fetchMe(accessToken);
@@ -104,6 +109,7 @@ class AuthService {
       _logBackendError('Login', response.body);
       return null;
     } catch (e) {
+      _lastErrorMessage = e.toString();
       debugPrint('[AuthService] Login exception: $e');
       return null;
     }
@@ -173,7 +179,7 @@ class AuthService {
 
     try {
       final resp = await http.patch(
-        Uri.parse(_config.meUrl + '/onboarding'),
+        Uri.parse('${_config.meUrl}/onboarding'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -201,7 +207,10 @@ class AuthService {
         },
       );
 
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        debugPrint('[AuthService] /me response: ${response.statusCode}');
+        return null;
+      }
 
       final decoded = _decodeBody(response.body);
       final userMap = decoded['user'];
@@ -293,15 +302,6 @@ class AuthService {
     }
   }
 
-  String _extractUid(Map<String, dynamic> claims) {
-    return _firstNonEmpty([
-      claims['uid'],
-      claims['id'],
-      claims['userId'],
-      claims['sub'],
-    ]);
-  }
-
   String _firstNonEmpty(List<dynamic> values) {
     for (final value in values) {
       if (value == null) continue;
@@ -323,11 +323,14 @@ class AuthService {
       final error = jsonDecode(body);
 
       if (error is Map<String, dynamic>) {
+        _lastErrorMessage = error['error']?.toString() ?? '$operation failed';
         debugPrint('[AuthService] $operation error: ${error['error']}');
       } else {
+        _lastErrorMessage = error.toString();
         debugPrint('[AuthService] $operation error: $error');
       }
     } catch (_) {
+      _lastErrorMessage = body.isEmpty ? '$operation failed' : body;
       debugPrint('[AuthService] $operation error body: $body');
     }
   }

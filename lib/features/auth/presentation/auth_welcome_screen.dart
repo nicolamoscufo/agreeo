@@ -41,7 +41,10 @@ class AgreeoAuthWelcomeScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(22),
                             gradient: const LinearGradient(
-                              colors: <Color>[Color(0xFF8B5CF6), Color(0xFF22D3EE)],
+                              colors: <Color>[
+                                Color(0xFF8B5CF6),
+                                Color(0xFF22D3EE),
+                              ],
                             ),
                           ),
                           child: const Icon(
@@ -98,7 +101,7 @@ class AgreeoAuthWelcomeScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Auth is mocked locally. Demo login: demo@agreeo.app / demo123',
+                                'Auth uses the local backend on port 3000.',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.68),
                                 ),
@@ -108,12 +111,14 @@ class AgreeoAuthWelcomeScreen extends StatelessWidget {
                         ),
                         const Spacer(),
                         FilledButton(
-                          onPressed: () => _showAuthSheet(context, _AuthMode.signUp),
+                          onPressed: () =>
+                              _showAuthSheet(context, _AuthMode.signUp),
                           child: const Text('Sign up'),
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton(
-                          onPressed: () => _showAuthSheet(context, _AuthMode.logIn),
+                          onPressed: () =>
+                              _showAuthSheet(context, _AuthMode.logIn),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: BorderSide(
@@ -212,9 +217,9 @@ class _AuthSheetState extends ConsumerState<_AuthSheet> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -249,8 +254,8 @@ class _AuthSheetState extends ConsumerState<_AuthSheet> {
             const SizedBox(height: 8),
             Text(
               _isSignUp
-                  ? 'Just enough mock auth to start building your taste profile.'
-                  : 'Log in and continue the prototype where you left off.',
+                  ? 'Create an account backed by the local Neo4j auth service.'
+                  : 'Log in with the local backend and continue where you left off.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -276,7 +281,9 @@ class _AuthSheetState extends ConsumerState<_AuthSheet> {
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) {
-                if (value == null || value.trim().isEmpty || !value.contains('@')) {
+                if (value == null ||
+                    value.trim().isEmpty ||
+                    !value.contains('@')) {
                   return 'Enter a valid email';
                 }
                 return null;
@@ -313,11 +320,13 @@ class _AuthSheetState extends ConsumerState<_AuthSheet> {
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _submitting ? null : _submit,
-              child: Text(_submitting
-                  ? 'Please wait...'
-                  : _isSignUp
-                  ? 'Continue to onboarding'
-                  : 'Log in'),
+              child: Text(
+                _submitting
+                    ? 'Please wait...'
+                    : _isSignUp
+                    ? 'Continue to onboarding'
+                    : 'Log in',
+              ),
             ),
           ],
         ),
