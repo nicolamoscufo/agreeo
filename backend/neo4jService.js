@@ -5,7 +5,10 @@ class Neo4jService {
     const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
     const user = process.env.NEO4J_USERNAME || 'neo4j';
     const password = process.env.NEO4J_PASSWORD || 'password';
+    const database = process.env.NEO4J_DATABASE || undefined;
+
     this._uri = uri;
+    this._database = database;
     this._driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
   }
 
@@ -13,18 +16,45 @@ class Neo4jService {
     return this._uri;
   }
 
+  async initialize() {
+    await this.verifyConnection();
+    await this.createConstraints();
+  }
+
   async verifyConnection() {
     await this._driver.verifyConnectivity();
   }
 
+  session() {
+    if (this._database) {
+      return this._driver.session({ database: this._database });
+    }
+
+    return this._driver.session();
+  }
+
   async run(query, params = {}) {
-    const session = this._driver.session();
+    const session = this.session();
+
     try {
-      const result = await session.run(query, params);
-      return result;
+      return await session.run(query, params);
     } finally {
       await session.close();
     }
+  }
+
+  async createConstraints() {
+    await this.run(`
+      CREATE CONSTRAINT app_user_uid IF NOT EXISTS
+      FOR (u:AppUser)
+      REQUIRE u.uid IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT app_user_email IF NOT EXISTS
+      FOR (u:AppUser)
+      REQUIRE u.emailNormalized IS UNIQUE
+    `);
   }
 
   async close() {

@@ -7,20 +7,23 @@ class Neo4jUser {
     required this.email,
     required this.createdAt,
     this.passwordHash,
+    this.onboardingCompleted = false,
   });
 
   final String uid;
   final String displayName;
   final String email;
-
   final String createdAt;
   final String? passwordHash;
+  final bool onboardingCompleted;
 
   Map<String, dynamic> toProperties() => {
     'uid': uid,
     'displayName': displayName,
     'email': email,
+    'emailNormalized': email.toLowerCase().trim(),
     'createdAt': createdAt,
+    'onboardingCompleted': onboardingCompleted,
     if (passwordHash != null) 'passwordHash': passwordHash,
   };
 
@@ -30,6 +33,7 @@ class Neo4jUser {
       displayName: session.displayName,
       email: session.email,
       createdAt: session.createdAt.toIso8601String(),
+      onboardingCompleted: false,
     );
   }
 }
