@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/models/neo4j/neo4j_models.dart';
-import 'package:agreeo/services/neo4j_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -11,12 +10,10 @@ class AuthService {
   static const String _tokenKey = 'auth_accessToken';
   static const String _refreshTokenKey = 'auth_refreshToken';
 
-  AuthService({BackendConfig? config, Neo4jService? neo4jService})
-    : _config = config ?? BackendConfig.fromEnv(),
-      _neo4jService = neo4jService ?? Neo4jService();
+  AuthService({BackendConfig? config})
+    : _config = config ?? BackendConfig.fromEnv();
 
   final BackendConfig _config;
-  final Neo4jService _neo4jService;
 
   Future<bool> register(String email, String password) async {
     try {
@@ -50,7 +47,8 @@ class AuthService {
           isNewUser: true,
         );
 
-        await _syncRegisteredUser(user);
+        // Populate current user by calling backend /me (no direct Neo4j writes)
+        await _fetchMe(accessToken);
 
         debugPrint('[AuthService] Registration successful');
         return true;
@@ -96,7 +94,8 @@ class AuthService {
           isNewUser: false,
         );
 
-        await _syncLoggedUser(user);
+        // Populate current user by calling backend /me (no direct Neo4j writes)
+        await _fetchMe(accessToken);
 
         debugPrint('[AuthService] Login successful');
         return accessToken;
@@ -145,12 +144,22 @@ class AuthService {
     final token = await readToken();
     if (token == null || token.isEmpty) return null;
 
-    final claims = _decodeJwtPayload(token);
-    final uid = _extractUid(claims);
+    try {
+      final responseUser = await _fetchMe(token);
+      if (responseUser == null) return null;
 
-    if (uid == null || uid.isEmpty) return null;
+      final responseData = {'user': responseUser};
 
-    return _neo4jService.getUserByUid(uid);
+      return _buildNeo4jUser(
+        email: (responseUser['email'] ?? '') as String,
+        accessToken: token,
+        responseData: responseData,
+        isNewUser: false,
+      );
+    } catch (e) {
+      debugPrint('[AuthService] getCurrentNeo4jUser failed: $e');
+      return null;
+    }
   }
 
   Future<bool> isOnboardingCompleted() async {
@@ -162,47 +171,46 @@ class AuthService {
     final token = await readToken();
     if (token == null || token.isEmpty) return;
 
-    final claims = _decodeJwtPayload(token);
-    final uid = _extractUid(claims);
+    try {
+      final resp = await http.patch(
+        Uri.parse(_config.meUrl + '/onboarding'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'completed': true}),
+      );
 
-    if (uid == null || uid.isEmpty) return;
-
-    await _neo4jService.setOnboardingCompleted(uid: uid, completed: true);
-  }
-
-  Future<void> _syncRegisteredUser(Neo4jUser user) async {
-    await _ensureNeo4jReady();
-
-    await _neo4jService.upsertUser(user);
-
-    debugPrint('[AuthService] Registered user synced to Neo4j: ${user.uid}');
-  }
-
-  Future<void> _syncLoggedUser(Neo4jUser user) async {
-    await _ensureNeo4jReady();
-
-    final existingUser = await _neo4jService.getUserByUid(user.uid);
-
-    if (existingUser == null) {
-      await _neo4jService.upsertUser(user);
-      debugPrint('[AuthService] Logged user created in Neo4j: ${user.uid}');
-      return;
+      if (resp.statusCode != 200) {
+        debugPrint(
+          '[AuthService] markOnboardingCompleted failed: ${resp.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[AuthService] markOnboardingCompleted exception: $e');
     }
-
-    await _neo4jService.updateUserProfile(
-      uid: user.uid,
-      displayName: user.displayName,
-      email: user.email,
-    );
-
-    debugPrint(
-      '[AuthService] Logged user already exists in Neo4j: ${user.uid}',
-    );
   }
 
-  Future<void> _ensureNeo4jReady() async {
-    if (_neo4jService.isReady) return;
-    await _neo4jService.initialize();
+  Future<Map<String, dynamic>?> _fetchMe(String accessToken) async {
+    try {
+      final response = await http.get(
+        Uri.parse(_config.meUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+
+      if (response.statusCode != 200) return null;
+
+      final decoded = _decodeBody(response.body);
+      final userMap = decoded['user'];
+      if (userMap is Map<String, dynamic>) return userMap;
+      return null;
+    } catch (e) {
+      debugPrint('[AuthService] _fetchMe failed: $e');
+      return null;
+    }
   }
 
   Neo4jUser _buildNeo4jUser({

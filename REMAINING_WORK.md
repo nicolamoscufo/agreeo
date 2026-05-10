@@ -159,6 +159,7 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 
 ### Flutter Auth Alignment
 - [ ] Update Flutter `AuthService` so it trusts backend auth as the source of truth.
+- [x] Update Flutter `AuthService` so it trusts backend auth as the source of truth. (client now uses `/me` and no longer writes directly to Neo4j)
 - [ ] Store `accessToken` and `refreshToken` after register/login.
 - [ ] Parse and store/read the returned `user` object.
 - [ ] Use returned `user.onboardingCompleted` to route the user.
