@@ -1,5 +1,5 @@
 const neo4jService = require('./neo4jService');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 (async () => {
   try {

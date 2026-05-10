@@ -191,6 +191,11 @@ class AppController extends StateNotifier<AppState> {
       activeEventId: activeEventId,
     );
 
+    // If we have an existing local session, attempt backend sync to stay up to date:
+    if (session != null) {
+      await _syncSessionWithBackend();
+    }
+
     if (state.hasSession &&
         state.onboardingComplete &&
         state.dailyQueue.isEmpty) {
@@ -234,76 +239,49 @@ class AppController extends StateNotifier<AppState> {
       onboardingComplete: true,
     );
 
+    // Call backend endpoint to persist onboarding completion
+    await _authService.markOnboardingCompleted();
+
     state = state.copyWith(preferences: nextPreferences);
     await _persistState();
     await _backendSyncPreferences();
     await regenerateDailyQueue();
   }
 
-  // Simple Email/Password Auth MVP
   Future<bool> registerWithEmail(String email, String password) async {
     final ok = await _authService.register(email, password);
     if (!ok) return false;
-    final token = await _authService.login(email, password);
-    if (token == null) return false;
 
-    final session = AppSession(
-      uid: _uuid.v4(),
-      displayName: email.split('@').first,
-      email: email,
-      isGuest: false,
-      createdAt: DateTime.now(),
-    );
-
-    state = state.copyWith(session: session);
-    await _persistState();
-
-    return true;
+    return await _syncSessionWithBackend();
   }
 
   Future<bool> loginWithEmail(String email, String password) async {
     final token = await _authService.login(email, password);
     if (token == null) return false;
 
-    // Decode JWT to extract userId (sub)
-    try {
-      final parts = token.split('.');
-      if (parts.length != 3) {
-        debugPrint('[AppController] Invalid JWT format');
-        return false;
-      }
+    return await _syncSessionWithBackend();
+  }
 
-      // Decode payload (second part)
-      final payload = parts[1];
-      // Add padding if needed
-      final paddedPayload = payload + ('=' * (4 - payload.length % 4));
-      final decoded = utf8.decode(base64Url.decode(paddedPayload));
-      final json = jsonDecode(decoded) as Map<String, dynamic>;
-      final uid = json['sub'] as String?;
+  Future<bool> _syncSessionWithBackend() async {
+    final user = await _authService.getCurrentNeo4jUser();
+    if (user == null) return false;
 
-      if (uid == null) {
-        debugPrint('[AppController] No sub in JWT');
-        return false;
-      }
+    final session = AppSession(
+      uid: user.uid,
+      displayName: user.displayName,
+      email: user.email,
+      isGuest: false,
+      createdAt: DateTime.tryParse(user.createdAt) ?? DateTime.now(),
+    );
 
-      debugPrint('[AppController] Extracted uid from JWT: $uid');
-
-      final session = AppSession(
-        uid: uid, // Use the userId from JWT, not a random UUID
-        displayName: email.split('@').first,
-        email: email,
-        isGuest: false,
-        createdAt: DateTime.now(),
-      );
-
-      state = state.copyWith(session: session);
-      await _persistState();
-
-      return true;
-    } catch (e) {
-      debugPrint('[AppController] Error extracting uid from JWT: $e');
-      return false;
-    }
+    state = state.copyWith(
+      session: session,
+      preferences: state.preferences.copyWith(
+        onboardingComplete: user.onboardingCompleted,
+      ),
+    );
+    await _persistState();
+    return true;
   }
 
   Future<void> setDailyRecommendationsEnabled(bool enabled) async {
@@ -441,9 +419,7 @@ class AppController extends StateNotifier<AppState> {
       ...group.memberIds,
       session.uid,
     }.toList(growable: false);
-    final updatedGroup = group.copyWith(
-      memberIds: memberIds,
-    );
+    final updatedGroup = group.copyWith(memberIds: memberIds);
 
     final updatedGroups = [...state.groups];
     updatedGroups[index] = updatedGroup;

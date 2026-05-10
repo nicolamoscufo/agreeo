@@ -1,5 +1,5 @@
 const neo4jService = require('./neo4jService');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { sign, signRefresh } = require('./jwtUtils');
 
 const DEFAULT_ROLES = ['USER'];
@@ -101,7 +101,7 @@ exports.register = async (req, res) => {
 
     const result = await neo4jService.run(createCypher, {
       uid,
-      email: emailNormalized,
+      email: email, // Usa la versione orginale preserving case
       emailNormalized,
       displayName: resolvedDisplayName,
       passwordHash,

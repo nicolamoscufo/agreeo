@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Run App",
+      "request": "launch",
+      "type": "dart"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Node: Backend",
+      "program": "${workspaceFolder}/backend/server.js",
+      "cwd": "${workspaceFolder}/backend",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run Full Stack",
+      "configurations": ["Node: Backend", "Flutter: Run App"]
+    }
+  ]
+}
