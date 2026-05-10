@@ -41,3 +41,7 @@ flutter pub get
 flutter test
 flutter run
 ```
+
+
+netstat -ano | findstr :3000
+taskkill //PID 15212 //F
