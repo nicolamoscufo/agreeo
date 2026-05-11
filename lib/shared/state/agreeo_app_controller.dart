@@ -496,7 +496,17 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       favoriteGenres: state.onboarding.favoriteGenres,
       favoriteMovieIds: state.onboarding.favoriteMovieIds,
     );
+
+    // Add any suggestions to catalog if they are not already there
+    final currentCatalog = List<Movie>.of(state.catalog);
+    for (final movie in suggestions) {
+      if (!currentCatalog.any((m) => m.id == movie.id)) {
+        currentCatalog.add(movie);
+      }
+    }
+
     state = state.copyWith(
+      catalog: currentCatalog,
       dailySuggestionIds: suggestions
           .map((movie) => movie.id)
           .toList(growable: false),

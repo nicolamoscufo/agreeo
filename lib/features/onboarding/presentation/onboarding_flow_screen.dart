@@ -173,9 +173,6 @@ class _AgreeoOnboardingFlowScreenState
                             .updateOnboardingGenres(
                               next.toList(growable: false),
                             );
-                            .updateOnboardingGenres(
-                              next.toList(growable: false),
-                            );
                       },
                     ),
                     _FavoriteMoviesStep(
@@ -282,9 +279,6 @@ class _GenresStep extends StatelessWidget {
         Text(
           '${selectedGenres.length} selected',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),

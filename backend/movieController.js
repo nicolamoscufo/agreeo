@@ -379,6 +379,10 @@ exports.recommendations = async (req, res) => {
             },
           };
         } catch (error) {
+          // TMDB often returns 404 for old MovieLens IDs (deleted or moved to TV shows)
+          if (error.message && error.message.includes('TMDB error 404')) {
+            return null;
+          }
           console.warn(`Skipping TMDB recommendation ${entry.tmdbId}:`, error.message || error);
           return null;
         }
