@@ -130,12 +130,7 @@ class MovieSwipeCard extends StatelessWidget {
           ),
         ),
         if (header != null)
-          Positioned(
-            top: 18,
-            left: 18,
-            right: 72,
-            child: header!,
-          ),
+          Positioned(top: 18, left: 18, right: 72, child: header!),
         Positioned(
           top: 18,
           right: 18,
@@ -200,12 +195,7 @@ class MovieSwipeCard extends StatelessWidget {
           ),
         ),
         if (footer != null)
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 18,
-            child: footer!,
-          ),
+          Positioned(left: 18, right: 18, bottom: 18, child: footer!),
       ],
     );
 
@@ -329,84 +319,112 @@ class PosterGrid extends StatelessWidget {
       itemCount: movies.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 0.65,
+        childAspectRatio: 0.75,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
       itemBuilder: (context, index) {
         final movie = movies[index];
         final selected = selectedIds.contains(movie.id);
+
+        final decoration = selected
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.transparent,
+                  width: 2,
+                ), // Gradient border padding
+              )
+            : BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.transparent, width: 2),
+              );
+
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             onTap: () => onToggle(movie),
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: _MovieArtwork(
-                    imageUrl: movie.posterUrl,
-                    fallbackSeed: movie.title,
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: selected
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.white.withValues(alpha: 0.1),
-                        width: selected ? 2 : 1,
+            child: Container(
+              decoration: selected
+                  ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF00FF), Color(0xFF00FFFF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Colors.transparent,
-                          Colors.black.withValues(
-                            alpha: selected ? 0.6 : 0.45,
-                          ),
-                        ],
-                      ),
+                    )
+                  : null,
+              padding: selected
+                  ? const EdgeInsets.all(2)
+                  : const EdgeInsets.all(
+                      2,
+                    ), // transparent padding for non-selected to maintain size
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _MovieArtwork(
+                      imageUrl: movie.posterUrl,
+                      fallbackSeed: movie.title,
                     ),
                   ),
-                ),
-                if (selected)
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 28,
-                      height: 28,
+                  Positioned.fill(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 18,
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: <Color>[
+                            Colors.transparent,
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.8),
+                            Colors.black,
+                          ],
+                          stops: const [0.0, 0.5, 0.85, 1.0],
+                        ),
                       ),
                     ),
                   ),
-                Positioned(
-                  left: 10,
-                  right: 10,
-                  bottom: 10,
-                  child: Text(
-                    movie.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                  Positioned(
+                    left: 4,
+                    right: 4,
+                    bottom: 8,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          movie.title,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                                height: 1.1,
+                              ),
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          movie.releaseYear.toString(),
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 9,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
