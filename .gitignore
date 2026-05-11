@@ -51,6 +51,9 @@ node_modules/
 npm-debug.log
 package-lock.json
 
+# Local MovieLens dataset
+backend/data/movielens/
+
 # Environment variables
 .env
 .env.local

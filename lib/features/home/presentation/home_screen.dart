@@ -19,6 +19,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   MovieSearchFilters _filters = const MovieSearchFilters();
   String _activeQuickFilter = 'Any';
+  Future<List<Movie>>? _searchFuture;
 
   @override
   void dispose() {
@@ -26,11 +27,26 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
     super.dispose();
   }
 
+  void _refreshSearch() {
+    final query = _searchController.text.trim();
+
+    setState(() {
+      if (query.isEmpty) {
+        _searchFuture = null;
+      } else {
+        _searchFuture = ref
+            .read(movieServiceProvider)
+            .searchMovies(query, _filters);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(agreeoAppControllerProvider);
     final session = state.session;
     final query = _searchController.text.trim().toLowerCase();
+    final hasRemoteSearch = query.isNotEmpty;
 
     final recommended = _applyFilters(state.remainingDailySuggestions, query);
     final trending = _applyFilters(_buildTrending(state.catalog), query);
@@ -44,14 +60,18 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
           .toList(growable: false),
       query,
     );
-    final searchResults = _applyFilters(state.catalog, query);
+    final filteredCatalog = _applyFilters(state.catalog, query);
 
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: <Color>[Color(0xFF08111F), Color(0xFF0B1120), Color(0xFF111827)],
+          colors: <Color>[
+            Color(0xFF08111F),
+            Color(0xFF0B1120),
+            Color(0xFF111827),
+          ],
         ),
       ),
       child: SafeArea(
@@ -61,22 +81,22 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
             Text(
               'Hi, ${session?.displayName ?? 'there'}',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.8,
-                  ),
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               'What should we discover today?',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 18),
             AgreeoSearchBar(
               controller: _searchController,
               hintText: 'Search a title, genre, or vibe',
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => _refreshSearch(),
               trailing: IconButton.filledTonal(
                 onPressed: () async {
                   final updated = await showMovieFilterBottomSheet(
@@ -88,6 +108,9 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                     setState(() {
                       _filters = updated;
                     });
+                    if (hasRemoteSearch) {
+                      _refreshSearch();
+                    }
                   }
                 },
                 icon: const Icon(Icons.tune_rounded),
@@ -124,18 +147,39 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            if (query.isNotEmpty || _filters.hasActiveFilters)
+            if (hasRemoteSearch)
+              FutureBuilder<List<Movie>>(
+                future: _searchFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  return _CollectionSection(
+                    title: 'Search results',
+                    subtitle:
+                        'TMDB search results enriched with your current app filters.',
+                    movies: snapshot.data ?? const <Movie>[],
+                  );
+                },
+              )
+            else if (_filters.hasActiveFilters)
               _CollectionSection(
-                title: query.isNotEmpty ? 'Search results' : 'Filtered picks',
-                subtitle: query.isNotEmpty
-                    ? 'A tighter slice of the catalog for your current search.'
-                    : 'The catalog after your current discovery filters.',
-                movies: searchResults,
+                title: 'Filtered picks',
+                subtitle: 'The current catalog after your discovery filters.',
+                movies: filteredCatalog,
               )
             else ...<Widget>[
               _CollectionSection(
                 title: 'Recommended for you',
-                subtitle: 'Based on your favorite genres and saved taste profile.',
+                subtitle:
+                    'Based on your favorite genres and saved taste profile.',
                 movies: recommended,
               ),
               const SizedBox(height: 22),
@@ -147,13 +191,15 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               const SizedBox(height: 22),
               _CollectionSection(
                 title: 'Popular with your friends',
-                subtitle: 'A social placeholder for titles your circle keeps circling back to.',
+                subtitle:
+                    'A social placeholder for titles your circle keeps circling back to.',
                 movies: friends,
               ),
               const SizedBox(height: 22),
               _CollectionSection(
                 title: 'Short movies for tonight',
-                subtitle: 'Good when the group wants something strong without a long runtime.',
+                subtitle:
+                    'Good when the group wants something strong without a long runtime.',
                 movies: shortTonight,
               ),
             ],
@@ -180,6 +226,9 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               _filters = filters;
             }
           });
+          if (_searchController.text.trim().isNotEmpty) {
+            _refreshSearch();
+          }
         },
       ),
     );
@@ -198,12 +247,15 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   }
 
   List<Movie> _applyFilters(List<Movie> movies, String query) {
-    final filtered = movies.where((movie) {
-      final matchesSearch = query.isEmpty ||
-          movie.title.toLowerCase().contains(query) ||
-          movie.genres.any((genre) => genre.toLowerCase().contains(query));
-      return matchesSearch && _filters.matches(movie);
-    }).toList(growable: false);
+    final filtered = movies
+        .where((movie) {
+          final matchesSearch =
+              query.isEmpty ||
+              movie.title.toLowerCase().contains(query) ||
+              movie.genres.any((genre) => genre.toLowerCase().contains(query));
+          return matchesSearch && _filters.matches(movie);
+        })
+        .toList(growable: false);
 
     return filtered;
   }

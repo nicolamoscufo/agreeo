@@ -1,6 +1,9 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const authController = require('./authController');
+const movieController = require('./movieController');
 const neo4jService = require('./neo4jService');
 const { verifyMiddleware, verifyRefresh, sign, signRefresh } = require('./jwtUtils');
 
@@ -18,6 +21,10 @@ app.use((req, res, next) => {
 
 app.post('/auth/register', authController.register);
 app.post('/auth/login', authController.login);
+
+app.get('/movies/popular', movieController.popular);
+app.get('/movies/search', movieController.search);
+app.get('/movies/:tmdbId', movieController.details);
 
 app.post('/auth/refresh', (req, res) => {
   const { refreshToken } = req.body;
@@ -151,6 +158,13 @@ app.patch('/me/onboarding', verifyMiddleware, async (req, res) => {
     });
   }
 });
+
+app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
+app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
+app.post('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.watchlist);
+app.delete('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.removeFromWatchlist);
+app.get('/me/library', verifyMiddleware, movieController.library);
+app.get('/me/recommendations', verifyMiddleware, movieController.recommendations);
 
 app.get('/health/db', async (_, res) => {
   try {

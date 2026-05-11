@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:agreeo/shared/models/agreeo_models.dart';
+import 'package:agreeo/shared/services/backend_catalog_movie_service.dart';
 import 'package:agreeo/shared/services/mock_auth_service.dart';
-import 'package:agreeo/shared/services/mock_movie_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -525,7 +525,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 }
 
 final movieServiceProvider = Provider<MovieService>((ref) {
-  return MockMovieService();
+  return BackendCatalogMovieService();
 });
 
 final mockAuthServiceProvider = Provider<MockAuthService>((ref) {

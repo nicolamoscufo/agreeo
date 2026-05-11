@@ -58,97 +58,21 @@ class _AgreeoOnboardingFlowScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // Top Bar
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Agreeo',
-                    style:
-                        TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.transparent,
-                          letterSpacing: -0.5,
-                          shadows: [
-                            Shadow(color: Color(0xFFFF00FF), blurRadius: 10),
-                          ],
-                          decoration: TextDecoration.none,
-                        ).copyWith(
-                          foreground: Paint()
-                            ..style = PaintingStyle.stroke
-                            ..strokeWidth = 1.5
-                            ..color = const Color(0xFFFF00FF),
-                        ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _pageIndex == 0
-                            ? 'Step 1 of 3: Genres'
-                            : 'Step 2 of 3: Pick Your Favourites',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: 140,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          color: Colors.white.withValues(alpha: 0.1),
-                        ),
-                        alignment: Alignment.centerLeft,
-                        child: FractionallySizedBox(
-                          widthFactor: _pageIndex == 0 ? 0.33 : 0.66,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(999),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFFF00FF), Color(0xFF00FFFF)],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              Text(
+                _pageIndex == 0 ? 'Step 2 of 3' : 'Step 3 of 3',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
-              const SizedBox(height: 24),
-
-              // Title and Subtitle dynamically handled by the views but in the screenshot it's part of the header
-              if (isMoviesStep) ...[
-                RichText(
-                  text: TextSpan(
-                    text: 'Select ',
-                    style: titleStyle,
-                    children: [
-                      TextSpan(
-                        text: 'Movies You Like',
-                        style: titleStyle?.copyWith(
-                          color: const Color(0xFF00FFFF),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "We'll use your choices to find the perfect match.",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: _pageIndex == 0 ? 2 / 3 : 1,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(999),
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+              ),
+              const SizedBox(height: 18),
               Expanded(
                 child: PageView(
                   controller: _pageController,
@@ -190,52 +114,34 @@ class _AgreeoOnboardingFlowScreenState
                   ],
                 ),
               ),
-
-              // Gradient Button Container
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24, top: 12),
-                child: Container(
-                  height: 54,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF00FF), Color(0xFF00FFFF)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _pageIndex == 0
-                          ? onboarding.favoriteGenres.length >= 3
-                                ? () {
-                                    _pageController.nextPage(
-                                      duration: const Duration(
-                                        milliseconds: 250,
-                                      ),
-                                      curve: Curves.easeOut,
-                                    );
-                                  }
-                                : null
-                          : () async {
-                              await ref
-                                  .read(agreeoAppControllerProvider.notifier)
-                                  .finishOnboarding();
-                            },
-                      child: Center(
-                        child: Text(
-                          _pageIndex == 0 ? 'Continue' : 'Continue',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _pageIndex == 0
+                    ? onboarding.favoriteGenres.length >= 3
+                        ? () {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        : null
+                    : () async {
+                        await ref
+                            .read(agreeoAppControllerProvider.notifier)
+                            .finishOnboarding();
+                      },
+                child: Text(_pageIndex == 0 ? 'Continue' : 'Finish onboarding'),
+              ),
+              if (_pageIndex == 1) ...<Widget>[
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    _pageController.previousPage(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                    );
+                  },
+                  child: const Text('Back'),
                 ),
               ),
             ],
@@ -310,8 +216,17 @@ class _FavoriteMoviesStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // The title is now handled by the parent screen
-        // Search bar disabled for a cleaner look as per mockup, or preserved below
+        SectionHeader(
+          title: 'Select up to 10 favorite movies',
+          subtitle: '$selectedCount / 10 selected',
+        ),
+        const SizedBox(height: 16),
+        AgreeoSearchBar(
+          controller: searchController,
+          hintText: 'Search mock favorites',
+          onChanged: onSearchChanged,
+        ),
+        const SizedBox(height: 16),
         Expanded(
           child: PosterGrid(
             movies: movies,

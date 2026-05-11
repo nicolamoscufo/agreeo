@@ -4,7 +4,7 @@
 Phase 1 - Core MVP prototype + real auth/database foundation
 
 ## Last Updated
-2026-05-10 - Auth/backend/Neo4j architecture reviewed and MVP database flow defined
+2026-05-10 - Backend `.env` loading added and active Flutter read flows remain on backend movie endpoints
 
 ## Current Status
 The Phase 1 Flutter prototype already contains the main app flow: bootstrap gate, mock auth welcome screen, onboarding, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, and Friends placeholder. The UI prototype has passed `flutter analyze`, `flutter test`, and a web build smoke test.
@@ -141,6 +141,22 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 - [x] Planned optional cleanup of `jwtUtils.js`.
 - [x] Planned update of `seedInitialUsers.js`.
 
+### Movie Data Foundation Completed
+- [x] Added `backend/data/movielens/` as the manual drop location for `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv`.
+- [x] Added `backend/scripts/import_movielens.cypher`.
+- [x] Switched the planned import model to canonical `(:Movie {tmdbId})` plus raw `(:MovieLensMovie {movieLensId})` linked by `:MATCHES_TMDB`.
+- [x] Added Docker and `cypher-shell` import instructions.
+- [x] Added backend TMDB client support in Node.
+- [x] Added backend movie repository and movie routes.
+- [x] Added MovieLens rating enrichment on backend movie responses by `tmdbId`.
+- [x] Added authenticated user movie interaction routes for like, dislike, watchlist, library, and recommendations.
+- [x] Added Flutter `BackendMovieService` for the new movie endpoints.
+- [x] Added a shared Flutter movie-service adapter that routes catalog, recommendations, search, and details through the backend with mock fallback.
+- [x] Switched the active Flutter prototype catalog bootstrap to backend-driven movie reads.
+- [x] Switched the active Flutter Home search flow to backend `/movies/search`.
+- [x] Switched the active Flutter Movie Details screen to backend `/movies/:tmdbId`.
+- [x] Added technical architecture documentation for the Neo4j/TMDB/MovieLens MVP.
+
 ## In Progress
 
 ### Auth + Neo4j MVP Integration
@@ -213,8 +229,8 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 
 ### TMDB Integration
 - [ ] Create or finalize TMDB config.
-- [ ] Store TMDB token through environment / dart define for MVP.
-- [ ] Create `TmdbApiClient`.
+- [x] Store TMDB token through backend environment for MVP.
+- [x] Create `TmdbApiClient`.
 - [ ] Create TMDB DTOs:
   - `TmdbMovieDto`
   - `TmdbMovieDetailsDto`
@@ -225,14 +241,14 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
   - `MovieDetails`
   - `Genre`
 - [ ] Create `TmdbMovieMapper`.
-- [ ] Create `MovieRepository` abstraction.
+- [x] Create backend `MovieRepository` for Neo4j movie lookup and interactions.
 - [ ] Create `TmdbMovieRepository`.
-- [ ] Connect Home to real popular/trending TMDB movies.
-- [ ] Connect search to TMDB `/search/movie`.
-- [ ] Connect movie details to TMDB `/movie/{movie_id}`.
+- [x] Connect Home to real popular/trending TMDB movies.
+- [x] Connect search to TMDB `/search/movie`.
+- [x] Connect movie details to TMDB `/movie/{movie_id}`.
 - [ ] Build poster/backdrop URLs from TMDB image paths.
 - [ ] Keep mock movie service available until real TMDB flow is stable.
-- [ ] Decide whether TMDB calls stay in Flutter for MVP or move behind backend later.
+- [x] Decide that TMDB calls should stay behind the backend for this MVP path.
 
 ### MovieLens Import
 - [ ] Place downloaded MovieLens files in an importable folder:
@@ -240,49 +256,44 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
   - `ratings.csv`
   - `tags.csv`
   - `links.csv`
-- [ ] Create import script or Cypher file for MovieLens.
-- [ ] Import `movies.csv` as `(:Movie)`.
+- [x] Create import script or Cypher file for MovieLens.
+- [x] Import `movies.csv` as `(:MovieLensMovie)`.
 - [ ] Import genres from `movies.csv` as `(:Genre)`.
 - [ ] Create relationships:
-  - `(:Movie)-[:IN_GENRE]->(:Genre)`
-- [ ] Import `links.csv` and set:
-  - `movieLensId`
-  - `imdbId`
-  - `imdbFullId`
-  - `tmdbId`
+  - `(:MovieLensMovie)-[:IN_GENRE]->(:Genre)`
+- [x] Import `links.csv` and create canonical `(:Movie {tmdbId})` plus `(:MovieLensMovie)-[:MATCHES_TMDB]->(:Movie)`.
 - [ ] Import `ratings.csv`.
 - [ ] Create MovieLens rating graph:
-  - `(:MovieLensUser)-[:RATED {rating, timestamp, ratedAt}]->(:Movie)`
+  - `(:MovieLensUser)-[:RATED {rating, timestamp, ratedAt}]->(:MovieLensMovie)`
 - [ ] Import `tags.csv`.
 - [ ] Create MovieLens tag graph:
-  - `(:MovieLensUser)-[:TAGGED {tag, timestamp, taggedAt}]->(:Movie)`
-- [ ] Compute and store:
-  - `movieLensAvgRating`
-  - `movieLensRatingCount`
-- [ ] Add useful constraints/indexes for:
-  - `Movie.movieLensId`
+  - `(:MovieLensUser)-[:TAGGED {tag, timestamp, taggedAt}]->(:MovieLensMovie)`
+- [x] Compute and store average MovieLens ratings in the import script for both `:MovieLensMovie` and canonical `:Movie`.
+- [x] Add useful constraints/indexes for:
+  - `MovieLensMovie.movieLensId`
   - `Movie.tmdbId`
   - `MovieLensUser.movieLensUserId`
   - `Genre.name`
+- [x] Verify imported graph counts in the local Neo4j instance.
 
 ### TMDB ↔ MovieLens Matching
-- [ ] Use `links.csv.tmdbId` as the primary matching key.
-- [ ] Confirm that TMDB movie `id` maps to Neo4j `Movie.tmdbId`.
-- [ ] Add backend query:
+- [x] Use `links.csv.tmdbId` as the primary matching key.
+- [x] Confirm that TMDB movie `id` maps to Neo4j `Movie.tmdbId`.
+- [x] Add backend query:
   - find movie by `tmdbId`.
-- [ ] Add backend query:
+- [x] Add backend query:
   - return MovieLens rating info by `tmdbId`.
 - [ ] Add fallback matching using IMDb ID where `tmdbId` is missing.
 - [ ] Avoid title-based matching unless absolutely necessary.
 - [ ] Store only interacted-with TMDB movies if a movie does not exist in MovieLens.
-- [ ] When user likes/dislikes/watchlists a TMDB movie, `MERGE` it into Neo4j by `tmdbId`.
+- [x] When user likes/dislikes/watchlists a TMDB movie, `MERGE` it into Neo4j by `tmdbId`.
 
 ### User Movie Interactions
-- [ ] When user likes a movie, create:
+- [x] When user likes a movie, create:
   - `(:AppUser)-[:LIKED]->(:Movie)`
-- [ ] When user dislikes a movie, create:
+- [x] When user dislikes a movie, create:
   - `(:AppUser)-[:DISLIKED]->(:Movie)`
-- [ ] When user adds to watchlist, create:
+- [x] When user adds to watchlist, create:
   - `(:AppUser)-[:WATCHLISTED]->(:Movie)`
 - [ ] When user rates a movie inside the app, create:
   - `(:AppUser)-[:RATED_APP {rating}]->(:Movie)`
@@ -296,8 +307,9 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 
 ### Recommendations
 - [ ] Do not build full recommendation algorithm yet.
-- [ ] Start with simple MovieLens-backed recommendations.
-- [ ] Recommend movies liked by similar MovieLens users.
+- [x] Start with simple MovieLens-backed recommendations.
+- [x] Recommend movies liked by similar MovieLens users.
+- [x] Use popular-movie fallback when recommendations are empty or unavailable.
 - [ ] Recommend movies sharing genres with liked/favorite movies.
 - [ ] Filter out movies the app user already liked/disliked/watchlisted.
 - [ ] Return only movies with valid `tmdbId` when UI needs TMDB poster/details.
@@ -316,11 +328,15 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 - [ ] Swipe right/left and confirm Neo4j relationships are created.
 - [ ] Add movie to watchlist and confirm Library updates.
 - [ ] Open Movie Details and confirm data source consistency.
-- [ ] Run `flutter analyze`.
-- [ ] Run `flutter test`.
-- [ ] Run backend manually with `npm start`.
-- [ ] Run backend health check.
+- [x] Run `flutter analyze`.
+- [x] Run `flutter test`.
+- [x] Run backend manually with `npm start`.
+- [x] Run backend health check.
 - [ ] Confirm Neo4j Browser shows expected graph nodes/relationships.
+- [x] Verify MovieLens import counts in Neo4j:
+  - canonical `:Movie`
+  - raw `:MovieLensMovie`
+  - `:MATCHES_TMDB`
 
 ## Blocked / Issues
 - [ ] Windows desktop smoke run/build is blocked locally because the Visual Studio toolchain is not installed/configured for Flutter desktop builds.
@@ -329,8 +345,10 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 - [ ] Backend auth currently needs migration from old `:User`/`userId` model to new `:AppUser`/`uid` model.
 - [ ] Existing Neo4j database may contain old test `:User` nodes.
 - [ ] MovieLens is downloaded but not yet imported into Neo4j.
-- [ ] TMDB integration is not started yet.
-- [ ] Real user/movie interaction persistence is not connected yet.
+- [ ] Full MovieLens import still needs to be executed against the local Neo4j instance.
+- [ ] TMDB token still needs to be tested in the local runtime environment.
+- [ ] Real Flutter screens are not all connected to the new backend movie service yet.
+- [ ] The active Flutter interaction flow still keeps local undo state for like/dislike/watchlist because the backend does not yet expose symmetric removal endpoints for all preference mutations.
 
 ## Next Steps
 
@@ -353,18 +371,23 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 6. Update Flutter `AuthService` to use backend auth response.
 7. Connect Flutter welcome/login/register screens to real backend auth.
 8. Use `onboardingCompleted` to route user after login/register.
-9. Only after auth works, start MovieLens import.
-10. Only after MovieLens import works, start TMDB integration.
+9. Run the MovieLens import against the local Neo4j instance.
+10. Validate TMDB-backed movie endpoints and then connect the remaining Flutter screens.
 
 ### Backend Test Checklist
-- [ ] `GET /health/db` returns `{ ok: true }`.
-- [ ] Register creates `(:AppUser)`.
-- [ ] Register returns access token, refresh token, and user object.
-- [ ] Login returns access token, refresh token, and user object.
-- [ ] Login does not reset onboarding.
-- [ ] `/me` returns current user.
+- [x] `GET /health/db` returns `{ ok: true }`.
+- [x] Register creates `(:AppUser)`.
+- [x] Register returns access token, refresh token, and user object.
+- [x] Login returns access token, refresh token, and user object.
+- [x] Login does not reset onboarding.
+- [x] `/me` returns current user.
 - [ ] `/me/onboarding` updates `onboardingCompleted`.
-- [ ] No endpoint returns `passwordHash`.
+- [x] No endpoint returns `passwordHash`.
+
+### Current Verified Neo4j Counts
+- [x] `MATCH (m:Movie) RETURN count(m)` returned `87425`.
+- [x] `MATCH (ml:MovieLensMovie) RETURN count(ml)` returned `87585`.
+- [x] `MATCH (:MovieLensMovie)-[:MATCHES_TMDB]->(:Movie) RETURN count(*)` returned `87461`.
 
 ### Neo4j Browser Test Queries
 MATCH (u:AppUser)

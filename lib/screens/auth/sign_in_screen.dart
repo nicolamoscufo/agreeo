@@ -80,7 +80,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.45,
+                        ),
                         borderRadius: BorderRadius.circular(28),
                       ),
                       child: Column(
