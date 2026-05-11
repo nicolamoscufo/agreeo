@@ -11,15 +11,17 @@ class AgreeoAuthWelcomeScreen extends ConsumerStatefulWidget {
   const AgreeoAuthWelcomeScreen({super.key});
 
   @override
-  ConsumerState<AgreeoAuthWelcomeScreen> createState() => _AgreeoAuthWelcomeScreenState();
+  ConsumerState<AgreeoAuthWelcomeScreen> createState() =>
+      _AgreeoAuthWelcomeScreenState();
 }
 
-class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScreen> {
+class _AgreeoAuthWelcomeScreenState
+    extends ConsumerState<AgreeoAuthWelcomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _submitting = false;
   bool _obscurePassword = true;
   _AuthMode _mode = _AuthMode.logIn;
@@ -66,7 +68,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
       }
     } on MockAuthException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -86,7 +90,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 64), // subtract padding
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 64,
+                ), // subtract padding
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -106,10 +112,19 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                                 fontSize: 72,
                                 fontWeight: FontWeight.normal,
                                 foreground: Paint()
-                                  ..shader = const LinearGradient(
-                                    colors: [Color(0xFFC026D3), Color(0xFF22D3EE)],
-                                  ).createShader(const Rect.fromLTWH(0, 0, 200, 70))
-                                  ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+                                  ..shader =
+                                      const LinearGradient(
+                                        colors: [
+                                          Color(0xFFC026D3),
+                                          Color(0xFF22D3EE),
+                                        ],
+                                      ).createShader(
+                                        const Rect.fromLTWH(0, 0, 200, 70),
+                                      )
+                                  ..maskFilter = const MaskFilter.blur(
+                                    BlurStyle.normal,
+                                    12,
+                                  ),
                               ),
                             ),
                             // Testo in primo piano nitido
@@ -119,50 +134,68 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                                 fontSize: 72,
                                 fontWeight: FontWeight.normal,
                                 foreground: Paint()
-                                  ..shader = const LinearGradient(
-                                    colors: [Color(0xFFE879F9), Color(0xFF67E8F9)],
-                                  ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
+                                  ..shader =
+                                      const LinearGradient(
+                                        colors: [
+                                          Color(0xFFE879F9),
+                                          Color(0xFF67E8F9),
+                                        ],
+                                      ).createShader(
+                                        const Rect.fromLTWH(0, 0, 200, 70),
+                                      ),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 40),
-                      
+
                       if (_isSignUp) ...[
-                         TextFormField(
+                        TextFormField(
                           controller: _nameController,
                           textInputAction: TextInputAction.next,
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
                           decoration: _buildInputDecoration('Name'),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) return 'Enter your name';
+                            if (value == null || value.trim().isEmpty)
+                              return 'Enter your name';
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
                       ],
-                      
+
                       TextFormField(
                         controller: _emailController,
                         textInputAction: TextInputAction.next,
                         keyboardType: TextInputType.emailAddress,
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                         decoration: _buildInputDecoration('Email'),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty || !value.contains('@')) {
+                          if (value == null ||
+                              value.trim().isEmpty ||
+                              !value.contains('@')) {
                             return 'Enter a valid email';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                         decoration: _buildInputDecoration('Password').copyWith(
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -180,12 +213,13 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                         ),
                         onFieldSubmitted: (_) => _submit(),
                         validator: (value) {
-                          if (value == null || value.length < 6) return 'Use at least 6 characters';
+                          if (value == null || value.length < 6)
+                            return 'Use at least 6 characters';
                           return null;
                         },
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Neon Login Button
                       Container(
                         width: double.infinity,
@@ -203,7 +237,7 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                               blurRadius: 20,
                               spreadRadius: 2,
                               offset: Offset(0, 4),
-                            ) // Glow effect
+                            ), // Glow effect
                           ],
                         ),
                         child: Material(
@@ -213,7 +247,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                             onTap: _submitting ? null : _submit,
                             child: Center(
                               child: _submitting
-                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
                                   : Text(
                                       _isSignUp ? 'Sign Up' : 'Log In',
                                       style: const TextStyle(
@@ -226,9 +262,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                           ),
                         ),
                       ),
-                      
+
                       const Spacer(),
-                      
+
                       // Bottom Switch Mode
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20, top: 40),
@@ -238,7 +274,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                           child: Center(
                             child: RichText(
                               text: TextSpan(
-                                text: _isSignUp ? 'Already have an account? ' : 'Don\'t have an account? ',
+                                text: _isSignUp
+                                    ? 'Already have an account? '
+                                    : 'Don\'t have an account? ',
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 15,
@@ -278,11 +316,11 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1, width: 1),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1, width: 1),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
