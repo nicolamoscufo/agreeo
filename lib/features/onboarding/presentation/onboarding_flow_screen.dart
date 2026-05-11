@@ -33,13 +33,15 @@ class _AgreeoOnboardingFlowScreenState
     final onboarding = state.onboarding;
     final selectedMovieIds = onboarding.favoriteMovieIds.toSet();
     final query = _searchController.text.trim().toLowerCase();
-    final filteredMovies = state.catalog.where((movie) {
-      if (query.isEmpty) {
-        return true;
-      }
-      return movie.title.toLowerCase().contains(query) ||
-          movie.genres.any((genre) => genre.toLowerCase().contains(query));
-    }).toList(growable: false);
+    final filteredMovies = state.catalog
+        .where((movie) {
+          if (query.isEmpty) {
+            return true;
+          }
+          return movie.title.toLowerCase().contains(query) ||
+              movie.genres.any((genre) => genre.toLowerCase().contains(query));
+        })
+        .toList(growable: false);
 
     return Scaffold(
       body: SafeArea(
@@ -51,9 +53,9 @@ class _AgreeoOnboardingFlowScreenState
               Text(
                 _pageIndex == 0 ? 'Step 2 of 3' : 'Step 3 of 3',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(
@@ -84,7 +86,9 @@ class _AgreeoOnboardingFlowScreenState
                         }
                         await ref
                             .read(agreeoAppControllerProvider.notifier)
-                            .updateOnboardingGenres(next.toList(growable: false));
+                            .updateOnboardingGenres(
+                              next.toList(growable: false),
+                            );
                       },
                     ),
                     _FavoriteMoviesStep(
@@ -106,13 +110,13 @@ class _AgreeoOnboardingFlowScreenState
               FilledButton(
                 onPressed: _pageIndex == 0
                     ? onboarding.favoriteGenres.length >= 3
-                        ? () {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOut,
-                            );
-                          }
-                        : null
+                          ? () {
+                              _pageController.nextPage(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          : null
                     : () async {
                         await ref
                             .read(agreeoAppControllerProvider.notifier)
@@ -141,10 +145,7 @@ class _AgreeoOnboardingFlowScreenState
 }
 
 class _GenresStep extends StatelessWidget {
-  const _GenresStep({
-    required this.selectedGenres,
-    required this.onToggle,
-  });
+  const _GenresStep({required this.selectedGenres, required this.onToggle});
 
   final Set<String> selectedGenres;
   final ValueChanged<String> onToggle;
@@ -176,9 +177,9 @@ class _GenresStep extends StatelessWidget {
         Text(
           '${selectedGenres.length} selected',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -214,7 +215,7 @@ class _FavoriteMoviesStep extends StatelessWidget {
         const SizedBox(height: 16),
         AgreeoSearchBar(
           controller: searchController,
-          hintText: 'Search mock favorites',
+          hintText: 'Search favorite movies',
           onChanged: onSearchChanged,
         ),
         const SizedBox(height: 16),

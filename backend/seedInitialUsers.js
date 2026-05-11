@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const neo4jService = require('./neo4jService');
 const bcrypt = require('bcryptjs');
 

@@ -55,6 +55,42 @@ class Neo4jService {
       FOR (u:AppUser)
       REQUIRE u.emailNormalized IS UNIQUE
     `);
+
+    await this.run(`
+      CREATE CONSTRAINT movie_tmdb_id IF NOT EXISTS
+      FOR (m:Movie)
+      REQUIRE m.tmdbId IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT movielens_movie_id IF NOT EXISTS
+      FOR (m:MovieLensMovie)
+      REQUIRE m.movieLensId IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT movielens_user_id IF NOT EXISTS
+      FOR (u:MovieLensUser)
+      REQUIRE u.movieLensUserId IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT genre_name IF NOT EXISTS
+      FOR (g:Genre)
+      REQUIRE g.name IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE INDEX movie_title IF NOT EXISTS
+      FOR (m:Movie)
+      ON (m.title)
+    `);
+
+    await this.run(`
+      CREATE INDEX movielens_movie_title IF NOT EXISTS
+      FOR (m:MovieLensMovie)
+      ON (m.title)
+    `);
   }
 
   async close() {

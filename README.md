@@ -21,6 +21,33 @@ Agreeo falls back to the bundled demo catalog when TMDb is not configured. To en
 flutter run --dart-define=TMDB_API_KEY=your_key_here
 ```
 
+## Backend Movie MVP
+
+The backend now owns TMDB movie reads and Neo4j movie interactions for the MVP. Use the backend for:
+
+- `GET /movies/popular`
+- `GET /movies/search?query=matrix`
+- `GET /movies/:tmdbId`
+- authenticated `/me/movies/...`, `/me/library`, and `/me/recommendations`
+
+### Backend environment
+
+The backend now loads `backend/.env` automatically through `dotenv`. A ready-to-edit local file is already in place at `backend/.env`.
+
+Keep `backend/.env.example` as the tracked template. The critical new variable is:
+
+```txt
+TMDB_ACCESS_TOKEN=your_tmdb_bearer_token
+```
+
+### MovieLens import
+
+Place `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv` in `backend/data/movielens/`.
+
+The import workflow, Docker command, graph schema, and verification queries are documented in:
+
+- `docs/NEO4J_TMDB_MOVIELENS_ARCHITECTURE.md`
+
 ### Project structure
 
 The app follows this `lib/` layout:
@@ -40,4 +67,10 @@ Use the usual Flutter commands to run the app and tests:
 flutter pub get
 flutter test
 flutter run
+```
+
+Run the backend from `backend/` with the Neo4j and TMDB environment variables set:
+
+```bash
+npm start
 ```
