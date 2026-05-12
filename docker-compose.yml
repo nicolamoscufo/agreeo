@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: agreeo_neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/password123
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    volumes:
+      - neo4j_data:/data
+      - ./backend/data/ml-latest-small:/var/lib/neo4j/import
+    networks:
+      - agreeo_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agreeo_backend
+    environment:
+      - PORT=3000
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=password123
+      - NEO4J_DATABASE=neo4j
+      - TMDB_ACCESS_TOKEN=
+      - JWT_SECRET=super_secret_key_change_me
+    ports:
+      - "3000:3000"
+    depends_on:
+      - neo4j
+    networks:
+      - agreeo_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agreeo_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - agreeo_net
+
+networks:
+  agreeo_net:
+    driver: bridge
+
+volumes:
+  neo4j_data:

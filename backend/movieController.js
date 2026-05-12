@@ -322,6 +322,38 @@ exports.watchlist = async (req, res) => {
   }
 };
 
+exports.removeLike = async (req, res) => {
+  const uid = requestUid(req);
+  const tmdbId = parseTmdbId(req.params.tmdbId);
+
+  if (isNaN(tmdbId)) {
+    return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
+  }
+
+  try {
+    await movieRepository.removeLike(uid, tmdbId);
+    return res.status(204).send();
+  } catch (error) {
+    return handleError(res, error, 'Failed to remove like');
+  }
+};
+
+exports.removeDislike = async (req, res) => {
+  const uid = requestUid(req);
+  const tmdbId = parseTmdbId(req.params.tmdbId);
+
+  if (isNaN(tmdbId)) {
+    return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
+  }
+
+  try {
+    await movieRepository.removeDislike(uid, tmdbId);
+    return res.status(204).send();
+  } catch (error) {
+    return handleError(res, error, 'Failed to remove dislike');
+  }
+};
+
 exports.removeFromWatchlist = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);

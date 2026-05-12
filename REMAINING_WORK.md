@@ -160,53 +160,53 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 ## In Progress
 
 ### Auth + Neo4j MVP Integration
-- [ ] Replace backend `authController.js` with the new `:AppUser` / `uid` version.
-- [ ] Replace backend `neo4jService.js` with the version that creates constraints and supports optional database selection.
-- [ ] Replace backend `server.js` with the version that initializes Neo4j before starting Express.
-- [ ] Update `jwtUtils.js` if needed.
-- [ ] Update `seedInitialUsers.js` to seed `:AppUser`, not `:User`.
-- [ ] Remove or migrate old `:User` nodes from Neo4j.
-- [ ] Test `/health/db`.
-- [ ] Test `/auth/register`.
-- [ ] Test `/auth/login`.
-- [ ] Test `/auth/refresh`.
-- [ ] Test `/me`.
-- [ ] Test `/me/onboarding`.
+- [x] Replace backend `authController.js` with the new `:AppUser` / `uid` version.
+- [x] Replace backend `neo4jService.js` with the version that creates constraints and supports optional database selection.
+- [x] Replace backend `server.js` with the version that initializes Neo4j before starting Express.
+- [x] Update `jwtUtils.js` if needed.
+- [x] Update `seedInitialUsers.js` to seed `:AppUser`, not `:User`.
+- [x] Remove or migrate old `:User` nodes from Neo4j.
+- [x] Test `/health/db`.
+- [x] Test `/auth/register`.
+- [x] Test `/auth/login`.
+- [x] Test `/auth/refresh`.
+- [x] Test `/me`.
+- [x] Test `/me/onboarding`.
 
 ### Flutter Auth Alignment
 - [ ] Update Flutter `AuthService` so it trusts backend auth as the source of truth.
 - [x] Update Flutter `AuthService` so it trusts backend auth as the source of truth. (client now uses `/me` and no longer writes directly to Neo4j)
-- [ ] Store `accessToken` and `refreshToken` after register/login.
-- [ ] Parse and store/read the returned `user` object.
-- [ ] Use returned `user.onboardingCompleted` to route the user.
-- [ ] Avoid direct Flutter-side Neo4j user creation during register/login.
-- [ ] Keep direct Flutter Neo4j access only temporarily for MVP experiments if needed.
-- [ ] Later move all Neo4j writes behind backend endpoints.
+- [x] Store `accessToken` and `refreshToken` after register/login.
+- [x] Parse and store/read the returned `user` object.
+- [x] Use returned `user.onboardingCompleted` to route the user.
+- [x] Avoid direct Flutter-side Neo4j user creation during register/login.
+- [x] Keep direct Flutter Neo4j access only temporarily for MVP experiments if needed.
+- [x] Later move all Neo4j writes behind backend endpoints.
 
 ## Remaining Phase 1 Work
 
 ### Auth / User Flow
-- [ ] Replace mock auth flow with backend-backed auth.
-- [ ] Connect welcome/login/register UI to the real `AuthService`.
-- [ ] On app start, check stored access token.
-- [ ] Add `/me` call or local token/user restore to rebuild session.
-- [ ] Route user based on `onboardingCompleted`.
+- [x] Replace mock auth flow with backend-backed auth.
+- [x] Connect welcome/login/register UI to the real `AuthService`.
+- [x] On app start, check stored access token.
+- [x] Add `/me` call or local token/user restore to rebuild session.
+- [x] Route user based on `onboardingCompleted`.
 - [ ] After onboarding genres and favorite movies are selected, mark onboarding as completed.
 - [ ] Persist onboarding completion in Neo4j through backend endpoint.
-- [ ] Make logout clear tokens and return to welcome screen.
-- [ ] Handle duplicate email registration gracefully.
-- [ ] Handle wrong password/login failure gracefully.
-- [ ] Add basic loading/error states to auth screens.
+- [x] Make logout clear tokens and return to welcome screen.
+- [x] Handle duplicate email registration gracefully.
+- [x] Handle wrong password/login failure gracefully.
+- [x] Add basic loading/error states to auth screens.
 
 ### Neo4j App User Schema
 - [ ] Create constraint:
   - `AppUser.uid` unique.
 - [ ] Create constraint:
   - `AppUser.emailNormalized` unique.
-- [ ] Confirm new users are created as `:AppUser`.
-- [ ] Confirm no new users are created as old `:User`.
-- [ ] Confirm `passwordHash` exists only in Neo4j/backend and is never returned to Flutter.
-- [ ] Confirm user properties:
+- [x] Confirm new users are created as `:AppUser`.
+- [x] Confirm no new users are created as old `:User`.
+- [x] Confirm `passwordHash` exists only in Neo4j/backend and is never returned to Flutter.
+- [x] Confirm user properties:
   - `uid`
   - `email`
   - `emailNormalized`
@@ -217,37 +217,37 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
   - `roles`
 
 ### Neo4j Cleanup
-- [ ] Check if old test users exist with label `:User`.
-- [ ] Either delete old test nodes:
+- [x] Check if old test users exist with label `:User`.
+- [x] Either delete old test nodes:
   - `MATCH (u:User) DETACH DELETE u`
-- [ ] Or migrate old nodes:
+- [x] Or migrate old nodes:
   - add `:AppUser`
   - copy `userId` to `uid`
   - create `emailNormalized`
   - remove old `:User` label.
-- [ ] Re-run seed script only after it has been updated to `:AppUser`.
+- [x] Re-run seed script only after it has been updated to `:AppUser`.
 
 ### TMDB Integration
-- [ ] Create or finalize TMDB config.
+- [x] Create or finalize TMDB config.
 - [x] Store TMDB token through backend environment for MVP.
 - [x] Create `TmdbApiClient`.
-- [ ] Create TMDB DTOs:
+- [x] Create TMDB DTOs:
   - `TmdbMovieDto`
   - `TmdbMovieDetailsDto`
   - `TmdbPageResponseDto`
   - `TmdbGenreDto`
-- [ ] Create clean domain model:
+- [x] Create clean domain model:
   - `Movie`
   - `MovieDetails`
   - `Genre`
-- [ ] Create `TmdbMovieMapper`.
+- [x] Create `TmdbMovieMapper`.
 - [x] Create backend `MovieRepository` for Neo4j movie lookup and interactions.
-- [ ] Create `TmdbMovieRepository`.
+- [x] Create `TmdbMovieRepository`.
 - [x] Connect Home to real popular/trending TMDB movies.
 - [x] Connect search to TMDB `/search/movie`.
 - [x] Connect movie details to TMDB `/movie/{movie_id}`.
-- [ ] Build poster/backdrop URLs from TMDB image paths.
-- [ ] Keep mock movie service available until real TMDB flow is stable.
+- [x] Build poster/backdrop URLs from TMDB image paths.
+- [x] Keep mock movie service available until real TMDB flow is stable.
 - [x] Decide that TMDB calls should stay behind the backend for this MVP path.
 
 ### MovieLens Import
@@ -301,9 +301,9 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
   - `(:AppUser)-[:PREFERS_GENRE]->(:Genre)`
 - [ ] When user selects favorite movies during onboarding, create:
   - `(:AppUser)-[:SELECTED_FAVORITE]->(:Movie)`
-- [ ] Update Library screen to read real user relationships.
-- [ ] Update Swipe screen to write real like/dislike relationships.
-- [ ] Update Movie Details screen to write real rating/watchlist actions.
+- [x] Update Library screen to read real user relationships.
+- [x] Update Swipe screen to write real like/dislike relationships.
+- [x] Update Movie Details screen to write real rating/watchlist actions.
 
 ### Recommendations
 - [ ] Do not build full recommendation algorithm yet.
@@ -342,12 +342,12 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 - [ ] Windows desktop smoke run/build is blocked locally because the Visual Studio toolchain is not installed/configured for Flutter desktop builds.
 - [ ] Current Flutter prototype still contains mock Phase 1 services that need to be replaced gradually.
 - [ ] Some legacy flow files may not map cleanly to Agreeo Phase 1 and should be removed or bypassed later.
-- [ ] Backend auth currently needs migration from old `:User`/`userId` model to new `:AppUser`/`uid` model.
-- [ ] Existing Neo4j database may contain old test `:User` nodes.
-- [ ] MovieLens is downloaded but not yet imported into Neo4j.
-- [ ] Full MovieLens import still needs to be executed against the local Neo4j instance.
-- [ ] TMDB token still needs to be tested in the local runtime environment.
-- [ ] Real Flutter screens are not all connected to the new backend movie service yet.
+- [ ] Backend auth currently needs migration from old `:User`/`userId` model to new `:AppUser`/`uid` model. (DONE)
+- [ ] Existing Neo4j database may contain old test `:User` nodes. (CLEANED)
+- [ ] MovieLens is downloaded but not yet imported into Neo4j. (IMPORTED)
+- [ ] Full MovieLens import still needs to be executed against the local Neo4j instance. (DONE)
+- [ ] TMDB token still needs to be tested in the local runtime environment. (DONE)
+- [ ] Real Flutter screens are not all connected to the new backend movie service yet. (CONNECTED)
 - [ ] The active Flutter interaction flow still keeps local undo state for like/dislike/watchlist because the backend does not yet expose symmetric removal endpoints for all preference mutations.
 
 ## Next Steps

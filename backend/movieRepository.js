@@ -221,6 +221,26 @@ async function removeFromWatchlist(uid, tmdbId) {
   );
 }
 
+async function removeLike(uid, tmdbId) {
+  await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[r:LIKED]->(:Movie {tmdbId: $tmdbId})
+    DELETE r
+    `,
+    { uid, tmdbId }
+  );
+}
+
+async function removeDislike(uid, tmdbId) {
+  await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[r:DISLIKED]->(:Movie {tmdbId: $tmdbId})
+    DELETE r
+    `,
+    { uid, tmdbId }
+  );
+}
+
 async function getUserLibrary(uid) {
   const result = await neo4jService.run(
     `
@@ -316,37 +336,63 @@ async function getUserLibrary(uid) {
   };
 }
 
+/**
+ * Ottiene le raccomandazioni dei film per un utente specifico.
+ * Implementa un algoritmo di Filtraggio Collaborativo tramite Neo4j
+ * e prevede un fallback sui film più popolari (per risolvere il "cold start").
+ * * @param {string} uid - L'ID univoco dell'utente nell'app.
+ * @returns {Array} - Un array di oggetti contenenti i dati dei film raccomandati.
+ */
 async function getRecommendations(uid) {
+  
+  // ==========================================
+  // FASE 1: QUERY DI RACCOMANDAZIONE PERSONALIZZATA
+  // ==========================================
+  
+  // Esegue una query sul database Neo4j passando l'uid dell'utente
   const personalized = await neo4jService.run(
     `
+    // PASSO A: Trova l'utente attuale nell'app e i film che gli piacciono o che ha tra i preferiti
     MATCH (me:AppUser {uid: $uid})-[:LIKED|SELECTED_FAVORITE]->(liked:Movie)
+
+    // PASSO B: "Gemelli di Gusti". Collega i film trovati al dataset di MovieLens.
+    // Poi cerca altri utenti su MovieLens (similar) che hanno recensito positivamente (>= 4.0) questi stessi film.
     MATCH (liked)<-[:MATCHES_TMDB]-(likedMl:MovieLensMovie)<-[r1:RATED]-(similar:MovieLensUser)
     WHERE r1.rating >= 4.0
 
+    // PASSO C: I Suggerimenti. Cerca altri film (recMl) recensiti positivamente (>= 4.0)
+    // da questi utenti "simili" e ricollegali ai film del nostro database locale (rec:Movie).
     MATCH (similar)-[r2:RATED]->(recMl:MovieLensMovie)-[:MATCHES_TMDB]->(rec:Movie)
     WHERE r2.rating >= 4.0
-      AND rec.tmdbId IS NOT NULL
+      AND rec.tmdbId IS NOT NULL // Assicura che il film esista e abbia un ID valido per l'API
+
+      // PASSO D: Esclusione. Non consigliare film che l'utente ha già valutato o salvato.
       AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED]->(rec)
 
+    // PASSO E: Aggregazione dei risultati.
     RETURN
       rec.tmdbId AS tmdbId,
       rec.title AS title,
-      count(DISTINCT similar) AS similarUsers,
-      avg(r2.rating) AS avgSimilarRating,
-      rec.movieLensAvgRating AS globalAvg,
-      rec.movieLensRatingCount AS ratingCount
+      count(DISTINCT similar) AS similarUsers, // Conta quanti "utenti simili" consigliano il film
+      avg(r2.rating) AS avgSimilarRating,      // Calcola il voto medio dato solo dagli utenti simili
+      rec.movieLensAvgRating AS globalAvg,     // Recupera il voto medio globale del film
+      rec.movieLensRatingCount AS ratingCount  // Recupera il numero totale di recensioni
+    
+    // PASSO F: Ordinamento e Limite.
     ORDER BY
-      similarUsers DESC,
-      avgSimilarRating DESC,
-      ratingCount DESC
-    LIMIT 30
+      similarUsers DESC,       // Primario: quanti utenti della tua "nicchia" lo consigliano
+      avgSimilarRating DESC,   // Secondario: che voto medio gli ha dato la tua "nicchia"
+      ratingCount DESC         // Terziario: popolarità globale (per rompere eventuali pareggi)
+    LIMIT 30                   // Restituisce solo le top 30 raccomandazioni per non appesantire il client
     `,
-    { uid }
+    { uid } // Inietta l'ID utente nella query in modo sicuro
   );
 
+  // Se la query personalizzata ha trovato dei film (l'utente aveva uno storico sufficiente)...
   if (personalized.records.length > 0) {
+    // Mappa i record grezzi restituiti dal driver di Neo4j in un array di oggetti JavaScript standard
     return personalized.records.map((record) => ({
-      tmdbId: toNativeNumber(record.get('tmdbId')),
+      tmdbId: toNativeNumber(record.get('tmdbId')), // Usa un helper per convertire l'intero di Neo4j
       title: record.get('title') || '',
       similarUsers: toNativeNumber(record.get('similarUsers')),
       avgSimilarRating: Number(record.get('avgSimilarRating')),
@@ -355,26 +401,40 @@ async function getRecommendations(uid) {
     }));
   }
 
+  // ==========================================
+  // FASE 2: QUERY DI FALLBACK (COLD START)
+  // ==========================================
+  
+  // Se arriviamo qui, significa che l'utente è nuovo e non ha ancora messo nessun "Mi piace".
+  // Cerchiamo quindi i film più popolari e apprezzati in assoluto.
   const fallback = await neo4jService.run(
     `
+    // Seleziona tutti i film
     MATCH (m:Movie)
+    // Filtra quelli validi e che hanno almeno 50 recensioni (per evitare film sconosciuti con un solo voto "5")
     WHERE m.tmdbId IS NOT NULL
       AND m.movieLensRatingCount >= 50
+    
+    // Restituisci i dati base
     RETURN
       m.tmdbId AS tmdbId,
       m.title AS title,
       m.movieLensAvgRating AS globalAvg,
       m.movieLensRatingCount AS ratingCount
+    
+    // Ordina prima per voto medio più alto, e poi per numero di recensioni
     ORDER BY m.movieLensAvgRating DESC, m.movieLensRatingCount DESC
-    LIMIT 30
+    LIMIT 30 // Restituisce i top 30 assoluti
     `
   );
 
+  // Mappa i risultati della query di fallback.
+  // IMPORTANTE: Mantiene la stessa identica struttura dati della query personalizzata.
   return fallback.records.map((record) => ({
     tmdbId: toNativeNumber(record.get('tmdbId')),
     title: record.get('title') || '',
-    similarUsers: 0,
-    avgSimilarRating: null,
+    similarUsers: 0, // Settato a 0 perché non stiamo usando il filtraggio collaborativo
+    avgSimilarRating: null, // Settato a null per lo stesso motivo
     globalAvg: record.get('globalAvg') == null ? null : Number(record.get('globalAvg')),
     ratingCount: record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
   }));
@@ -388,6 +448,8 @@ module.exports = {
   dislikeMovie,
   watchlistMovie,
   removeFromWatchlist,
+  removeLike,
+  removeDislike,
   getUserLibrary,
   getRecommendations,
 };

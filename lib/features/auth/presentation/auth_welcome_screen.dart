@@ -93,11 +93,12 @@ class _AgreeoAuthWelcomeScreenState
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight - 64,
                 ), // subtract padding
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: IntrinsicHeight(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 40),
                       // Neon Text Logo
@@ -298,6 +299,7 @@ class _AgreeoAuthWelcomeScreenState
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
             );

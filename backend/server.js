@@ -163,6 +163,8 @@ app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
 app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
 app.post('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.watchlist);
 app.delete('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.removeFromWatchlist);
+app.delete('/me/movies/:tmdbId/like', verifyMiddleware, movieController.removeLike);
+app.delete('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.removeDislike);
 app.get('/me/library', verifyMiddleware, movieController.library);
 app.get('/me/recommendations', verifyMiddleware, movieController.recommendations);
 
