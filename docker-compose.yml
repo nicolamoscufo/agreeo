@@ -26,7 +26,7 @@ services:
       - NEO4J_USERNAME=neo4j
       - NEO4J_PASSWORD=password123
       - NEO4J_DATABASE=neo4j
-      - TMDB_ACCESS_TOKEN=
+      - TMDB_ACCESS_TOKEN=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1OGFmN2VhNGVjMTk1YmVhZjk2NWNjNmNkM2U2ZWJhNiIsIm5iZiI6MTY1NjQzNzE4My45NTgwMDAyLCJzdWIiOiI2MmJiMzliZjdlZjM4MTA0MzUzOTU5ODUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.0xkn6EA6U_2Ghh0X2LIjcZCuqvyj0FTdnnYwKjUxHew
       - JWT_SECRET=super_secret_key_change_me
     ports:
       - "3000:3000"
