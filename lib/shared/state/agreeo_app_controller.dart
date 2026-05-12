@@ -300,11 +300,33 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   }
 
   Future<void> finishOnboarding() async {
+    await _authService.markOnboardingCompleted(
+      selectedFavoriteTmdbIds: _selectedFavoriteTmdbIds(),
+      favoriteGenres: state.onboarding.favoriteGenres,
+    );
+
     state = state.copyWith(
       onboarding: state.onboarding.copyWith(completed: true),
     );
     await _refreshDailySuggestions();
     await _persist();
+  }
+
+  List<int> _selectedFavoriteTmdbIds() {
+    final ids = <int>[];
+    for (final movieId in state.onboarding.favoriteMovieIds) {
+      final movie = state.movieById(movieId);
+      final tmdbId = movie?.tmdbId ?? _parseTmdbId(movieId);
+      if (tmdbId != null && tmdbId > 0) {
+        ids.add(tmdbId);
+      }
+    }
+    return ids.toList(growable: false);
+  }
+
+  int? _parseTmdbId(String movieId) {
+    final rawId = movieId.startsWith('tmdb-') ? movieId.substring(5) : movieId;
+    return int.tryParse(rawId);
   }
 
   Future<void> refreshMovieSuggestions() async {

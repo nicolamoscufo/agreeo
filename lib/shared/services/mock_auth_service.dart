@@ -55,6 +55,16 @@ class MockAuthService {
     await _authService.logout();
   }
 
+  Future<void> markOnboardingCompleted({
+    List<int> selectedFavoriteTmdbIds = const <int>[],
+    List<String> favoriteGenres = const <String>[],
+  }) async {
+    await _authService.markOnboardingCompleted(
+      selectedFavoriteTmdbIds: selectedFavoriteTmdbIds,
+      favoriteGenres: favoriteGenres,
+    );
+  }
+
   Future<AgreeoUserSession> _loadSessionFromBackend() async {
     final user = await _authService.getCurrentNeo4jUser();
     if (user == null) {

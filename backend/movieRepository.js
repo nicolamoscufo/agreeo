@@ -211,6 +211,69 @@ async function watchlistMovie(uid, movie) {
   return result.records.length > 0;
 }
 
+async function saveSelectedFavorites(uid, movies, weight = 4.0) {
+  const selectedMovies = Array.isArray(movies) ? movies : [];
+
+  for (const movie of selectedMovies) {
+    await mergeTmdbMovie(movie);
+  }
+
+  const tmdbIds = selectedMovies
+    .map((movie) => movie?.tmdbId)
+    .filter((tmdbId) => Number.isInteger(tmdbId) && tmdbId > 0);
+
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})
+    OPTIONAL MATCH (u)-[old:SELECTED_FAVORITE]->(:Movie)
+    DELETE old
+    WITH u
+    CALL {
+      WITH u
+      UNWIND $tmdbIds AS tmdbId
+      MATCH (m:Movie {tmdbId: tmdbId})
+      MERGE (u)-[r:SELECTED_FAVORITE]->(m)
+      ON CREATE SET r.createdAt = datetime()
+      SET r.weight = $weight
+      RETURN count(r) AS selectedCount
+    }
+    RETURN selectedCount
+    `,
+    { uid, tmdbIds, weight }
+  );
+
+  return result.records.length > 0;
+}
+
+async function savePreferredGenres(uid, genres) {
+  const normalizedGenres = Array.isArray(genres)
+    ? genres
+        .map((genre) => (genre == null ? '' : String(genre).trim()))
+        .filter((genre) => genre.length > 0)
+    : [];
+
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})
+    OPTIONAL MATCH (u)-[old:PREFERS_GENRE]->(:Genre)
+    DELETE old
+    WITH u
+    CALL {
+      WITH u
+      UNWIND $genres AS genreName
+      MERGE (g:Genre {name: genreName})
+      MERGE (u)-[r:PREFERS_GENRE]->(g)
+      ON CREATE SET r.createdAt = datetime()
+      RETURN count(r) AS preferredGenreCount
+    }
+    RETURN preferredGenreCount
+    `,
+    { uid, genres: normalizedGenres }
+  );
+
+  return result.records.length > 0;
+}
+
 async function removeFromWatchlist(uid, tmdbId) {
   await neo4jService.run(
     `
@@ -352,40 +415,130 @@ async function getRecommendations(uid) {
   // Esegue una query sul database Neo4j passando l'uid dell'utente
   const personalized = await neo4jService.run(
     `
-    // PASSO A: Trova l'utente attuale nell'app e i film che gli piacciono o che ha tra i preferiti
-    MATCH (me:AppUser {uid: $uid})-[:LIKED|SELECTED_FAVORITE]->(liked:Movie)
+    MATCH (me:AppUser {uid: $uid})
 
-    // PASSO B: "Gemelli di Gusti". Collega i film trovati al dataset di MovieLens.
-    // Poi cerca altri utenti su MovieLens (similar) che hanno recensito positivamente (>= 4.0) questi stessi film.
-    MATCH (liked)<-[:MATCHES_TMDB]-(likedMl:MovieLensMovie)<-[r1:RATED]-(similar:MovieLensUser)
+    // PASSO A: Sintetizza i generi ripetutamente disprezzati. La soglia evita di
+    // penalizzare un intero genere per un singolo film non gradito.
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:DISLIKED]->(disliked:Movie)
+      OPTIONAL MATCH (disliked)<-[:MATCHES_TMDB]-(dislikedMl:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+      OPTIONAL MATCH (disliked)-[:IN_GENRE]->(movieGenre:Genre)
+      WITH disliked, collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS genreNames
+      UNWIND CASE WHEN size(genreNames) = 0 THEN [null] ELSE genreNames END AS genreName
+      WITH genreName, count(DISTINCT disliked) AS dislikedCount
+      WHERE genreName IS NOT NULL AND dislikedCount >= $dislikedGenreThreshold
+      RETURN collect({name: genreName, count: dislikedCount}) AS dislikedGenres
+    }
+
+    // PASSO B: Trova i segnali positivi dell'utente e assegna pesi diversi.
+    MATCH (me)-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(seed:Movie)
+
+    // PASSO C: "Gemelli di Gusti" pesati. I rating MovieLens piu alti contano di piu,
+    // mentre i seed estremamente popolari sono meno informativi.
+    MATCH (seed)<-[:MATCHES_TMDB]-(seedMl:MovieLensMovie)<-[r1:RATED]-(similar:MovieLensUser)
     WHERE r1.rating >= 4.0
+    WITH
+      me,
+      dislikedGenres,
+      similar,
+      count(DISTINCT seed) AS overlapCount,
+      sum(
+        CASE type(signal)
+          WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, $selectedFavoriteWeight)
+          WHEN 'LIKED' THEN $likedWeight
+          WHEN 'WATCHLISTED' THEN $watchlistedWeight
+          ELSE 1.0
+        END
+        * (toFloat(r1.rating) - 3.0)
+        * (1.0 / log(toFloat(coalesce(seed.movieLensRatingCount, seedMl.movieLensRatingCount, 0)) + 2.0))
+      ) AS similarityScore
+    WHERE similarityScore > 0
 
-    // PASSO C: I Suggerimenti. Cerca altri film (recMl) recensiti positivamente (>= 4.0)
+    // PASSO D: I Suggerimenti. Cerca altri film (recMl) recensiti positivamente (>= 4.0)
     // da questi utenti "simili" e ricollegali ai film del nostro database locale (rec:Movie).
     MATCH (similar)-[r2:RATED]->(recMl:MovieLensMovie)-[:MATCHES_TMDB]->(rec:Movie)
     WHERE r2.rating >= 4.0
       AND rec.tmdbId IS NOT NULL // Assicura che il film esista e abbia un ID valido per l'API
 
-      // PASSO D: Esclusione. Non consigliare film che l'utente ha già valutato o salvato.
-      AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED]->(rec)
+      // PASSO E: Esclusione. Non consigliare film che l'utente ha già valutato o salvato.
+      AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(rec)
 
-    // PASSO E: Aggregazione dei risultati.
+    // PASSO F: Penalita negativa morbida. I generi ripetutamente disprezzati abbassano
+    // il ranking ma non bloccano del tutto il candidato.
+    OPTIONAL MATCH (recMl)-[:IN_GENRE]->(recMlGenre:Genre)
+    OPTIONAL MATCH (rec)-[:IN_GENRE]->(recMovieGenre:Genre)
+    WITH
+      rec,
+      similar,
+      r2,
+      similarityScore,
+      overlapCount,
+      dislikedGenres,
+      collect(DISTINCT recMlGenre.name) + collect(DISTINCT recMovieGenre.name) AS candidateGenreNames
+    WITH
+      rec,
+      similar,
+      r2,
+      similarityScore,
+      overlapCount,
+      [entry IN coalesce(dislikedGenres, []) WHERE entry.name IN candidateGenreNames | entry] AS matchingDislikedGenres
+    WITH
+      rec,
+      similar,
+      r2,
+      similarityScore,
+      overlapCount,
+      reduce(penalty = 0.0, entry IN matchingDislikedGenres |
+        penalty + ($dislikedGenrePenalty * toFloat(entry.count))
+      ) AS negativePenalty
+
+    // PASSO G: Aggregazione dei risultati.
+    WITH
+      rec,
+      count(DISTINCT similar) AS similarUsers,
+      avg(r2.rating) AS avgSimilarRating,
+      sum(similarityScore * (toFloat(r2.rating) - 3.0)) AS collaborativeScore,
+      avg(overlapCount) AS avgOverlapCount,
+      max(negativePenalty) AS negativePenalty
+    WITH
+      rec,
+      similarUsers,
+      avgSimilarRating,
+      collaborativeScore,
+      avgOverlapCount,
+      negativePenalty,
+      collaborativeScore - negativePenalty AS finalScore
+
     RETURN
       rec.tmdbId AS tmdbId,
       rec.title AS title,
-      count(DISTINCT similar) AS similarUsers, // Conta quanti "utenti simili" consigliano il film
-      avg(r2.rating) AS avgSimilarRating,      // Calcola il voto medio dato solo dagli utenti simili
+      similarUsers,       // Conta quanti "utenti simili" consigliano il film
+      avgSimilarRating,   // Calcola il voto medio dato solo dagli utenti simili
+      collaborativeScore,
+      avgOverlapCount,
+      negativePenalty,
+      finalScore,
       rec.movieLensAvgRating AS globalAvg,     // Recupera il voto medio globale del film
       rec.movieLensRatingCount AS ratingCount  // Recupera il numero totale di recensioni
     
-    // PASSO F: Ordinamento e Limite.
+    // PASSO H: Ordinamento e Limite.
     ORDER BY
-      similarUsers DESC,       // Primario: quanti utenti della tua "nicchia" lo consigliano
-      avgSimilarRating DESC,   // Secondario: che voto medio gli ha dato la tua "nicchia"
-      ratingCount DESC         // Terziario: popolarità globale (per rompere eventuali pareggi)
-    LIMIT 30                   // Restituisce solo le top 30 raccomandazioni per non appesantire il client
+      finalScore DESC,         // Primario: score collaborativo corretto dai segnali negativi
+      collaborativeScore DESC, // Secondario: forza pesata della similarita e del rating candidato
+      similarUsers DESC,       // Secondario: quanti utenti della tua "nicchia" lo consigliano
+      avgSimilarRating DESC,   // Terziario: che voto medio gli ha dato la tua "nicchia"
+      ratingCount DESC         // Tie-breaker: popolarità globale
+    LIMIT 80                   // Pool candidato piu ampio per il reranking lato backend
     `,
-    { uid } // Inietta l'ID utente nella query in modo sicuro
+    {
+      uid,
+      selectedFavoriteWeight: 4.0,
+      likedWeight: 3.0,
+      watchlistedWeight: 1.25,
+      dislikedGenreThreshold: 2,
+      dislikedGenrePenalty: 1.5,
+    } // Inietta i parametri nella query in modo sicuro
   );
 
   // Se la query personalizzata ha trovato dei film (l'utente aveva uno storico sufficiente)...
@@ -396,6 +549,10 @@ async function getRecommendations(uid) {
       title: record.get('title') || '',
       similarUsers: toNativeNumber(record.get('similarUsers')),
       avgSimilarRating: Number(record.get('avgSimilarRating')),
+      collaborativeScore: Number(record.get('collaborativeScore')),
+      avgOverlapCount: Number(record.get('avgOverlapCount')),
+      negativePenalty: Number(record.get('negativePenalty')),
+      finalScore: Number(record.get('finalScore')),
       globalAvg: record.get('globalAvg') == null ? null : Number(record.get('globalAvg')),
       ratingCount: record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
     }));
@@ -405,27 +562,85 @@ async function getRecommendations(uid) {
   // FASE 2: QUERY DI FALLBACK (COLD START)
   // ==========================================
   
-  // Se arriviamo qui, significa che l'utente è nuovo e non ha ancora messo nessun "Mi piace".
-  // Cerchiamo quindi i film più popolari e apprezzati in assoluto.
+  // Se arriviamo qui, l'utente non ha abbastanza storico collaborativo.
+  // Usiamo un fallback a livelli: generi onboarding, generi dei preferiti, poi qualità globale.
   const fallback = await neo4jService.run(
     `
-    // Seleziona tutti i film
+    MATCH (me:AppUser {uid: $uid})
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:PREFERS_GENRE]->(preferred:Genre)
+      RETURN collect(DISTINCT preferred.name) AS preferredGenres
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:SELECTED_FAVORITE]->(favorite:Movie)
+      OPTIONAL MATCH (favorite)<-[:MATCHES_TMDB]-(favoriteMl:MovieLensMovie)-[:IN_GENRE]->(favoriteMlGenre:Genre)
+      OPTIONAL MATCH (favorite)-[:IN_GENRE]->(favoriteMovieGenre:Genre)
+      RETURN collect(DISTINCT favoriteMlGenre.name) + collect(DISTINCT favoriteMovieGenre.name) AS favoriteGenres
+    }
+
     MATCH (m:Movie)
-    // Filtra quelli validi e che hanno almeno 50 recensioni (per evitare film sconosciuti con un solo voto "5")
     WHERE m.tmdbId IS NOT NULL
-      AND m.movieLensRatingCount >= 50
+      AND coalesce(m.movieLensRatingCount, 0) >= $minFallbackRatingCount
+      AND NOT EXISTS {
+        MATCH (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
+      }
+
+    OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+    OPTIONAL MATCH (m)-[:IN_GENRE]->(movieGenre:Genre)
+    WITH
+      m,
+      preferredGenres,
+      favoriteGenres,
+      collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS candidateGenres
+    WITH
+      m,
+      preferredGenres,
+      favoriteGenres,
+      candidateGenres,
+      size([genre IN candidateGenres WHERE genre IN preferredGenres]) AS matchedPreferredGenres,
+      size([genre IN candidateGenres WHERE genre IN favoriteGenres]) AS matchedFavoriteGenres,
+      toFloat(coalesce(m.movieLensRatingCount, 0)) AS ratingCount,
+      toFloat(coalesce(m.movieLensAvgRating, $globalMeanRating)) AS avgRating
+    WITH
+      m,
+      matchedPreferredGenres,
+      matchedFavoriteGenres,
+      ratingCount,
+      ((ratingCount / (ratingCount + $bayesianPriorWeight)) * avgRating) +
+        (($bayesianPriorWeight / (ratingCount + $bayesianPriorWeight)) * $globalMeanRating) AS bayesianScore,
+      CASE
+        WHEN size(preferredGenres) > 0 THEN matchedPreferredGenres * 100.0 + matchedFavoriteGenres * 10.0
+        WHEN size(favoriteGenres) > 0 THEN matchedFavoriteGenres * 80.0
+        ELSE 0.0
+      END AS preferenceScore
     
-    // Restituisci i dati base
     RETURN
       m.tmdbId AS tmdbId,
       m.title AS title,
+      0 AS similarUsers,
+      null AS avgSimilarRating,
+      (preferenceScore + bayesianScore + log(ratingCount + 1.0)) AS collaborativeScore,
+      0.0 AS avgOverlapCount,
+      0.0 AS negativePenalty,
+      (preferenceScore + bayesianScore + log(ratingCount + 1.0)) AS finalScore,
       m.movieLensAvgRating AS globalAvg,
       m.movieLensRatingCount AS ratingCount
     
-    // Ordina prima per voto medio più alto, e poi per numero di recensioni
-    ORDER BY m.movieLensAvgRating DESC, m.movieLensRatingCount DESC
-    LIMIT 30 // Restituisce i top 30 assoluti
-    `
+    ORDER BY
+      finalScore DESC,
+      preferenceScore DESC,
+      bayesianScore DESC,
+      ratingCount DESC
+    LIMIT 80
+    `,
+    {
+      uid,
+      minFallbackRatingCount: 50,
+      bayesianPriorWeight: 100.0,
+      globalMeanRating: 3.5,
+    }
   );
 
   // Mappa i risultati della query di fallback.
@@ -433,8 +648,12 @@ async function getRecommendations(uid) {
   return fallback.records.map((record) => ({
     tmdbId: toNativeNumber(record.get('tmdbId')),
     title: record.get('title') || '',
-    similarUsers: 0, // Settato a 0 perché non stiamo usando il filtraggio collaborativo
-    avgSimilarRating: null, // Settato a null per lo stesso motivo
+    similarUsers: toNativeNumber(record.get('similarUsers')),
+    avgSimilarRating: record.get('avgSimilarRating'),
+    collaborativeScore: Number(record.get('collaborativeScore')),
+    avgOverlapCount: Number(record.get('avgOverlapCount')),
+    negativePenalty: Number(record.get('negativePenalty')),
+    finalScore: Number(record.get('finalScore')),
     globalAvg: record.get('globalAvg') == null ? null : Number(record.get('globalAvg')),
     ratingCount: record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
   }));
@@ -447,6 +666,8 @@ module.exports = {
   likeMovie,
   dislikeMovie,
   watchlistMovie,
+  saveSelectedFavorites,
+  savePreferredGenres,
   removeFromWatchlist,
   removeLike,
   removeDislike,

@@ -239,7 +239,7 @@ class AppController extends StateNotifier<AppState> {
     );
 
     // Call backend endpoint to persist onboarding completion
-    await _authService.markOnboardingCompleted();
+    await _authService.markOnboardingCompleted(favoriteGenres: favoriteGenres);
 
     state = state.copyWith(preferences: nextPreferences);
     await _persistState();

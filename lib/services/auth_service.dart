@@ -173,18 +173,29 @@ class AuthService {
     return user?.onboardingCompleted ?? false;
   }
 
-  Future<void> markOnboardingCompleted() async {
+  Future<void> markOnboardingCompleted({
+    List<int>? selectedFavoriteTmdbIds,
+    List<String>? favoriteGenres,
+  }) async {
     final token = await readToken();
     if (token == null || token.isEmpty) return;
 
     try {
+      final body = <String, dynamic>{'completed': true};
+      if (selectedFavoriteTmdbIds != null) {
+        body['selectedFavoriteTmdbIds'] = selectedFavoriteTmdbIds;
+      }
+      if (favoriteGenres != null) {
+        body['favoriteGenres'] = favoriteGenres;
+      }
+
       final resp = await http.patch(
         Uri.parse('${_config.meUrl}/onboarding'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({'completed': true}),
+        body: jsonEncode(body),
       );
 
       if (resp.statusCode != 200) {

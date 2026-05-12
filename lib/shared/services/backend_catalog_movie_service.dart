@@ -2,6 +2,7 @@ import 'package:agreeo/services/backend_movie_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/mock_movie_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
+import 'package:flutter/foundation.dart';
 
 class BackendCatalogMovieService implements MovieService {
   BackendCatalogMovieService({
@@ -31,18 +32,27 @@ class BackendCatalogMovieService implements MovieService {
     required List<String> favoriteMovieIds,
   }) async {
     try {
+      // Normal path: let the backend own personalized + cold-start fallback.
       final recommendations = await _backendMovieService.getRecommendations();
-      if (recommendations.isNotEmpty) {
-        return recommendations;
-      }
-    } catch (_) {}
+      return recommendations;
+    } catch (error) {
+      // Emergency path only: backend request failed completely.
+      // Keep the fallback explicit so normal cold-start users still go through Neo4j.
+      debugPrint(
+        '[BackendCatalogMovieService] recommendation backend failed: $error',
+      );
+    }
 
     try {
       final popular = await _backendMovieService.getPopularMovies();
       if (popular.isNotEmpty) {
         return popular;
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint(
+        '[BackendCatalogMovieService] popular backend fallback failed: $error',
+      );
+    }
 
     return _fallback.getDailySuggestions(
       favoriteGenres: favoriteGenres,

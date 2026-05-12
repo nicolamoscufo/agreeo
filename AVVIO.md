@@ -61,6 +61,7 @@ Assicurati di aver installato sul tuo sistema:
 ## Seed del Database (Opzionale)
 
 Se hai bisogno di popolare il database con dati mock o script come Movielens dopo il primissimo avvio (quando il database Neo4j è completamente vuoto), il servizio NodeJS (backend) ha una cartella `/scripts` e file `seedInitialUsers.js`. Puoi ad esempio entrare nel terminare del backend NodeJS su docker:
+
 ```bash
 docker exec -it agreeo_backend sh
 node seedInitialUsers.js

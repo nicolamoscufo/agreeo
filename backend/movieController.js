@@ -1,5 +1,6 @@
 const { tmdbGet } = require('./tmdbClient');
 const movieRepository = require('./movieRepository');
+const neo4jService = require('./neo4jService');
 
 function parseTmdbId(value) {
   const tmdbId = Number.parseInt(value, 10);
@@ -11,12 +12,228 @@ function parseTmdbId(value) {
   return tmdbId;
 }
 
+function parseTmdbIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const tmdbIds = [];
+
+  for (const item of value) {
+    const tmdbId = parseTmdbId(item);
+    if (tmdbId && !seen.has(tmdbId)) {
+      seen.add(tmdbId);
+      tmdbIds.push(tmdbId);
+    }
+  }
+
+  return tmdbIds;
+}
+
+function parseStringList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const items = [];
+
+  for (const item of value) {
+    const text = item == null ? '' : String(item).trim();
+    if (text && !seen.has(text)) {
+      seen.add(text);
+      items.push(text);
+    }
+  }
+
+  return items;
+}
+
 function imageUrl(path, size) {
   if (!path) {
     return '';
   }
 
   return `https://image.tmdb.org/t/p/${size}${path}`;
+}
+
+function normalizeRecommendationTitle(title) {
+  return String(title || '')
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function diversifyRecommendations(candidates, limit = 30) {
+  const ordered = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+  const selected = [];
+  const skipped = [];
+  const seenTmdbIds = new Set();
+  const seenTitles = new Set();
+  const genreCounts = new Map();
+  const hasGenreData = ordered.some(
+    (candidate) => Array.isArray(candidate.genreIds) && candidate.genreIds.length > 0
+  );
+  const genreCap = hasGenreData ? Math.max(2, Math.ceil(limit / 8)) : null;
+
+  function isDuplicate(candidate) {
+    const tmdbKey = candidate.tmdbId == null ? null : String(candidate.tmdbId);
+    const titleKey = normalizeRecommendationTitle(candidate.title || candidate.originalTitle);
+
+    if (tmdbKey && seenTmdbIds.has(tmdbKey)) {
+      return true;
+    }
+
+    return titleKey.length > 0 && seenTitles.has(titleKey);
+  }
+
+  function markSeen(candidate) {
+    if (candidate.tmdbId != null) {
+      seenTmdbIds.add(String(candidate.tmdbId));
+    }
+
+    const titleKey = normalizeRecommendationTitle(candidate.title || candidate.originalTitle);
+    if (titleKey.length > 0) {
+      seenTitles.add(titleKey);
+    }
+  }
+
+  function candidateGenreIds(candidate) {
+    if (!Array.isArray(candidate.genreIds)) {
+      return [];
+    }
+
+    return [...new Set(candidate.genreIds.filter((id) => Number.isInteger(id)))];
+  }
+
+  function canTake(candidate) {
+    if (!hasGenreData || !genreCap) {
+      return true;
+    }
+
+    const genres = candidateGenreIds(candidate);
+    if (genres.length === 0) {
+      return true;
+    }
+
+    const lowestPressure = Math.min(
+      ...genres.map((genreId) => genreCounts.get(genreId) || 0)
+    );
+
+    return lowestPressure < genreCap;
+  }
+
+  function applyGenreCounts(candidate) {
+    for (const genreId of candidateGenreIds(candidate)) {
+      genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+    }
+  }
+
+  for (const candidate of ordered) {
+    if (selected.length >= limit) {
+      break;
+    }
+
+    if (isDuplicate(candidate)) {
+      continue;
+    }
+
+    if (!canTake(candidate)) {
+      skipped.push(candidate);
+      continue;
+    }
+
+    markSeen(candidate);
+    applyGenreCounts(candidate);
+    selected.push(candidate);
+  }
+
+  if (selected.length < limit && skipped.length > 0) {
+    for (const candidate of skipped) {
+      if (selected.length >= limit) {
+        break;
+      }
+
+      if (isDuplicate(candidate)) {
+        continue;
+      }
+
+      markSeen(candidate);
+      selected.push(candidate);
+    }
+  }
+
+  if (!hasGenreData) {
+    // TODO: add genre-aware reranking once canonical genre data is guaranteed everywhere.
+  }
+
+  return selected.slice(0, limit);
+}
+
+async function hydrateRecommendations(
+  recommendations,
+  {
+    limit = 30,
+    batchSize = 4,
+    tmdbFetch = tmdbGet,
+    findMovieByTmdbId = movieRepository.findMovieByTmdbId,
+    logger = console,
+  } = {}
+) {
+  const hydrated = [];
+  const candidates = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
+
+  for (let index = 0; index < candidates.length && hydrated.length < limit; index += batchSize) {
+    const batch = candidates.slice(index, index + batchSize);
+    const batchHydrated = await Promise.all(
+      batch.map(async (entry) => {
+        try {
+          const tmdbMovie = await tmdbFetch(`/movie/${entry.tmdbId}`);
+          if (!tmdbMovie || typeof tmdbMovie !== 'object' || !Number.isInteger(tmdbMovie.id)) {
+            logger.warn(`Skipping invalid TMDB recommendation ${entry.tmdbId}: invalid payload`);
+            return null;
+          }
+
+          const neoMovie = await findMovieByTmdbId(entry.tmdbId);
+          return {
+            ...mapTmdbMovie(tmdbMovie, {
+              ...(neoMovie || {}),
+              movieLensAvgRating: entry.globalAvg ?? neoMovie?.movieLensAvgRating ?? null,
+              movieLensRatingCount: entry.ratingCount ?? neoMovie?.movieLensRatingCount ?? 0,
+            }),
+            recommendation: {
+              similarUsers: entry.similarUsers,
+              avgSimilarRating: entry.avgSimilarRating,
+            },
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message.includes('TMDB error 404')) {
+            // TODO: mark stale TMDB ids in Neo4j if a safe invalidation mechanism is added.
+            logger.warn(`Skipping stale TMDB recommendation ${entry.tmdbId}: ${message}`);
+            return null;
+          }
+
+          logger.warn(`Skipping TMDB recommendation ${entry.tmdbId}: ${message}`);
+          return null;
+        }
+      })
+    );
+
+    for (const movie of batchHydrated) {
+      if (movie) {
+        hydrated.push(movie);
+      }
+      if (hydrated.length >= limit) {
+        break;
+      }
+    }
+  }
+
+  return hydrated.slice(0, limit);
 }
 
 function extractTrailerUrl(videos) {
@@ -322,6 +539,79 @@ exports.watchlist = async (req, res) => {
   }
 };
 
+exports.updateOnboarding = async (req, res) => {
+  const uid = requestUid(req);
+
+  if (!uid) {
+    return res.status(401).json({ error: 'Missing user context' });
+  }
+
+  const completed = req.body.completed === true;
+  const selectedFavoriteTmdbIds = parseTmdbIds(req.body.selectedFavoriteTmdbIds);
+  const favoriteGenres = parseStringList(req.body.favoriteGenres);
+  const shouldPersistFavorites = Object.prototype.hasOwnProperty.call(
+    req.body,
+    'selectedFavoriteTmdbIds'
+  );
+  const shouldPersistGenres = Object.prototype.hasOwnProperty.call(req.body, 'favoriteGenres');
+
+  try {
+    if (shouldPersistGenres) {
+      const saved = await movieRepository.savePreferredGenres(uid, favoriteGenres);
+
+      if (!saved) {
+        return res.status(404).json({ error: 'App user not found' });
+      }
+    }
+
+    if (shouldPersistFavorites) {
+      const selectedFavoriteMovies = await Promise.all(
+        selectedFavoriteTmdbIds.map((tmdbId) => fetchInteractionMovie(tmdbId))
+      );
+      const saved = await movieRepository.saveSelectedFavorites(uid, selectedFavoriteMovies, 4.0);
+
+      if (!saved) {
+        return res.status(404).json({ error: 'App user not found' });
+      }
+    }
+
+    const result = await neo4jService.run(
+      `
+      MATCH (u:AppUser {uid: $uid})
+      SET u.onboardingCompleted = $completed
+      RETURN
+        u.uid AS uid,
+        u.email AS email,
+        u.displayName AS displayName,
+        toString(u.createdAt) AS createdAt,
+        coalesce(u.onboardingCompleted, false) AS onboardingCompleted,
+        coalesce(u.roles, ['USER']) AS roles
+      LIMIT 1
+      `,
+      { uid, completed }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const record = result.records[0];
+
+    return res.json({
+      user: {
+        uid: record.get('uid'),
+        email: record.get('email'),
+        displayName: record.get('displayName'),
+        createdAt: record.get('createdAt'),
+        onboardingCompleted: record.get('onboardingCompleted') === true,
+        roles: record.get('roles') || ['USER'],
+      },
+    });
+  } catch (error) {
+    return handleError(res, error, 'Failed to update onboarding');
+  }
+};
+
 exports.removeLike = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
@@ -394,37 +684,21 @@ exports.recommendations = async (req, res) => {
 
   try {
     const recommendations = await movieRepository.getRecommendations(uid);
-    const detailed = await Promise.all(
-      recommendations.map(async (entry) => {
-        try {
-          const tmdbMovie = await tmdbGet(`/movie/${entry.tmdbId}`);
-          const neoMovie = await movieRepository.findMovieByTmdbId(entry.tmdbId);
-          return {
-            ...mapTmdbMovie(tmdbMovie, {
-              ...(neoMovie || {}),
-              movieLensAvgRating: entry.globalAvg ?? neoMovie?.movieLensAvgRating ?? null,
-              movieLensRatingCount: entry.ratingCount ?? neoMovie?.movieLensRatingCount ?? 0,
-            }),
-            recommendation: {
-              similarUsers: entry.similarUsers,
-              avgSimilarRating: entry.avgSimilarRating,
-            },
-          };
-        } catch (error) {
-          // TMDB often returns 404 for old MovieLens IDs (deleted or moved to TV shows)
-          if (error.message && error.message.includes('TMDB error 404')) {
-            return null;
-          }
-          console.warn(`Skipping TMDB recommendation ${entry.tmdbId}:`, error.message || error);
-          return null;
-        }
-      })
-    );
+    const detailed = await hydrateRecommendations(recommendations, {
+      limit: 30,
+      batchSize: 4,
+      logger: console,
+    });
+    const diversified = diversifyRecommendations(detailed, 30);
 
     return res.json({
-      results: detailed.filter(Boolean),
+      results: diversified,
     });
   } catch (error) {
     return handleError(res, error, 'Failed to load recommendations');
   }
 };
+
+exports.diversifyRecommendations = diversifyRecommendations;
+exports.normalizeRecommendationTitle = normalizeRecommendationTitle;
+exports.hydrateRecommendations = hydrateRecommendations;

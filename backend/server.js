@@ -112,52 +112,7 @@ app.get('/me', verifyMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/me/onboarding', verifyMiddleware, async (req, res) => {
-  try {
-    const uid = req.user.uid || req.user.sub;
-    const completed = req.body.completed === true;
-
-    const result = await neo4jService.run(
-      `
-      MATCH (u:AppUser {uid: $uid})
-      SET u.onboardingCompleted = $completed
-      RETURN
-        u.uid AS uid,
-        u.email AS email,
-        u.displayName AS displayName,
-        toString(u.createdAt) AS createdAt,
-        coalesce(u.onboardingCompleted, false) AS onboardingCompleted,
-        coalesce(u.roles, ['USER']) AS roles
-      LIMIT 1
-      `,
-      { uid, completed }
-    );
-
-    if (result.records.length === 0) {
-      return res.status(404).json({
-        error: 'User not found',
-      });
-    }
-
-    const record = result.records[0];
-
-    return res.json({
-      user: {
-        uid: record.get('uid'),
-        email: record.get('email'),
-        displayName: record.get('displayName'),
-        createdAt: record.get('createdAt'),
-        onboardingCompleted: record.get('onboardingCompleted') === true,
-        roles: record.get('roles') || ['USER'],
-      },
-    });
-  } catch (error) {
-    console.error('/me/onboarding error:', error);
-    return res.status(500).json({
-      error: 'Failed to update onboarding',
-    });
-  }
-});
+app.patch('/me/onboarding', verifyMiddleware, movieController.updateOnboarding);
 
 app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
 app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
