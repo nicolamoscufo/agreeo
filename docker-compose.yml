@@ -1,17 +1,21 @@
-version: '3.8'
-
 services:
   neo4j:
     image: neo4j:latest
     container_name: agreeo_neo4j
     environment:
-      - NEO4J_AUTH=neo4j/password123
+      NEO4J_AUTH: neo4j/password123
     ports:
       - "7474:7474" # HTTP
       - "7687:7687" # Bolt
     volumes:
       - neo4j_data:/data
       - ./backend/data/ml-latest-small:/var/lib/neo4j/import
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "password123", "RETURN 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
     networks:
       - agreeo_net
 
@@ -20,18 +24,20 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: agreeo_backend
+    restart: unless-stopped
     environment:
-      - PORT=3000
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=password123
-      - NEO4J_DATABASE=neo4j
-      - TMDB_ACCESS_TOKEN=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1OGFmN2VhNGVjMTk1YmVhZjk2NWNjNmNkM2U2ZWJhNiIsIm5iZiI6MTY1NjQzNzE4My45NTgwMDAyLCJzdWIiOiI2MmJiMzliZjdlZjM4MTA0MzUzOTU5ODUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.0xkn6EA6U_2Ghh0X2LIjcZCuqvyj0FTdnnYwKjUxHew
-      - JWT_SECRET=super_secret_key_change_me
+      PORT: 3000
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: password123
+      NEO4J_DATABASE: neo4j
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME}
+      TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:-}
     ports:
       - "3000:3000"
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     networks:
       - agreeo_net
 

@@ -11,7 +11,7 @@ RUN flutter pub get
 COPY . .
 
 # Build the web version
-RUN flutter build web --release
+RUN flutter build web --release --dart-define=BACKEND_BASE_URL=http://localhost:3000
 
 # Serve with nginx
 FROM nginx:alpine
