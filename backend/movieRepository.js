@@ -31,6 +31,7 @@ function normalizeMovieRecord(record) {
     posterUrl: record.get('posterUrl') || '',
     backdropUrl: record.get('backdropUrl') || '',
     releaseDate: record.get('releaseDate') || '',
+    director: record.get('director') || '',
     voteAverage: record.get('voteAverage') == null ? null : Number(record.get('voteAverage')),
     movieLensAvgRating:
       record.get('movieLensAvgRating') == null ? null : Number(record.get('movieLensAvgRating')),
@@ -55,6 +56,7 @@ async function findMovieByTmdbId(tmdbId) {
       m.posterUrl AS posterUrl,
       m.backdropUrl AS backdropUrl,
       m.releaseDate AS releaseDate,
+      m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
       m.movieLensRatingCount AS movieLensRatingCount
@@ -85,6 +87,7 @@ async function findMoviesByTmdbIds(tmdbIds) {
       m.posterUrl AS posterUrl,
       m.backdropUrl AS backdropUrl,
       m.releaseDate AS releaseDate,
+      m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
       m.movieLensRatingCount AS movieLensRatingCount
@@ -111,6 +114,7 @@ async function mergeTmdbMovie(movie) {
       m.posterUrl = $posterUrl,
       m.backdropUrl = $backdropUrl,
       m.releaseDate = $releaseDate,
+      m.director = $director,
       m.voteAverage = $voteAverage,
       m.updatedAt = datetime()
     RETURN
@@ -123,6 +127,7 @@ async function mergeTmdbMovie(movie) {
       m.posterUrl AS posterUrl,
       m.backdropUrl AS backdropUrl,
       m.releaseDate AS releaseDate,
+      m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
       m.movieLensRatingCount AS movieLensRatingCount
@@ -137,6 +142,7 @@ async function mergeTmdbMovie(movie) {
       posterUrl: movie.posterUrl,
       backdropUrl: movie.backdropUrl,
       releaseDate: movie.releaseDate,
+      director: movie.director,
       voteAverage: movie.voteAverage,
     }
   );

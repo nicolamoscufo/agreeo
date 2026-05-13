@@ -190,6 +190,7 @@ class BackendMovieService {
             2);
     final trailerUrl = json['trailerUrl']?.toString() ?? '';
     final castEntries = _decodeObjectList(json['cast']);
+    final director = json['director']?.toString() ?? '';
 
     return Movie(
       id: tmdbId == null ? '' : 'tmdb-$tmdbId',
@@ -203,7 +204,7 @@ class BackendMovieService {
       releaseYear: year,
       runtime: (json['runtime'] as num?)?.toInt() ?? 110,
       genres: genres,
-      director: '',
+      director: director,
       cast: castEntries
           .map((entry) => entry['name']?.toString() ?? '')
           .where((name) => name.isNotEmpty)

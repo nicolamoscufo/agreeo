@@ -1,7 +1,5 @@
 import 'dart:ui';
-import 'package:agreeo/shared/components/movie_widgets.dart';
-import 'package:agreeo/shared/components/primitives.dart';
-import 'package:agreeo/shared/components/review_editor.dart';
+
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -26,318 +24,253 @@ class _AgreeoMovieDetailsScreenState
   @override
   void initState() {
     super.initState();
-    _movieFuture = ref
-        .read(movieServiceProvider)
-        .getMovieDetails(widget.movieId);
+    _movieFuture = ref.read(movieServiceProvider).getMovieDetails(widget.movieId);
+  }
+
+  Future<void> _openTrailer(Movie movie) async {
+    final uri = Uri.tryParse(movie.trailerUrl);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext context) {
     final appState = ref.watch(agreeoAppControllerProvider);
-    final controller = ref.read(agreeoAppControllerProvider.notifier);
     final cachedMovie = appState.movieById(widget.movieId);
-    final userState = appState.userMovieStateFor(widget.movieId);
-
-    Future<void> openTrailer(Movie movie) async {
-      final uri = Uri.tryParse(movie.trailerUrl);
-      if (uri == null) return;
-
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open trailer.')),
-        );
-      }
-    }
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFFC026D3)),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.ios_share_rounded, color: Color(0xFF22D3EE)),
-            onPressed: () {},
-          )
-        ],
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFF111111), // Sfondo nero profondo
       body: FutureBuilder<Movie?>(
         future: _movieFuture,
         initialData: cachedMovie,
         builder: (context, snapshot) {
           final movie = snapshot.data;
-
           if (movie == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: Colors.red));
           }
 
+          final heroImageUrl = movie.backdropUrl.isNotEmpty ? movie.backdropUrl : movie.posterUrl;
+          final metadata = [
+            movie.releaseYear.toString(),
+            if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
+            movie.runtimeLabel,
+          ].join('  |  ');
+
           return Stack(
-            fit: StackFit.expand,
             children: [
-              // Immagine Sotto a tutto schermo
-              CachedNetworkImage(
-                imageUrl: movie.posterUrl.isNotEmpty ? movie.posterUrl : movie.backdropUrl,
-                fit: BoxFit.cover,
-                errorWidget: (context, url, error) => Container(color: Colors.black),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.1),
-                      Colors.black.withOpacity(0.5),
-                      Colors.black.withOpacity(0.9),
-                      Colors.black.withOpacity(1.0),
-                    ],
-                    stops: const [0.0, 0.4, 0.7, 1.0],
-                  ),
-                ),
-              ),
-              // Content
               SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 100, 20, 20),
+                physics: const BouncingScrollPhysics(),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Title
-                    Text(
-                      movie.title.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
-                        shadows: [
-                          Shadow(
-                            color: Color(0x60C026D3),
-                            blurRadius: 20,
+                    // --- HEADER CON BACKDROP E TASTO PLAY ---
+                    SizedBox(
+                      height: MediaQuery.sizeOf(context).height * 0.45,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: CachedNetworkImage(
+                              imageUrl: heroImageUrl,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Gradiente per sfumare verso il basso
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    const Color(0xFF111111).withOpacity(0.8),
+                                    const Color(0xFF111111),
+                                  ],
+                                  stops: const [0.6, 0.9, 1.0],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Tasto Play Rosso Centrale
+                          Align(
+                            alignment: Alignment.center,
+                            child: GestureDetector(
+                              onTap: () => _openTrailer(movie),
+                              child: Container(
+                                width: 65,
+                                height: 65,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 45),
+                              ),
+                            ),
+                          ),
+                          // Tasti Top (Back e Heart)
+                          SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _GlassButton(icon: Icons.arrow_back, onPressed: () => Navigator.pop(context)),
+                                  _GlassButton(icon: Icons.favorite, onPressed: () {}),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Year & Duration
-                    Text(
-                      '${movie.releaseYear} • 2h 46m', 
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Neon Genres
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: movie.genres.take(3).map((g) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0xFF22D3EE), width: 1.5),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x2022D3EE),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              )
-                            ],
-                          ),
-                          child: Text(
-                            g.toUpperCase(),
+
+                    // --- DETTAGLI FILM ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          Text(
+                            movie.title,
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              color: Color(0xFF22D3EE),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 30),
-                    // Match & Rating Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Radial Match
-                        Container(
-                          width: 90,
-                          height: 90,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x30C026D3),
-                                blurRadius: 30,
-                                spreadRadius: -5,
-                              )
-                            ],
+                          const SizedBox(height: 12),
+                          Text(
+                            metadata,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14, fontWeight: FontWeight.w500),
                           ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              ShaderMask(
-                                shaderCallback: (rect) => const SweepGradient(
-                                  colors: [Color(0xFFC026D3), Color(0xFF22D3EE)],
-                                  stops: [0.3, 1.0],
-                                ).createShader(rect),
-                                child: const CircularProgressIndicator(
-                                  value: 0.92,
-                                  strokeWidth: 6,
-                                  backgroundColor: Colors.white12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Text(
-                                    '92%',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  Text(
-                                    'MATCH',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                          const SizedBox(height: 12),
+                          // Stelle gialle
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(5, (index) {
+                              return Icon(
+                                index < 4 ? Icons.star : Icons.star_border,
+                                color: Colors.amber,
+                                size: 24,
+                              );
+                            }),
                           ),
-                        ),
-                        const SizedBox(width: 30),
-                        // Rating
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Row(
-                              children: List.generate(5, (index) {
-                                return Icon(
-                                  index < 4 ? Icons.star : Icons.star_half,
-                                  color: const Color(0xFF22D3EE),
-                                  size: 24,
+                          const SizedBox(height: 32),
+                          
+                          // --- PLOT ---
+                          _buildSectionHeader('Plot'),
+                          const SizedBox(height: 12),
+                          Text(
+                            movie.overview,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 15,
+                              height: 1.5,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 32),
+
+                          // --- CAST (NUOVA SEZIONE) ---
+                          _buildSectionHeader('Cast'),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 100,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: movie.cast.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 20),
+                              itemBuilder: (context, index) {
+                                return Column(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 30,
+                                      backgroundColor: Colors.white10,
+                                      child: Icon(Icons.person, color: Colors.white.withOpacity(0.2)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      movie.cast[index],
+                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                    ),
+                                  ],
                                 );
-                              }),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${movie.rating.toStringAsFixed(1)}/5',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            )
-                          ],
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    // Plot
-                    Text(
-                      movie.overview,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 15,
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Director & Cast
-                    Row(
-                      children: [
-                         const CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.white24,
-                          child: Icon(Icons.person, color: Colors.white70, size: 20),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Director: ${movie.director.isNotEmpty ? movie.director : 'N/A'}',
-                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                          ),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Cast
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Cast: ',
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                        Expanded(
-                          child: Text(
-                            movie.cast.join(', '),
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                          ),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-                    // Buttons
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        gradient: LinearGradient(
-                          colors: [Colors.white.withOpacity(0.3), Colors.white.withOpacity(0.1)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        border: Border.all(color: Colors.white24, width: 1),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(28),
-                          onTap: () => openTrailer(movie),
-                          child: const Center(
-                            child: Text(
-                              'WATCH TRAILER',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              },
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 50),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 40),
                   ],
                 ),
+              ),
+              // Bottom Navigation Bar fissa
+              const Align(
+                alignment: Alignment.bottomCenter,
+                child: _FakeBottomNav(),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class _GlassButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  const _GlassButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          color: Colors.white.withOpacity(0.15),
+          child: IconButton(icon: Icon(icon, color: Colors.white), onPressed: onPressed),
+        ),
+      ),
+    );
+  }
+}
+
+class _FakeBottomNav extends StatelessWidget {
+  const _FakeBottomNav();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
+        ),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Icon(Icons.home, color: Colors.white, size: 28),
+          Icon(Icons.play_circle_outline, color: Colors.white54, size: 28),
+          Icon(Icons.search, color: Colors.white54, size: 28),
+          Icon(Icons.person_outline, color: Colors.white54, size: 28),
+        ],
       ),
     );
   }

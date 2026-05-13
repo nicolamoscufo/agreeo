@@ -245,6 +245,13 @@ function extractTrailerUrl(videos) {
   return trailer?.key ? `https://www.youtube.com/watch?v=${trailer.key}` : '';
 }
 
+function extractDirector(credits) {
+  const crew = Array.isArray(credits?.crew) ? credits.crew : [];
+  const director = crew.find((member) => member.job === 'Director');
+
+  return director?.name || '';
+}
+
 function mapMovieLens(neoMovie, fallbackAvg, fallbackCount) {
   const avgRating = neoMovie?.movieLensAvgRating ?? fallbackAvg ?? null;
   const ratingCount = neoMovie?.movieLensRatingCount ?? fallbackCount ?? 0;
@@ -284,6 +291,7 @@ function mapTmdbMovieDetails(tmdbMovie, neoMovie = null) {
 
   return {
     ...base,
+    director: extractDirector(tmdbMovie.credits),
     runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     genres: Array.isArray(tmdbMovie.genres)
       ? tmdbMovie.genres
@@ -339,6 +347,7 @@ function mapRepositoryMovieToResponse(movie) {
     posterUrl: movie.posterUrl || '',
     backdropUrl: movie.backdropUrl || '',
     releaseDate: movie.releaseDate || '',
+    director: movie.director || '',
     voteAverage: movie.voteAverage,
     genreIds: [],
     movieLens: {
@@ -361,6 +370,7 @@ function mapInteractionMovie(tmdbMovie) {
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
     voteAverage:
       tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
+    director: extractDirector(tmdbMovie.credits),
   };
 }
 
@@ -375,7 +385,9 @@ async function enrichMovies(tmdbMovies) {
 }
 
 async function fetchInteractionMovie(tmdbId) {
-  const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`);
+  const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, {
+    append_to_response: 'credits',
+  });
   return mapInteractionMovie(tmdbMovie);
 }
 
