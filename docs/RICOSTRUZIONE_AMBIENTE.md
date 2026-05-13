@@ -1,62 +1,61 @@
-# Ricostruzione ambiente (Docker + Neo4j + Frontend)
+# Ricostruzione ambiente
 
-Questa guida serve quando le modifiche non vengono applicate o l'ambiente sembra in stato incoerente.
+Guida rapida per portare lo stack da zero e verificare che tutto sia tornato pulito. Il database fa parte dello stack Docker, quindi qui viene trattato una sola volta e non ripetuto in ogni comando.
 
-## 1) Rebuild standard (senza cancellare il database)
+## 1) Reset totale da zero
 
-Usa questa procedura per aggiornare i container mantenendo i dati Neo4j.
+Da eseguire nella root del progetto, dove si trova `docker-compose.yml`:
 
-1. Ricostruisci e ricrea backend e frontend:
-   docker compose up -d --build --force-recreate backend frontend
+```bash
+docker compose down -v --remove-orphans
+docker image prune -f
+docker compose up -d --build --force-recreate
+```
 
-2. Controlla stato servizi:
-   docker compose ps
+Cosa fa:
+- `down -v` rimuove container, rete e volumi del progetto
+- `--remove-orphans` elimina eventuali container rimasti fuori composizione
+- `image prune -f` pulisce le immagini non più usate
+- `up -d --build --force-recreate` ricostruisce e ricrea tutto da zero
 
-3. Verifica connessione backend -> Neo4j:
-   curl -s http://localhost:3000/health/db
+## 2) Controlli dopo l'avvio
 
-4. Verifica payload movie details (esempio TMDB 550):
-   curl -s http://localhost:3000/movies/550
+```bash
+docker compose ps
+docker compose logs -f
+```
 
-5. Verifica campo director in modo esplicito:
-   curl -s http://localhost:3000/movies/550 | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const j=JSON.parse(s);console.log('hasDirectorKey',Object.prototype.hasOwnProperty.call(j.movie,'director'));console.log('directorValue',JSON.stringify(j.movie.director));});"
+Se vuoi verificare il backend:
 
-## 2) Reset totale (anche database)
+```bash
+curl -s http://localhost:3000/health/db
+```
 
-Usa questa procedura solo se il rebuild standard non basta.
+Se vuoi verificare il frontend, apri:
+- http://localhost:8080
 
-1. Spegni e rimuovi container, rete e volumi:
-   docker compose down -v --remove-orphans
+## 3) Riavvio normale senza reset completo
 
-2. (Opzionale ma consigliato) Pulisci immagini inutilizzate:
-   docker image prune -f
+Se non vuoi cancellare i volumi:
 
-3. Ricostruisci tutto da zero:
-   docker compose up -d --build --force-recreate
+```bash
+docker compose up -d --build --force-recreate
+```
 
-4. Ricontrolla stato servizi:
-   docker compose ps
+Se vuoi solo fermare tutto:
 
-5. Ricontrolla health backend:
-   curl -s http://localhost:3000/health/db
+```bash
+docker compose stop
+```
 
-## 3) Verifica che il container backend usi davvero il codice aggiornato
+Se vuoi spegnere e rimuovere solo i container, lasciando i volumi:
 
-Se la API restituisce ancora dati vecchi, controlla il file nel container:
+```bash
+docker compose down --remove-orphans
+```
 
-docker exec agreeo_backend sh -lc "grep -n 'extractDirector\|director: extractDirector\|append_to_response: '\''credits'\''' /usr/src/app/movieController.js"
+## 4) Note pratiche
 
-docker exec agreeo_backend sh -lc "grep -n 'm.director AS director\|m.director = \$director' /usr/src/app/movieRepository.js"
-
-Se i pattern non compaiono, rifai la sezione Rebuild standard.
-
-## 4) Frontend: cache browser
-
-Dopo il rebuild frontend, fai hard refresh su http://localhost:8080:
-- macOS: Cmd + Shift + R
-
-## 5) Note utili
-
-- Il warning su docker-compose relativo a version e' innocuo.
-- Puoi rimuovere la riga version: '3.8' dal file docker-compose.yml per evitare il warning.
-- Se docker compose up -d termina con successo ma i dati sembrano vecchi, il problema e' quasi sempre cache immagine/container non ricreato o browser cache.
+- Il volume Neo4j viene eliminato solo con `down -v`.
+- Se i cambiamenti non si vedono, il primo controllo da fare e' `docker compose logs -f`.
+- Se il browser mostra ancora contenuti vecchi, fai un hard refresh su `http://localhost:8080`.
