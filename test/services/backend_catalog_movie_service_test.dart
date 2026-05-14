@@ -1,14 +1,16 @@
 import 'package:agreeo/services/backend_movie_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/backend_catalog_movie_service.dart';
-import 'package:agreeo/shared/services/mock_movie_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeBackendMovieService extends BackendMovieService {
-  _FakeBackendMovieService({this.failRecommendations = false})
-    : super(config: null);
+  _FakeBackendMovieService({
+    this.failRecommendations = false,
+    this.popularMovies = const <Movie>[],
+  }) : super(config: null);
 
   final bool failRecommendations;
+  final List<Movie> popularMovies;
 
   @override
   Future<List<Movie>> getRecommendations() async {
@@ -20,7 +22,7 @@ class _FakeBackendMovieService extends BackendMovieService {
 
   @override
   Future<List<Movie>> getPopularMovies() async {
-    return const <Movie>[];
+    return popularMovies;
   }
 }
 
@@ -45,28 +47,13 @@ Movie _movie(String id) {
 }
 
 void main() {
-  test('uses backend recommendations even when empty', () async {
-    final service = BackendCatalogMovieService(
-      backendMovieService: _FakeBackendMovieService(),
-      fallback: _FakeMockMovieService(),
-    );
-
-    final suggestions = await service.getDailySuggestions(
-      favoriteGenres: <String>['Drama'],
-      favoriteMovieIds: <String>['tmdb-1'],
-    );
-
-    expect(suggestions, isEmpty);
-  });
-
   test(
-    'falls back to emergency catalog when backend recommendations fail',
+    'falls back to popular movies when backend recommendations are empty',
     () async {
       final service = BackendCatalogMovieService(
         backendMovieService: _FakeBackendMovieService(
-          failRecommendations: true,
+          popularMovies: <Movie>[_movie('tmdb-popular')],
         ),
-        fallback: _FakeMockMovieService(),
       );
 
       final suggestions = await service.getDailySuggestions(
@@ -74,16 +61,41 @@ void main() {
         favoriteMovieIds: <String>['tmdb-1'],
       );
 
-      expect(suggestions, isNotEmpty);
-      expect(suggestions.first.id, 'tmdb-emergency');
+      expect(suggestions, hasLength(1));
+      expect(suggestions.single.id, 'tmdb-popular');
     },
   );
-}
 
-class _FakeMockMovieService extends MockMovieService {
-  @override
-  Future<List<Movie>> getDailySuggestions({
-    required List<String> favoriteGenres,
-    required List<String> favoriteMovieIds,
-  }) async => <Movie>[_movie('tmdb-emergency')];
+  test(
+    'returns empty when backend recommendations and popular fallback are empty',
+    () async {
+      final service = BackendCatalogMovieService(
+        backendMovieService: _FakeBackendMovieService(),
+      );
+
+      final suggestions = await service.getDailySuggestions(
+        favoriteGenres: <String>['Drama'],
+        favoriteMovieIds: <String>['tmdb-1'],
+      );
+
+      expect(suggestions, isEmpty);
+    },
+  );
+
+  test('returns popular movies when backend recommendations fail', () async {
+    final service = BackendCatalogMovieService(
+      backendMovieService: _FakeBackendMovieService(
+        failRecommendations: true,
+        popularMovies: <Movie>[_movie('tmdb-emergency')],
+      ),
+    );
+
+    final suggestions = await service.getDailySuggestions(
+      favoriteGenres: <String>['Drama'],
+      favoriteMovieIds: <String>['tmdb-1'],
+    );
+
+    expect(suggestions, hasLength(1));
+    expect(suggestions.single.id, 'tmdb-emergency');
+  });
 }

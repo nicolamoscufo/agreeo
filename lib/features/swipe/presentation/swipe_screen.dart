@@ -1,9 +1,12 @@
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/movie_widgets.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// Modello fittizio per completezza (assicurati che corrisponda al tuo)
+import 'package:agreeo/shared/models/agreeo_models.dart';
 
 enum _SwipeFeedback { like, dislike }
 
@@ -17,9 +20,7 @@ class AgreeoSwipeScreen extends ConsumerStatefulWidget {
 }
 
 class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
-  Future<void> _runAction(
-    Future<String> Function() action,
-  ) async {
+  Future<void> _runAction(Future<String> Function() action) async {
     final message = await action();
     if (!mounted) {
       return;
@@ -39,199 +40,326 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
     final queue = state.remainingDailySuggestions;
     final currentMovie = queue.isNotEmpty ? queue.first : null;
     final nextMovie = queue.length > 1 ? queue[1] : null;
-    final totalCards = state.dailySuggestionIds.length;
-    final processedCards = totalCards - queue.length;
-    final progressValue = totalCards == 0 ? 0.0 : processedCards / totalCards;
 
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color(0xFF060B16), Color(0xFF0B1120), Color(0xFF111827)],
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 92),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Text(
-                    'Swipe',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+    if (currentMovie == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF060B16),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.celebration_rounded,
+                  size: 64,
+                  color: Colors.white,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'You\'re done for today.',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.5),
-                    ),
-                    child: Text(
-                      queue.isEmpty ? 'Done' : '${queue.length} left',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Come back tomorrow for new suggestions or explore more movies now.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Swipe right to like. Swipe left to hide.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: currentMovie == null
-                    ? EmptyState(
-                        icon: Icons.celebration_rounded,
-                        title: 'You\'re done for today.',
-                        message:
-                            'Come back tomorrow for new suggestions or explore more movies now.',
-                        action: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            FilledButton(
-                              onPressed: () => widget.onNavigateTab?.call(0),
-                              child: const Text('Explore more movies'),
-                            ),
-                            const SizedBox(height: 10),
-                            OutlinedButton(
-                              onPressed: () => widget.onNavigateTab?.call(1),
-                              child: const Text('Go to Library'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Stack(
-                        alignment: Alignment.center,
-                        children: <Widget>[
-                          if (nextMovie != null)
-                            Positioned.fill(
-                              top: 18,
-                              left: 10,
-                              right: 10,
-                              bottom: 18,
-                              child: Opacity(
-                                opacity: 0.26,
-                                child: Transform.scale(
-                                  scale: 0.965,
-                                  child: MovieSwipeCard(
-                                    movie: nextMovie,
-                                    expand: true,
-                                    onInfoTap: () {},
-                                    footer: const _SwipeCardFooterSkeleton(),
-                                    footerReservedSpace: 84,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Positioned.fill(
-                            child: Dismissible(
-                              key: ValueKey<String>(currentMovie.id),
-                              direction: DismissDirection.horizontal,
-                              resizeDuration: null,
-                              movementDuration: const Duration(milliseconds: 240),
-                              background: const _SwipeBackground(
-                                alignment: Alignment.centerLeft,
-                                icon: Icons.thumb_up_alt_rounded,
-                                label: 'Like',
-                                color: Color(0xFF16A34A),
-                              ),
-                              secondaryBackground: const _SwipeBackground(
-                                alignment: Alignment.centerRight,
-                                icon: Icons.thumb_down_alt_rounded,
-                                label: 'Dislike',
-                                color: Color(0xFFDC2626),
-                              ),
-                              onDismissed: (direction) {
-                                final feedback = direction == DismissDirection.startToEnd
-                                    ? _SwipeFeedback.like
-                                    : _SwipeFeedback.dislike;
-                                _runAction(
-                                  feedback == _SwipeFeedback.like
-                                      ? () => ref
-                                          .read(agreeoAppControllerProvider.notifier)
-                                          .likeMovie(currentMovie.id)
-                                      : () => ref
-                                          .read(agreeoAppControllerProvider.notifier)
-                                          .dislikeMovie(currentMovie.id),
-                                );
-                              },
-                              child: MovieSwipeCard(
-                                movie: currentMovie,
-                                expand: true,
-                                header: _SwipeCardHeader(
-                                  progress: progressValue,
-                                  seenCount: processedCards,
-                                  totalCount: totalCards,
-                                ),
-                                footer: _SwipeCardActions(
-                                  canUndo: state.undoStack.isNotEmpty,
-                                  onUndo: () async {
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    final message = await ref
-                                        .read(agreeoAppControllerProvider.notifier)
-                                        .undoLastAction();
-                                    if (!mounted) {
-                                      return;
-                                    }
-                                    messenger.showSnackBar(
-                                      SnackBar(content: Text(message)),
-                                    );
-                                  },
-                                  onDislike: () => _runAction(
-                                    () => ref
-                                        .read(agreeoAppControllerProvider.notifier)
-                                        .dislikeMovie(currentMovie.id),
-                                  ),
-                                  onSeen: () => _runAction(
-                                    () => ref
-                                        .read(agreeoAppControllerProvider.notifier)
-                                        .markAsWatched(currentMovie.id),
-                                  ),
-                                  onLike: () => _runAction(
-                                    () => ref
-                                        .read(agreeoAppControllerProvider.notifier)
-                                        .likeMovie(currentMovie.id),
-                                  ),
-                                  onWatchlist: () => _runAction(
-                                    () => ref
-                                        .read(agreeoAppControllerProvider.notifier)
-                                        .addToWatchlist(currentMovie.id),
-                                  ),
-                                ),
-                                footerReservedSpace: 92,
-                                onInfoTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => AgreeoMovieDetailsScreen(
-                                        movieId: currentMovie.id,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
+                ),
+                const SizedBox(height: 32),
+                FilledButton(
+                  onPressed: () => widget.onNavigateTab?.call(0),
+                  child: const Text('Explore more movies'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => widget.onNavigateTab?.call(1),
+                  child: const Text('Go to Library'),
+                ),
+              ],
+            ),
           ),
         ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          // Background Movie (Il prossimo film, visibile leggermente dietro/durante lo swipe)
+          if (nextMovie != null)
+            Positioned.fill(
+              child: _ImmersiveMovieCard(
+                movie: nextMovie,
+                isBackground: true,
+                actions: const _SwipeCardFooterSkeleton(),
+              ),
+            ),
+
+          // Current Movie (Interattivo con Dismissible)
+          Positioned.fill(
+            child: Dismissible(
+              key: ValueKey<String>(currentMovie.id),
+              direction: DismissDirection.horizontal,
+              resizeDuration: null,
+              movementDuration: const Duration(milliseconds: 240),
+              background: const _SwipeBackground(
+                alignment: Alignment.centerLeft,
+                icon: Icons.thumb_up_alt_rounded,
+                label: 'Like',
+                color: Color(0xFF16A34A),
+              ),
+              secondaryBackground: const _SwipeBackground(
+                alignment: Alignment.centerRight,
+                icon: Icons.close_rounded,
+                label: 'Dislike',
+                color: Color(0xFFDC2626),
+              ),
+              onDismissed: (direction) {
+                final feedback = direction == DismissDirection.startToEnd
+                    ? _SwipeFeedback.like
+                    : _SwipeFeedback.dislike;
+                _runAction(
+                  feedback == _SwipeFeedback.like
+                      ? () => ref
+                            .read(agreeoAppControllerProvider.notifier)
+                            .likeMovie(currentMovie.id)
+                      : () => ref
+                            .read(agreeoAppControllerProvider.notifier)
+                            .dislikeMovie(currentMovie.id),
+                );
+              },
+              child: _ImmersiveMovieCard(
+                movie: currentMovie,
+                isBackground: false,
+                onInfoTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AgreeoMovieDetailsScreen(movieId: currentMovie.id),
+                    ),
+                  );
+                },
+                actions: _SwipeCardActions(
+                  canUndo: state.undoStack.isNotEmpty,
+                  onUndo: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final message = await ref
+                        .read(agreeoAppControllerProvider.notifier)
+                        .undoLastAction();
+                    if (!mounted) return;
+                    messenger.showSnackBar(SnackBar(content: Text(message)));
+                  },
+                  onDislike: () => _runAction(
+                    () => ref
+                        .read(agreeoAppControllerProvider.notifier)
+                        .dislikeMovie(currentMovie.id),
+                  ),
+                  onSeen: () => _runAction(
+                    () => ref
+                        .read(agreeoAppControllerProvider.notifier)
+                        .markAsWatched(currentMovie.id),
+                  ),
+                  onLike: () => _runAction(
+                    () => ref
+                        .read(agreeoAppControllerProvider.notifier)
+                        .likeMovie(currentMovie.id),
+                  ),
+                  onWatchlist: () => _runAction(
+                    () => ref
+                        .read(agreeoAppControllerProvider.notifier)
+                        .addToWatchlist(currentMovie.id),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+// Widget personalizzato per replicare la UI immersiva di Interstellar
+class _ImmersiveMovieCard extends StatelessWidget {
+  const _ImmersiveMovieCard({
+    required this.movie,
+    required this.actions,
+    this.isBackground = false,
+    this.onInfoTap,
+  });
+
+  final Movie movie;
+  final Widget actions;
+  final bool isBackground;
+  final VoidCallback? onInfoTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = movie.posterUrl.isNotEmpty
+        ? movie.posterUrl
+        : movie.backdropUrl;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. Immagine a tutto schermo
+        CachedNetworkImage(
+          imageUrl: imageUrl,
+          fit: BoxFit.cover,
+          errorWidget: (context, url, error) => Container(color: Colors.black),
+        ),
+
+        // 2. Gradiente superiore per leggere il cast
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 160,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+              ),
+            ),
+          ),
+        ),
+
+        // 3. Gradiente inferiore per i dettagli e i bottoni
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: MediaQuery.sizeOf(context).height * 0.45,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.6),
+                  Colors.black.withOpacity(0.9),
+                  Colors.black,
+                ],
+                stops: const [0.0, 0.4, 0.8, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        // 4. Contenuti Testuali (Cast in alto, Titolo e Generi in basso)
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 16.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top: Nomi del Cast (mostriamo i primi 3 o 4)
+                if (movie.cast.isNotEmpty)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: movie.cast.take(4).map((actor) {
+                      return Expanded(
+                        child: Text(
+                          actor.toUpperCase().replaceAll(
+                            ' ',
+                            '\n',
+                          ), // Nome a capo per replicare l'effetto poster
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                const Spacer(),
+
+                // Bottom: Info Film
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        movie.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 40,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    if (onInfoTap != null)
+                      GestureDetector(
+                        onTap: onInfoTap,
+                        child: const Icon(
+                          Icons.info_outline_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Generi stile "Pillola Trasparente"
+                if (movie.genres.isNotEmpty)
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: movie.genres.take(4).map((genre) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          color: Colors.transparent,
+                        ),
+                        child: Text(
+                          genre,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                const SizedBox(height: 32),
+
+                // Bottoni d'azione in fondo
+                actions,
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -252,87 +380,24 @@ class _SwipeBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(34),
-        gradient: LinearGradient(
-          begin: alignment == Alignment.centerLeft
-              ? Alignment.centerLeft
-              : Alignment.centerRight,
-          end: alignment == Alignment.centerLeft
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          colors: <Color>[color.withValues(alpha: 0.88), color.withValues(alpha: 0.32)],
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      color: color.withOpacity(0.8),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       alignment: alignment,
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (alignment == Alignment.centerRight) ...<Widget>[
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 22,
-              ),
+        children: [
+          Icon(icon, color: Colors.white, size: 48),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 24,
             ),
-            const SizedBox(width: 10),
-          ],
-          Icon(icon, color: Colors.white, size: 30),
-          if (alignment == Alignment.centerLeft) ...<Widget>[
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 22,
-              ),
-            ),
-          ],
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _SwipeCardHeader extends StatelessWidget {
-  const _SwipeCardHeader({
-    required this.progress,
-    required this.seenCount,
-    required this.totalCount,
-  });
-
-  final double progress;
-  final int seenCount;
-  final int totalCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: progress <= 0 ? 0.04 : progress,
-            minHeight: 4,
-            backgroundColor: Colors.white.withValues(alpha: 0.18),
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          totalCount == 0 ? 'Daily queue' : '${seenCount + 1} of $totalCount',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.86),
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-              ),
-        ),
-      ],
     );
   }
 }
@@ -358,40 +423,44 @@ class _SwipeCardActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final buttonSize = constraints.maxWidth < 340 ? 46.0 : 54.0;
+        final isSmallPhone = constraints.maxWidth < 340;
+        final baseSize = isSmallPhone ? 48.0 : 56.0;
+        final mainSize = isSmallPhone
+            ? 56.0
+            : 68.0; // Per X e Cuore (più grandi)
 
         return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: <Widget>[
             _SwipeCardActionButton(
               icon: Icons.undo_rounded,
               semanticLabel: 'Undo',
-              size: buttonSize,
+              size: baseSize,
               enabled: canUndo,
               onTap: onUndo,
             ),
             _SwipeCardActionButton(
               icon: Icons.close_rounded,
               semanticLabel: 'Dislike',
-              size: buttonSize,
+              size: mainSize,
               onTap: onDislike,
             ),
             _SwipeCardActionButton(
-              icon: Icons.visibility_outlined,
+              icon: Icons.remove_red_eye_outlined,
               semanticLabel: 'Already seen',
-              size: buttonSize,
+              size: baseSize,
               onTap: onSeen,
             ),
             _SwipeCardActionButton(
               icon: Icons.favorite_rounded,
               semanticLabel: 'Like',
-              size: buttonSize,
+              size: mainSize,
               onTap: onLike,
             ),
             _SwipeCardActionButton(
               icon: Icons.bookmark_rounded,
               semanticLabel: 'Watchlist',
-              size: buttonSize,
+              size: baseSize,
               onTap: onWatchlist,
             ),
           ],
@@ -407,19 +476,18 @@ class _SwipeCardFooterSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List<Widget>.generate(
-        5,
-        (index) => Container(
-          width: 52,
-          height: 52,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: List<Widget>.generate(5, (index) {
+        final isMain = index == 1 || index == 3;
+        return Container(
+          width: isMain ? 68 : 56,
+          height: isMain ? 68 : 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            color: Colors.white.withOpacity(0.14),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 }
@@ -449,15 +517,20 @@ class _SwipeCardActionButton extends StatelessWidget {
           button: true,
           label: semanticLabel,
           child: Material(
-            color: Colors.white,
+            color: Colors.white, // Bottoni bianchi dello screenshot
             shape: const CircleBorder(),
+            elevation: 4,
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: onTap,
               child: SizedBox(
                 width: size,
                 height: size,
-                child: Icon(icon, color: const Color(0xFF0F172A), size: size * 0.46),
+                child: Icon(
+                  icon,
+                  color: Colors.black, // Icone nere dello screenshot
+                  size: size * 0.45,
+                ),
               ),
             ),
           ),

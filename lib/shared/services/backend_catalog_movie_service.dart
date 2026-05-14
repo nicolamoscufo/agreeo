@@ -1,18 +1,13 @@
 import 'package:agreeo/services/backend_movie_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
-import 'package:agreeo/shared/services/mock_movie_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:flutter/foundation.dart';
 
 class BackendCatalogMovieService implements MovieService {
-  BackendCatalogMovieService({
-    BackendMovieService? backendMovieService,
-    MockMovieService? fallback,
-  }) : _backendMovieService = backendMovieService ?? BackendMovieService(),
-       _fallback = fallback ?? MockMovieService();
+  BackendCatalogMovieService({BackendMovieService? backendMovieService})
+    : _backendMovieService = backendMovieService ?? BackendMovieService();
 
   final BackendMovieService _backendMovieService;
-  final MockMovieService _fallback;
 
   @override
   Future<List<Movie>> getCatalog() async {
@@ -23,7 +18,7 @@ class BackendCatalogMovieService implements MovieService {
       }
     } catch (_) {}
 
-    return _fallback.getCatalog();
+    return const <Movie>[];
   }
 
   @override
@@ -34,7 +29,10 @@ class BackendCatalogMovieService implements MovieService {
     try {
       // Normal path: let the backend own personalized + cold-start fallback.
       final recommendations = await _backendMovieService.getRecommendations();
-      return recommendations;
+      if (recommendations.isNotEmpty) {
+        return recommendations;
+      }
+      // Empty response: fall through to popular fallback, not mock content.
     } catch (error) {
       // Emergency path only: backend request failed completely.
       // Keep the fallback explicit so normal cold-start users still go through Neo4j.
@@ -54,10 +52,7 @@ class BackendCatalogMovieService implements MovieService {
       );
     }
 
-    return _fallback.getDailySuggestions(
-      favoriteGenres: favoriteGenres,
-      favoriteMovieIds: favoriteMovieIds,
-    );
+    return const <Movie>[];
   }
 
   @override
@@ -74,7 +69,7 @@ class BackendCatalogMovieService implements MovieService {
       final results = await _backendMovieService.searchMovies(query);
       return results.where(filters.matches).toList(growable: false);
     } catch (_) {
-      return _fallback.searchMovies(query, filters);
+      return const <Movie>[];
     }
   }
 
@@ -82,14 +77,14 @@ class BackendCatalogMovieService implements MovieService {
   Future<Movie?> getMovieDetails(String movieId) async {
     final tmdbId = _parseTmdbId(movieId);
     if (tmdbId == null) {
-      return _fallback.getMovieDetails(movieId);
+      return null;
     }
 
     try {
       final details = await _backendMovieService.getMovieDetails(tmdbId);
       return details.movie;
     } catch (_) {
-      return _fallback.getMovieDetails(movieId);
+      return null;
     }
   }
 

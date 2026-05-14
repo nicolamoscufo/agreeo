@@ -226,7 +226,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
     if (state.isAuthenticated &&
         state.onboardingComplete &&
-        state.dailySuggestionIds.isEmpty) {
+        state.remainingDailySuggestions.isEmpty) {
       await _refreshDailySuggestions();
     }
   }

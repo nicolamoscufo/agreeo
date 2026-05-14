@@ -412,19 +412,24 @@ async function getUserLibrary(uid) {
  * * @param {string} uid - L'ID univoco dell'utente nell'app.
  * @returns {Array} - Un array di oggetti contenenti i dati dei film raccomandati.
  */
+/**
+ * Ottiene le raccomandazioni dei film per un utente specifico.
+ * Implementa un algoritmo di Filtraggio Collaborativo tramite Neo4j
+ * e prevede un fallback sui film più popolari (per risolvere il "cold start").
+ * * @param {string} uid - L'ID univoco dell'utente nell'app.
+ * @returns {Array} - Un array di oggetti contenenti i dati dei film raccomandati.
+ */
 async function getRecommendations(uid) {
   
   // ==========================================
   // FASE 1: QUERY DI RACCOMANDAZIONE PERSONALIZZATA
   // ==========================================
   
-  // Esegue una query sul database Neo4j passando l'uid dell'utente
   const personalized = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})
 
-    // PASSO A: Sintetizza i generi ripetutamente disprezzati. La soglia evita di
-    // penalizzare un intero genere per un singolo film non gradito.
+    // PASSO A: FIX DEL BUG DELLA SUBQUERY. Usiamo la list comprehension per non far morire la query.
     CALL {
       WITH me
       OPTIONAL MATCH (me)-[:DISLIKED]->(disliked:Movie)
@@ -433,15 +438,14 @@ async function getRecommendations(uid) {
       WITH disliked, collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS genreNames
       UNWIND CASE WHEN size(genreNames) = 0 THEN [null] ELSE genreNames END AS genreName
       WITH genreName, count(DISTINCT disliked) AS dislikedCount
-      WHERE genreName IS NOT NULL AND dislikedCount >= $dislikedGenreThreshold
-      RETURN collect({name: genreName, count: dislikedCount}) AS dislikedGenres
+      // Non usiamo WHERE qui per non perdere le righe. Filtriamo la lista finale:
+      WITH [g IN collect({name: genreName, count: dislikedCount}) 
+            WHERE g.name IS NOT NULL AND g.count >= $dislikedGenreThreshold | g] AS dislikedGenres
+      RETURN dislikedGenres
     }
 
-    // PASSO B: Trova i segnali positivi dell'utente e assegna pesi diversi.
     MATCH (me)-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(seed:Movie)
 
-    // PASSO C: "Gemelli di Gusti" pesati. I rating MovieLens piu alti contano di piu,
-    // mentre i seed estremamente popolari sono meno informativi.
     MATCH (seed)<-[:MATCHES_TMDB]-(seedMl:MovieLensMovie)<-[r1:RATED]-(similar:MovieLensUser)
     WHERE r1.rating >= 4.0
     WITH
@@ -461,17 +465,12 @@ async function getRecommendations(uid) {
       ) AS similarityScore
     WHERE similarityScore > 0
 
-    // PASSO D: I Suggerimenti. Cerca altri film (recMl) recensiti positivamente (>= 4.0)
-    // da questi utenti "simili" e ricollegali ai film del nostro database locale (rec:Movie).
     MATCH (similar)-[r2:RATED]->(recMl:MovieLensMovie)-[:MATCHES_TMDB]->(rec:Movie)
     WHERE r2.rating >= 4.0
-      AND rec.tmdbId IS NOT NULL // Assicura che il film esista e abbia un ID valido per l'API
+      AND rec.tmdbId IS NOT NULL 
 
-      // PASSO E: Esclusione. Non consigliare film che l'utente ha già valutato o salvato.
       AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(rec)
 
-    // PASSO F: Penalita negativa morbida. I generi ripetutamente disprezzati abbassano
-    // il ranking ma non bloccano del tutto il candidato.
     OPTIONAL MATCH (recMl)-[:IN_GENRE]->(recMlGenre:Genre)
     OPTIONAL MATCH (rec)-[:IN_GENRE]->(recMovieGenre:Genre)
     WITH
@@ -499,7 +498,6 @@ async function getRecommendations(uid) {
         penalty + ($dislikedGenrePenalty * toFloat(entry.count))
       ) AS negativePenalty
 
-    // PASSO G: Aggregazione dei risultati.
     WITH
       rec,
       count(DISTINCT similar) AS similarUsers,
@@ -519,23 +517,22 @@ async function getRecommendations(uid) {
     RETURN
       rec.tmdbId AS tmdbId,
       rec.title AS title,
-      similarUsers,       // Conta quanti "utenti simili" consigliano il film
-      avgSimilarRating,   // Calcola il voto medio dato solo dagli utenti simili
+      similarUsers,
+      avgSimilarRating,
       collaborativeScore,
       avgOverlapCount,
       negativePenalty,
       finalScore,
-      rec.movieLensAvgRating AS globalAvg,     // Recupera il voto medio globale del film
-      rec.movieLensRatingCount AS ratingCount  // Recupera il numero totale di recensioni
+      rec.movieLensAvgRating AS globalAvg,
+      rec.movieLensRatingCount AS ratingCount
     
-    // PASSO H: Ordinamento e Limite.
     ORDER BY
-      finalScore DESC,         // Primario: score collaborativo corretto dai segnali negativi
-      collaborativeScore DESC, // Secondario: forza pesata della similarita e del rating candidato
-      similarUsers DESC,       // Secondario: quanti utenti della tua "nicchia" lo consigliano
-      avgSimilarRating DESC,   // Terziario: che voto medio gli ha dato la tua "nicchia"
-      ratingCount DESC         // Tie-breaker: popolarità globale
-    LIMIT 80                   // Pool candidato piu ampio per il reranking lato backend
+      finalScore DESC,
+      collaborativeScore DESC,
+      similarUsers DESC,
+      avgSimilarRating DESC,
+      ratingCount DESC
+    LIMIT 80
     `,
     {
       uid,
@@ -544,14 +541,12 @@ async function getRecommendations(uid) {
       watchlistedWeight: 1.25,
       dislikedGenreThreshold: 2,
       dislikedGenrePenalty: 1.5,
-    } // Inietta i parametri nella query in modo sicuro
+    }
   );
 
-  // Se la query personalizzata ha trovato dei film (l'utente aveva uno storico sufficiente)...
   if (personalized.records.length > 0) {
-    // Mappa i record grezzi restituiti dal driver di Neo4j in un array di oggetti JavaScript standard
     return personalized.records.map((record) => ({
-      tmdbId: toNativeNumber(record.get('tmdbId')), // Usa un helper per convertire l'intero di Neo4j
+      tmdbId: toNativeNumber(record.get('tmdbId')),
       title: record.get('title') || '',
       similarUsers: toNativeNumber(record.get('similarUsers')),
       avgSimilarRating: Number(record.get('avgSimilarRating')),
@@ -568,11 +563,10 @@ async function getRecommendations(uid) {
   // FASE 2: QUERY DI FALLBACK (COLD START)
   // ==========================================
   
-  // Se arriviamo qui, l'utente non ha abbastanza storico collaborativo.
-  // Usiamo un fallback a livelli: generi onboarding, generi dei preferiti, poi qualità globale.
   const fallback = await neo4jService.run(
     `
-    MATCH (me:AppUser {uid: $uid})
+    // FIX DEL BUG COLD START: Usiamo OPTIONAL MATCH in modo che proceda anche se il nodo utente non esiste ancora!
+    OPTIONAL MATCH (me:AppUser {uid: $uid})
     CALL {
       WITH me
       OPTIONAL MATCH (me)-[:PREFERS_GENRE]->(preferred:Genre)
@@ -589,6 +583,7 @@ async function getRecommendations(uid) {
     MATCH (m:Movie)
     WHERE m.tmdbId IS NOT NULL
       AND coalesce(m.movieLensRatingCount, 0) >= $minFallbackRatingCount
+      // NOT EXISTS evaluta a TRUE in automatico se 'me' è null (perfetto per i nuovi utenti)
       AND NOT EXISTS {
         MATCH (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
       }
@@ -649,8 +644,6 @@ async function getRecommendations(uid) {
     }
   );
 
-  // Mappa i risultati della query di fallback.
-  // IMPORTANTE: Mantiene la stessa identica struttura dati della query personalizzata.
   return fallback.records.map((record) => ({
     tmdbId: toNativeNumber(record.get('tmdbId')),
     title: record.get('title') || '',

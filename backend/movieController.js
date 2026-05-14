@@ -4,22 +4,14 @@ const neo4jService = require('./neo4jService');
 
 function parseTmdbId(value) {
   const tmdbId = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
-    return null;
-  }
-
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0) return null;
   return tmdbId;
 }
 
 function parseTmdbIds(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   const seen = new Set();
   const tmdbIds = [];
-
   for (const item of value) {
     const tmdbId = parseTmdbId(item);
     if (tmdbId && !seen.has(tmdbId)) {
@@ -27,18 +19,13 @@ function parseTmdbIds(value) {
       tmdbIds.push(tmdbId);
     }
   }
-
   return tmdbIds;
 }
 
 function parseStringList(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   const seen = new Set();
   const items = [];
-
   for (const item of value) {
     const text = item == null ? '' : String(item).trim();
     if (text && !seen.has(text)) {
@@ -46,15 +33,11 @@ function parseStringList(value) {
       items.push(text);
     }
   }
-
   return items;
 }
 
 function imageUrl(path, size) {
-  if (!path) {
-    return '';
-  }
-
+  if (!path) return '';
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
@@ -74,6 +57,8 @@ function diversifyRecommendations(candidates, limit = 30) {
   const seenTmdbIds = new Set();
   const seenTitles = new Set();
   const genreCounts = new Map();
+  
+  // Ora che idratiamo prima, i generi ci sono sempre!
   const hasGenreData = ordered.some(
     (candidate) => Array.isArray(candidate.genreIds) && candidate.genreIds.length > 0
   );
@@ -82,47 +67,26 @@ function diversifyRecommendations(candidates, limit = 30) {
   function isDuplicate(candidate) {
     const tmdbKey = candidate.tmdbId == null ? null : String(candidate.tmdbId);
     const titleKey = normalizeRecommendationTitle(candidate.title || candidate.originalTitle);
-
-    if (tmdbKey && seenTmdbIds.has(tmdbKey)) {
-      return true;
-    }
-
+    if (tmdbKey && seenTmdbIds.has(tmdbKey)) return true;
     return titleKey.length > 0 && seenTitles.has(titleKey);
   }
 
   function markSeen(candidate) {
-    if (candidate.tmdbId != null) {
-      seenTmdbIds.add(String(candidate.tmdbId));
-    }
-
+    if (candidate.tmdbId != null) seenTmdbIds.add(String(candidate.tmdbId));
     const titleKey = normalizeRecommendationTitle(candidate.title || candidate.originalTitle);
-    if (titleKey.length > 0) {
-      seenTitles.add(titleKey);
-    }
+    if (titleKey.length > 0) seenTitles.add(titleKey);
   }
 
   function candidateGenreIds(candidate) {
-    if (!Array.isArray(candidate.genreIds)) {
-      return [];
-    }
-
+    if (!Array.isArray(candidate.genreIds)) return [];
     return [...new Set(candidate.genreIds.filter((id) => Number.isInteger(id)))];
   }
 
   function canTake(candidate) {
-    if (!hasGenreData || !genreCap) {
-      return true;
-    }
-
+    if (!hasGenreData || !genreCap) return true;
     const genres = candidateGenreIds(candidate);
-    if (genres.length === 0) {
-      return true;
-    }
-
-    const lowestPressure = Math.min(
-      ...genres.map((genreId) => genreCounts.get(genreId) || 0)
-    );
-
+    if (genres.length === 0) return true;
+    const lowestPressure = Math.min(...genres.map((genreId) => genreCounts.get(genreId) || 0));
     return lowestPressure < genreCap;
   }
 
@@ -133,41 +97,25 @@ function diversifyRecommendations(candidates, limit = 30) {
   }
 
   for (const candidate of ordered) {
-    if (selected.length >= limit) {
-      break;
-    }
-
-    if (isDuplicate(candidate)) {
-      continue;
-    }
-
+    if (selected.length >= limit) break;
+    if (isDuplicate(candidate)) continue;
     if (!canTake(candidate)) {
       skipped.push(candidate);
       continue;
     }
-
     markSeen(candidate);
     applyGenreCounts(candidate);
     selected.push(candidate);
   }
 
+  // Fallback: se siamo stati troppo selettivi, peschiamo dagli scartati
   if (selected.length < limit && skipped.length > 0) {
     for (const candidate of skipped) {
-      if (selected.length >= limit) {
-        break;
-      }
-
-      if (isDuplicate(candidate)) {
-        continue;
-      }
-
+      if (selected.length >= limit) break;
+      if (isDuplicate(candidate)) continue;
       markSeen(candidate);
       selected.push(candidate);
     }
-  }
-
-  if (!hasGenreData) {
-    // TODO: add genre-aware reranking once canonical genre data is guaranteed everywhere.
   }
 
   return selected.slice(0, limit);
@@ -177,7 +125,7 @@ async function hydrateRecommendations(
   recommendations,
   {
     limit = 30,
-    batchSize = 4,
+    batchSize = 6, // Aumentato per velocizzare le chiamate a TMDB
     tmdbFetch = tmdbGet,
     findMovieByTmdbId = movieRepository.findMovieByTmdbId,
     logger = console,
@@ -193,7 +141,6 @@ async function hydrateRecommendations(
         try {
           const tmdbMovie = await tmdbFetch(`/movie/${entry.tmdbId}`);
           if (!tmdbMovie || typeof tmdbMovie !== 'object' || !Number.isInteger(tmdbMovie.id)) {
-            logger.warn(`Skipping invalid TMDB recommendation ${entry.tmdbId}: invalid payload`);
             return null;
           }
 
@@ -210,56 +157,35 @@ async function hydrateRecommendations(
             },
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (message.includes('TMDB error 404')) {
-            // TODO: mark stale TMDB ids in Neo4j if a safe invalidation mechanism is added.
-            logger.warn(`Skipping stale TMDB recommendation ${entry.tmdbId}: ${message}`);
-            return null;
-          }
-
-          logger.warn(`Skipping TMDB recommendation ${entry.tmdbId}: ${message}`);
-          return null;
+          return null; // Salta silenziosamente i film non validi su TMDB
         }
       })
     );
 
     for (const movie of batchHydrated) {
-      if (movie) {
-        hydrated.push(movie);
-      }
-      if (hydrated.length >= limit) {
-        break;
-      }
+      if (movie) hydrated.push(movie);
+      if (hydrated.length >= limit) break;
     }
   }
-
   return hydrated.slice(0, limit);
 }
 
 function extractTrailerUrl(videos) {
   const entries = Array.isArray(videos?.results) ? videos.results : [];
-  const trailer = entries.find(
-    (entry) => entry.site === 'YouTube' && (entry.type === 'Trailer' || entry.type === 'Teaser')
-  );
-
+  const trailer = entries.find((entry) => entry.site === 'YouTube' && (entry.type === 'Trailer' || entry.type === 'Teaser'));
   return trailer?.key ? `https://www.youtube.com/watch?v=${trailer.key}` : '';
 }
 
 function extractDirector(credits) {
   const crew = Array.isArray(credits?.crew) ? credits.crew : [];
   const director = crew.find((member) => member.job === 'Director');
-
   return director?.name || '';
 }
 
 function mapMovieLens(neoMovie, fallbackAvg, fallbackCount) {
   const avgRating = neoMovie?.movieLensAvgRating ?? fallbackAvg ?? null;
   const ratingCount = neoMovie?.movieLensRatingCount ?? fallbackCount ?? 0;
-
-  return {
-    avgRating,
-    ratingCount,
-  };
+  return { avgRating, ratingCount };
 }
 
 function mapTmdbMovie(tmdbMovie, neoMovie = null) {
@@ -273,14 +199,11 @@ function mapTmdbMovie(tmdbMovie, neoMovie = null) {
     posterUrl: imageUrl(tmdbMovie.poster_path, 'w500'),
     backdropUrl: imageUrl(tmdbMovie.backdrop_path, 'w780'),
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
-    voteAverage:
-      tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
+    voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
     genreIds: Array.isArray(tmdbMovie.genre_ids)
       ? tmdbMovie.genre_ids.filter((id) => Number.isInteger(id))
       : Array.isArray(tmdbMovie.genres)
-        ? tmdbMovie.genres
-            .map((genre) => genre?.id)
-            .filter((id) => Number.isInteger(id))
+        ? tmdbMovie.genres.map((genre) => genre?.id).filter((id) => Number.isInteger(id))
         : [],
     movieLens: mapMovieLens(neoMovie),
   };
@@ -288,15 +211,12 @@ function mapTmdbMovie(tmdbMovie, neoMovie = null) {
 
 function mapTmdbMovieDetails(tmdbMovie, neoMovie = null) {
   const base = mapTmdbMovie(tmdbMovie, neoMovie);
-
   return {
     ...base,
     director: extractDirector(tmdbMovie.credits),
     runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     genres: Array.isArray(tmdbMovie.genres)
-      ? tmdbMovie.genres
-          .map((genre) => genre?.name)
-          .filter((name) => typeof name === 'string' && name.trim() !== '')
+      ? tmdbMovie.genres.map((g) => g?.name).filter((n) => typeof n === 'string' && n.trim() !== '')
       : [],
     cast: Array.isArray(tmdbMovie.credits?.cast)
       ? tmdbMovie.credits.cast.slice(0, 10).map((member) => ({
@@ -309,15 +229,13 @@ function mapTmdbMovieDetails(tmdbMovie, neoMovie = null) {
       : [],
     trailerUrl: extractTrailerUrl(tmdbMovie.videos),
     trailers: Array.isArray(tmdbMovie.videos?.results)
-      ? tmdbMovie.videos.results
-          .filter((entry) => entry.site === 'YouTube')
-          .map((entry) => ({
-            id: entry.id,
-            key: entry.key,
-            name: entry.name || '',
-            type: entry.type || '',
-            url: entry.key ? `https://www.youtube.com/watch?v=${entry.key}` : '',
-          }))
+      ? tmdbMovie.videos.results.filter((e) => e.site === 'YouTube').map((e) => ({
+          id: e.id,
+          key: e.key,
+          name: e.name || '',
+          type: e.type || '',
+          url: e.key ? `https://www.youtube.com/watch?v=${e.key}` : '',
+        }))
       : [],
     images: {
       backdrops: Array.isArray(tmdbMovie.images?.backdrops)
@@ -368,26 +286,20 @@ function mapInteractionMovie(tmdbMovie) {
     posterUrl: imageUrl(tmdbMovie.poster_path, 'w500'),
     backdropUrl: imageUrl(tmdbMovie.backdrop_path, 'w780'),
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
-    voteAverage:
-      tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
+    voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
     director: extractDirector(tmdbMovie.credits),
   };
 }
 
 async function enrichMovies(tmdbMovies) {
-  const tmdbIds = tmdbMovies
-    .map((movie) => movie?.id)
-    .filter((id) => Number.isInteger(id));
+  const tmdbIds = tmdbMovies.map((movie) => movie?.id).filter((id) => Number.isInteger(id));
   const neoMovies = await movieRepository.findMoviesByTmdbIds(tmdbIds);
   const byTmdbId = new Map(neoMovies.map((movie) => [movie.tmdbId, movie]));
-
   return tmdbMovies.map((movie) => mapTmdbMovie(movie, byTmdbId.get(movie.id) || null));
 }
 
 async function fetchInteractionMovie(tmdbId) {
-  const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, {
-    append_to_response: 'credits',
-  });
+  const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, { append_to_response: 'credits' });
   return mapInteractionMovie(tmdbMovie);
 }
 
@@ -407,10 +319,7 @@ exports.popular = async (_, res) => {
     const response = await tmdbGet('/movie/popular', { language: 'en-US', page: 1 });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
-
-    return res.json({
-      results: movies,
-    });
+    return res.json({ results: movies });
   } catch (error) {
     return handleError(res, error, 'Failed to load popular movies');
   }
@@ -418,26 +327,13 @@ exports.popular = async (_, res) => {
 
 exports.search = async (req, res) => {
   const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
-
-  if (!query) {
-    return res.status(400).json({
-      error: 'Missing query parameter',
-    });
-  }
+  if (!query) return res.status(400).json({ error: 'Missing query parameter' });
 
   try {
-    const response = await tmdbGet('/search/movie', {
-      query,
-      language: 'en-US',
-      include_adult: false,
-      page: 1,
-    });
+    const response = await tmdbGet('/search/movie', { query, language: 'en-US', include_adult: false, page: 1 });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
-
-    return res.json({
-      results: movies,
-    });
+    return res.json({ results: movies });
   } catch (error) {
     return handleError(res, error, 'Failed to search movies');
   }
@@ -445,26 +341,14 @@ exports.search = async (req, res) => {
 
 exports.details = async (req, res) => {
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (!tmdbId) {
-    return res.status(400).json({
-      error: 'Invalid tmdbId',
-    });
-  }
+  if (!tmdbId) return res.status(400).json({ error: 'Invalid tmdbId' });
 
   try {
     const [tmdbMovie, neoMovie] = await Promise.all([
-      tmdbGet(`/movie/${tmdbId}`, {
-        language: 'en-US',
-        append_to_response: 'credits,videos,images',
-        include_image_language: 'en,null',
-      }),
+      tmdbGet(`/movie/${tmdbId}`, { language: 'en-US', append_to_response: 'credits,videos,images', include_image_language: 'en,null' }),
       movieRepository.findMovieByTmdbId(tmdbId),
     ]);
-
-    return res.json({
-      movie: mapTmdbMovieDetails(tmdbMovie, neoMovie),
-    });
+    return res.json({ movie: mapTmdbMovieDetails(tmdbMovie, neoMovie) });
   } catch (error) {
     return handleError(res, error, 'Failed to load movie details');
   }
@@ -473,25 +357,14 @@ exports.details = async (req, res) => {
 exports.like = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (!uid || !tmdbId) {
-    return res.status(400).json({ error: 'Invalid request' });
-  }
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
 
   try {
     const movie = await fetchInteractionMovie(tmdbId);
     const liked = await movieRepository.likeMovie(uid, movie);
-
-    if (!liked) {
-      return res.status(404).json({ error: 'App user not found' });
-    }
-
+    if (!liked) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
-
-    return res.json({
-      ok: true,
-      movie: mapRepositoryMovieToResponse(neoMovie || movie),
-    });
+    return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to like movie');
   }
@@ -500,25 +373,14 @@ exports.like = async (req, res) => {
 exports.dislike = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (!uid || !tmdbId) {
-    return res.status(400).json({ error: 'Invalid request' });
-  }
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
 
   try {
     const movie = await fetchInteractionMovie(tmdbId);
     const disliked = await movieRepository.dislikeMovie(uid, movie);
-
-    if (!disliked) {
-      return res.status(404).json({ error: 'App user not found' });
-    }
-
+    if (!disliked) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
-
-    return res.json({
-      ok: true,
-      movie: mapRepositoryMovieToResponse(neoMovie || movie),
-    });
+    return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to dislike movie');
   }
@@ -527,25 +389,14 @@ exports.dislike = async (req, res) => {
 exports.watchlist = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (!uid || !tmdbId) {
-    return res.status(400).json({ error: 'Invalid request' });
-  }
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
 
   try {
     const movie = await fetchInteractionMovie(tmdbId);
     const watchlisted = await movieRepository.watchlistMovie(uid, movie);
-
-    if (!watchlisted) {
-      return res.status(404).json({ error: 'App user not found' });
-    }
-
+    if (!watchlisted) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
-
-    return res.json({
-      ok: true,
-      movie: mapRepositoryMovieToResponse(neoMovie || movie),
-    });
+    return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to add movie to watchlist');
   }
@@ -553,38 +404,24 @@ exports.watchlist = async (req, res) => {
 
 exports.updateOnboarding = async (req, res) => {
   const uid = requestUid(req);
-
-  if (!uid) {
-    return res.status(401).json({ error: 'Missing user context' });
-  }
+  if (!uid) return res.status(401).json({ error: 'Missing user context' });
 
   const completed = req.body.completed === true;
   const selectedFavoriteTmdbIds = parseTmdbIds(req.body.selectedFavoriteTmdbIds);
   const favoriteGenres = parseStringList(req.body.favoriteGenres);
-  const shouldPersistFavorites = Object.prototype.hasOwnProperty.call(
-    req.body,
-    'selectedFavoriteTmdbIds'
-  );
+  const shouldPersistFavorites = Object.prototype.hasOwnProperty.call(req.body, 'selectedFavoriteTmdbIds');
   const shouldPersistGenres = Object.prototype.hasOwnProperty.call(req.body, 'favoriteGenres');
 
   try {
     if (shouldPersistGenres) {
       const saved = await movieRepository.savePreferredGenres(uid, favoriteGenres);
-
-      if (!saved) {
-        return res.status(404).json({ error: 'App user not found' });
-      }
+      if (!saved) return res.status(404).json({ error: 'App user not found' });
     }
 
     if (shouldPersistFavorites) {
-      const selectedFavoriteMovies = await Promise.all(
-        selectedFavoriteTmdbIds.map((tmdbId) => fetchInteractionMovie(tmdbId))
-      );
+      const selectedFavoriteMovies = await Promise.all(selectedFavoriteTmdbIds.map((tmdbId) => fetchInteractionMovie(tmdbId)));
       const saved = await movieRepository.saveSelectedFavorites(uid, selectedFavoriteMovies, 4.0);
-
-      if (!saved) {
-        return res.status(404).json({ error: 'App user not found' });
-      }
+      if (!saved) return res.status(404).json({ error: 'App user not found' });
     }
 
     const result = await neo4jService.run(
@@ -603,10 +440,7 @@ exports.updateOnboarding = async (req, res) => {
       { uid, completed }
     );
 
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
+    if (result.records.length === 0) return res.status(404).json({ error: 'User not found' });
     const record = result.records[0];
 
     return res.json({
@@ -627,10 +461,7 @@ exports.updateOnboarding = async (req, res) => {
 exports.removeLike = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (isNaN(tmdbId)) {
-    return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
-  }
+  if (isNaN(tmdbId)) return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
 
   try {
     await movieRepository.removeLike(uid, tmdbId);
@@ -643,10 +474,7 @@ exports.removeLike = async (req, res) => {
 exports.removeDislike = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (isNaN(tmdbId)) {
-    return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
-  }
+  if (isNaN(tmdbId)) return res.status(400).json({ error: 'Valid tmdbId parameter is required' });
 
   try {
     await movieRepository.removeDislike(uid, tmdbId);
@@ -659,10 +487,7 @@ exports.removeDislike = async (req, res) => {
 exports.removeFromWatchlist = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
-
-  if (!uid || !tmdbId) {
-    return res.status(400).json({ error: 'Invalid request' });
-  }
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
 
   try {
     await movieRepository.removeFromWatchlist(uid, tmdbId);
@@ -674,10 +499,7 @@ exports.removeFromWatchlist = async (req, res) => {
 
 exports.library = async (req, res) => {
   const uid = requestUid(req);
-
-  if (!uid) {
-    return res.status(401).json({ error: 'Missing user context' });
-  }
+  if (!uid) return res.status(401).json({ error: 'Missing user context' });
 
   try {
     const library = await movieRepository.getUserLibrary(uid);
@@ -687,6 +509,9 @@ exports.library = async (req, res) => {
   }
 };
 
+// ==========================================
+// IL CUORE DELLE RACCOMANDAZIONI (SISTEMATO)
+// ==========================================
 exports.recommendations = async (req, res) => {
   const uid = requestUid(req);
 
@@ -695,16 +520,22 @@ exports.recommendations = async (req, res) => {
   }
 
   try {
-    const recommendations = await movieRepository.getRecommendations(uid);
-    const detailed = await hydrateRecommendations(recommendations, {
-      limit: 30,
-      batchSize: 4,
+    // 1. Chiedi 80 candidati grezzi a Neo4j (velocissimo)
+    const rawRecommendations = await movieRepository.getRecommendations(uid);
+
+    // 2. Idrata un pool generoso (60 film) per scoprire i generi e filtrare quelli non validi.
+    // Lotti da 6 velocizzano le richieste a TMDB senza superare i limiti.
+    const hydratedPool = await hydrateRecommendations(rawRecommendations, {
+      limit: 60, 
+      batchSize: 6,
       logger: console,
     });
-    const diversified = diversifyRecommendations(detailed, 30);
+
+    // 3. ORA diversifica! Avendo i generi caricati, può scegliere la combinazione migliore di 30 film
+    const diversifiedFinal = diversifyRecommendations(hydratedPool, 30);
 
     return res.json({
-      results: diversified,
+      results: diversifiedFinal,
     });
   } catch (error) {
     return handleError(res, error, 'Failed to load recommendations');
