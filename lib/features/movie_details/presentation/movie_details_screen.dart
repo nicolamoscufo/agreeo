@@ -24,7 +24,9 @@ class _AgreeoMovieDetailsScreenState
   @override
   void initState() {
     super.initState();
-    _movieFuture = ref.read(movieServiceProvider).getMovieDetails(widget.movieId);
+    _movieFuture = ref
+        .read(movieServiceProvider)
+        .getMovieDetails(widget.movieId);
   }
 
   Future<void> _openTrailer(Movie movie) async {
@@ -39,17 +41,21 @@ class _AgreeoMovieDetailsScreenState
     final cachedMovie = appState.movieById(widget.movieId);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF111111), // Sfondo nero profondo
+      backgroundColor: const Color(0xFF111111),
       body: FutureBuilder<Movie?>(
         future: _movieFuture,
         initialData: cachedMovie,
         builder: (context, snapshot) {
           final movie = snapshot.data;
           if (movie == null) {
-            return const Center(child: CircularProgressIndicator(color: Colors.red));
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.red),
+            );
           }
 
-          final heroImageUrl = movie.backdropUrl.isNotEmpty ? movie.backdropUrl : movie.posterUrl;
+          final heroImageUrl = movie.backdropUrl.isNotEmpty
+              ? movie.backdropUrl
+              : movie.posterUrl;
           final metadata = [
             movie.releaseYear.toString(),
             if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
@@ -63,7 +69,6 @@ class _AgreeoMovieDetailsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- HEADER CON BACKDROP E TASTO PLAY ---
                     SizedBox(
                       height: MediaQuery.sizeOf(context).height * 0.45,
                       child: Stack(
@@ -74,7 +79,6 @@ class _AgreeoMovieDetailsScreenState
                               fit: BoxFit.cover,
                             ),
                           ),
-                          // Gradiente per sfumare verso il basso
                           Positioned.fill(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
@@ -91,7 +95,6 @@ class _AgreeoMovieDetailsScreenState
                               ),
                             ),
                           ),
-                          // Tasto Play Rosso Centrale
                           Align(
                             alignment: Alignment.center,
                             child: GestureDetector(
@@ -103,19 +106,32 @@ class _AgreeoMovieDetailsScreenState
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 45),
+                                child: const Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 45,
+                                ),
                               ),
                             ),
                           ),
-                          // Tasti Top (Back e Heart)
                           SafeArea(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  _GlassButton(icon: Icons.arrow_back, onPressed: () => Navigator.pop(context)),
-                                  _GlassButton(icon: Icons.favorite, onPressed: () {}),
+                                  _GlassButton(
+                                    icon: Icons.arrow_back,
+                                    onPressed: () => Navigator.pop(context),
+                                  ),
+                                  _GlassButton(
+                                    icon: Icons.favorite,
+                                    onPressed: () {},
+                                  ),
                                 ],
                               ),
                             ),
@@ -123,8 +139,6 @@ class _AgreeoMovieDetailsScreenState
                         ],
                       ),
                     ),
-
-                    // --- DETTAGLI FILM ---
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Column(
@@ -143,10 +157,13 @@ class _AgreeoMovieDetailsScreenState
                           Text(
                             metadata,
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           const SizedBox(height: 12),
-                          // Stelle gialle
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(5, (index) {
@@ -158,8 +175,6 @@ class _AgreeoMovieDetailsScreenState
                             }),
                           ),
                           const SizedBox(height: 32),
-                          
-                          // --- PLOT ---
                           _buildSectionHeader('Plot'),
                           const SizedBox(height: 12),
                           Text(
@@ -170,10 +185,7 @@ class _AgreeoMovieDetailsScreenState
                               height: 1.5,
                             ),
                           ),
-                          
                           const SizedBox(height: 32),
-
-                          // --- CAST (NUOVA SEZIONE) ---
                           _buildSectionHeader('Cast'),
                           const SizedBox(height: 12),
                           SizedBox(
@@ -181,19 +193,26 @@ class _AgreeoMovieDetailsScreenState
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: movie.cast.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 20),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 20),
                               itemBuilder: (context, index) {
                                 return Column(
                                   children: [
                                     CircleAvatar(
                                       radius: 30,
                                       backgroundColor: Colors.white10,
-                                      child: Icon(Icons.person, color: Colors.white.withOpacity(0.2)),
+                                      child: Icon(
+                                        Icons.person,
+                                        color: Colors.white.withOpacity(0.2),
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
                                       movie.cast[index],
-                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ],
                                 );
@@ -207,7 +226,6 @@ class _AgreeoMovieDetailsScreenState
                   ],
                 ),
               ),
-              // Bottom Navigation Bar fissa
               const Align(
                 alignment: Alignment.bottomCenter,
                 child: _FakeBottomNav(),
@@ -224,7 +242,11 @@ class _AgreeoMovieDetailsScreenState
       alignment: Alignment.centerLeft,
       child: Text(
         title,
-        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -243,7 +265,10 @@ class _GlassButton extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           color: Colors.white.withOpacity(0.15),
-          child: IconButton(icon: Icon(icon, color: Colors.white), onPressed: onPressed),
+          child: IconButton(
+            icon: Icon(icon, color: Colors.white),
+            onPressed: onPressed,
+          ),
         ),
       ),
     );

@@ -20,24 +20,64 @@ class AgreeoSwipeScreen extends ConsumerStatefulWidget {
 }
 
 class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
+  bool _queueRefillScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleRefillIfNeeded(0);
+    });
+  }
+
   Future<void> _runAction(Future<String> Function() action) async {
-    final message = await action();
-    if (!mounted) {
+    try {
+      final message = await action();
+      if (!mounted) {
+        return;
+      }
+      await showUndoSnackbar(
+        context,
+        message: message,
+        onUndo: () async {
+          await ref.read(agreeoAppControllerProvider.notifier).undoLastAction();
+        },
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  void _scheduleRefillIfNeeded(int queueLength) {
+    if (_queueRefillScheduled || !mounted) {
       return;
     }
-    await showUndoSnackbar(
-      context,
-      message: message,
-      onUndo: () async {
-        await ref.read(agreeoAppControllerProvider.notifier).undoLastAction();
-      },
-    );
+    if (queueLength > AgreeoAppController.swipeQueueRefillThreshold) {
+      return;
+    }
+
+    _queueRefillScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await ref
+            .read(agreeoAppControllerProvider.notifier)
+            .ensureSwipeQueueFilled();
+      } finally {
+        _queueRefillScheduled = false;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(agreeoAppControllerProvider);
     final queue = state.remainingDailySuggestions;
+    _scheduleRefillIfNeeded(queue.length);
     final currentMovie = queue.isNotEmpty ? queue.first : null;
     final nextMovie = queue.length > 1 ? queue[1] : null;
 
@@ -57,7 +97,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'You\'re done for today.',
+                  'No more suggestions available right now.',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -65,17 +105,19 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Come back tomorrow for new suggestions or explore more movies now.',
+                  'You can refresh the queue for any newly available candidates or explore the rest of the catalog.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 32),
                 FilledButton(
-                  onPressed: () => widget.onNavigateTab?.call(0),
-                  child: const Text('Explore more movies'),
+                  onPressed: () => ref
+                      .read(agreeoAppControllerProvider.notifier)
+                      .refreshMovieSuggestions(),
+                  child: const Text('Refresh suggestions'),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
@@ -182,13 +224,54 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
               ),
             ),
           ),
+          if (_queueRefillScheduled)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 28,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Loading more suggestions...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-// Widget personalizzato per replicare la UI immersiva di Interstellar
 class _ImmersiveMovieCard extends StatelessWidget {
   const _ImmersiveMovieCard({
     required this.movie,
@@ -204,163 +287,141 @@ class _ImmersiveMovieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = movie.posterUrl.isNotEmpty
-        ? movie.posterUrl
-        : movie.backdropUrl;
+    final imageUrl = _preferredImageUrl(movie);
+    final metadata = <String>[
+      if (movie.releaseYear > 0) movie.releaseYear.toString(),
+      if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
+    ].join(' • ');
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // 1. Immagine a tutto schermo
-        CachedNetworkImage(
-          imageUrl: imageUrl,
-          fit: BoxFit.cover,
-          errorWidget: (context, url, error) => Container(color: Colors.black),
-        ),
-
-        // 2. Gradiente superiore per leggere il cast
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 160,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.black.withOpacity(0.6), Colors.transparent],
-              ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        isBackground ? 26 : 16,
+        isBackground ? 36 : 18,
+        isBackground ? 26 : 16,
+        isBackground ? 120 : 18,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x66000000),
+              blurRadius: 30,
+              offset: Offset(0, 18),
             ),
-          ),
+          ],
         ),
-
-        // 3. Gradiente inferiore per i dettagli e i bottoni
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height * 0.45,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.6),
-                  Colors.black.withOpacity(0.9),
-                  Colors.black,
-                ],
-                stops: const [0.0, 0.4, 0.8, 1.0],
-              ),
-            ),
-          ),
-        ),
-
-        // 4. Contenuti Testuali (Cast in alto, Titolo e Generi in basso)
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-              vertical: 16.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top: Nomi del Cast (mostriamo i primi 3 o 4)
-                if (movie.cast.isNotEmpty)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: movie.cast.take(4).map((actor) {
-                      return Expanded(
-                        child: Text(
-                          actor.toUpperCase().replaceAll(
-                            ' ',
-                            '\n',
-                          ), // Nome a capo per replicare l'effetto poster
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            letterSpacing: 1.2,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (imageUrl.isNotEmpty)
+                CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  errorWidget: (context, url, error) =>
+                      Container(color: const Color(0xFF0F172A)),
+                )
+              else
+                Container(color: const Color(0xFF0F172A)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0x22060B16),
+                      Color(0x66060B16),
+                      Color(0xE6060B16),
+                    ],
+                    stops: <double>[0, 0.45, 1],
                   ),
-
-                const Spacer(),
-
-                // Bottom: Info Film
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Text(
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: onInfoTap == null
+                            ? const SizedBox.shrink()
+                            : Material(
+                                color: Colors.black.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(999),
+                                child: InkWell(
+                                  onTap: onInfoTap,
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(10),
+                                    child: Icon(
+                                      Icons.info_outline_rounded,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const Spacer(),
+                      Text(
                         movie.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 40,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
-                          height: 1.1,
-                          letterSpacing: -0.5,
+                          height: 1.05,
+                          letterSpacing: -0.6,
                         ),
                       ),
-                    ),
-                    if (onInfoTap != null)
-                      GestureDetector(
-                        onTap: onInfoTap,
-                        child: const Icon(
-                          Icons.info_outline_rounded,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Generi stile "Pillola Trasparente"
-                if (movie.genres.isNotEmpty)
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: movie.genres.take(4).map((genre) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white, width: 1.5),
-                          color: Colors.transparent,
-                        ),
-                        child: Text(
-                          genre,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                      if (metadata.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 10),
+                        Text(
+                          metadata,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ],
+                      if (movie.overview.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Text(
+                          movie.overview,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontSize: 14,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      actions,
+                    ],
                   ),
-
-                const SizedBox(height: 32),
-
-                // Bottoni d'azione in fondo
-                actions,
-                const SizedBox(height: 16),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
+  }
+
+  String _preferredImageUrl(Movie movie) {
+    final raw = movie.posterUrl.isNotEmpty
+        ? movie.posterUrl
+        : movie.backdropUrl;
+    return raw.replaceFirst('/w500/', '/w780/');
   }
 }
 
@@ -380,7 +441,7 @@ class _SwipeBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: color.withOpacity(0.8),
+      color: color.withValues(alpha: 0.8),
       padding: const EdgeInsets.symmetric(horizontal: 40),
       alignment: alignment,
       child: Column(
@@ -484,7 +545,7 @@ class _SwipeCardFooterSkeleton extends StatelessWidget {
           height: isMain ? 68 : 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.14),
+            color: Colors.white.withValues(alpha: 0.14),
           ),
         );
       }),

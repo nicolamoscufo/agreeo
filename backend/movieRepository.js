@@ -42,6 +42,47 @@ function normalizeMovieRecord(record) {
   };
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = value == null ? fallback : Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function toPositiveInteger(value, fallback = 5, max = 100) {
+  const numeric = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.min(numeric, max);
+}
+
+function normalizeRecommendationRecord(record, overrides = {}) {
+  if (!record) {
+    return null;
+  }
+
+  return {
+    tmdbId: toNativeNumber(record.get('tmdbId')),
+    title: record.get('title') || '',
+    similarUsers: toNativeNumber(record.get('similarUsers')),
+    avgSimilarRating:
+      record.get('avgSimilarRating') == null
+        ? null
+        : toFiniteNumber(record.get('avgSimilarRating'), null),
+    collaborativeScore: toFiniteNumber(record.get('collaborativeScore')),
+    genreScore: toFiniteNumber(record.get('genreScore')),
+    popularityScore: toFiniteNumber(record.get('popularityScore')),
+    negativePenalty: toFiniteNumber(record.get('negativePenalty')),
+    explorationBonus: toFiniteNumber(record.get('explorationBonus')),
+    finalScore: toFiniteNumber(record.get('finalScore')),
+    globalAvg:
+      record.get('globalAvg') == null ? null : toFiniteNumber(record.get('globalAvg'), null),
+    ratingCount:
+      record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
+    source: record.get('source') || overrides.source || 'personalized',
+    reason: record.get('reason') || overrides.reason || '',
+  };
+}
+
 async function findMovieByTmdbId(tmdbId) {
   const result = await neo4jService.run(
     `
@@ -217,6 +258,31 @@ async function watchlistMovie(uid, movie) {
   return result.records.length > 0;
 }
 
+async function markMovieAsSeen(uid, movie) {
+  await mergeTmdbMovie(movie);
+
+  await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[old:WATCHLISTED]->(:Movie {tmdbId: $tmdbId})
+    DELETE old
+    `,
+    { uid, tmdbId: movie.tmdbId }
+  );
+
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})
+    MATCH (m:Movie {tmdbId: $tmdbId})
+    MERGE (u)-[r:ALREADY_SEEN]->(m)
+    ON CREATE SET r.createdAt = datetime()
+    RETURN m.tmdbId AS tmdbId
+    `,
+    { uid, tmdbId: movie.tmdbId }
+  );
+
+  return result.records.length > 0;
+}
+
 async function saveSelectedFavorites(uid, movies, weight = 4.0) {
   const selectedMovies = Array.isArray(movies) ? movies : [];
 
@@ -304,6 +370,16 @@ async function removeDislike(uid, tmdbId) {
   await neo4jService.run(
     `
     MATCH (:AppUser {uid: $uid})-[r:DISLIKED]->(:Movie {tmdbId: $tmdbId})
+    DELETE r
+    `,
+    { uid, tmdbId }
+  );
+}
+
+async function removeSeen(uid, tmdbId) {
+  await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[r:ALREADY_SEEN]->(:Movie {tmdbId: $tmdbId})
     DELETE r
     `,
     { uid, tmdbId }
@@ -405,26 +481,7 @@ async function getUserLibrary(uid) {
   };
 }
 
-/**
- * Ottiene le raccomandazioni dei film per un utente specifico.
- * Implementa un algoritmo di Filtraggio Collaborativo tramite Neo4j
- * e prevede un fallback sui film più popolari (per risolvere il "cold start").
- * * @param {string} uid - L'ID univoco dell'utente nell'app.
- * @returns {Array} - Un array di oggetti contenenti i dati dei film raccomandati.
- */
-/**
- * Ottiene le raccomandazioni dei film per un utente specifico.
- * Implementa un algoritmo di Filtraggio Collaborativo tramite Neo4j
- * e prevede un fallback sui film più popolari (per risolvere il "cold start").
- * * @param {string} uid - L'ID univoco dell'utente nell'app.
- * @returns {Array} - Un array di oggetti contenenti i dati dei film raccomandati.
- */
-async function getRecommendations(uid) {
-  
-  // ==========================================
-  // FASE 1: QUERY DI RACCOMANDAZIONE PERSONALIZZATA
-  // ==========================================
-  
+async function getPersonalizedRecommendationCandidates(uid) {
   const personalized = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})
@@ -520,11 +577,15 @@ async function getRecommendations(uid) {
       similarUsers,
       avgSimilarRating,
       collaborativeScore,
+      0.0 AS genreScore,
+      log(toFloat(coalesce(rec.movieLensRatingCount, 0)) + 1.0) AS popularityScore,
       avgOverlapCount,
       negativePenalty,
+      0.0 AS explorationBonus,
       finalScore,
       rec.movieLensAvgRating AS globalAvg,
-      rec.movieLensRatingCount AS ratingCount
+      rec.movieLensRatingCount AS ratingCount,
+      'personalized' AS source
     
     ORDER BY
       finalScore DESC,
@@ -544,25 +605,17 @@ async function getRecommendations(uid) {
     }
   );
 
-  if (personalized.records.length > 0) {
-    return personalized.records.map((record) => ({
-      tmdbId: toNativeNumber(record.get('tmdbId')),
-      title: record.get('title') || '',
-      similarUsers: toNativeNumber(record.get('similarUsers')),
-      avgSimilarRating: Number(record.get('avgSimilarRating')),
-      collaborativeScore: Number(record.get('collaborativeScore')),
-      avgOverlapCount: Number(record.get('avgOverlapCount')),
-      negativePenalty: Number(record.get('negativePenalty')),
-      finalScore: Number(record.get('finalScore')),
-      globalAvg: record.get('globalAvg') == null ? null : Number(record.get('globalAvg')),
-      ratingCount: record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
-    }));
-  }
+  return personalized.records
+    .map((record) =>
+      normalizeRecommendationRecord(record, {
+        source: 'personalized',
+        reason: 'High collaborative overlap with your strongest positive signals.',
+      })
+    )
+    .filter(Boolean);
+}
 
-  // ==========================================
-  // FASE 2: QUERY DI FALLBACK (COLD START)
-  // ==========================================
-  
+async function getFallbackRecommendationCandidates(uid) {
   const fallback = await neo4jService.run(
     `
     // FIX DEL BUG COLD START: Usiamo OPTIONAL MATCH in modo che proceda anche se il nodo utente non esiste ancora!
@@ -623,11 +676,15 @@ async function getRecommendations(uid) {
       0 AS similarUsers,
       null AS avgSimilarRating,
       (preferenceScore + bayesianScore + log(ratingCount + 1.0)) AS collaborativeScore,
+      preferenceScore AS genreScore,
+      (bayesianScore + log(ratingCount + 1.0)) AS popularityScore,
       0.0 AS avgOverlapCount,
       0.0 AS negativePenalty,
+      0.0 AS explorationBonus,
       (preferenceScore + bayesianScore + log(ratingCount + 1.0)) AS finalScore,
       m.movieLensAvgRating AS globalAvg,
-      m.movieLensRatingCount AS ratingCount
+      m.movieLensRatingCount AS ratingCount,
+      'fallback' AS source
     
     ORDER BY
       finalScore DESC,
@@ -644,18 +701,353 @@ async function getRecommendations(uid) {
     }
   );
 
-  return fallback.records.map((record) => ({
+  return fallback.records
+    .map((record) =>
+      normalizeRecommendationRecord(record, {
+        source: 'fallback',
+        reason: 'Fallback ranking based on onboarding genres, favorites, and proven catalog quality.',
+      })
+    )
+    .filter(Boolean);
+}
+
+async function getRecommendationCandidates(uid) {
+  const personalized = await getPersonalizedRecommendationCandidates(uid);
+  if (personalized.length > 0) {
+    return {
+      candidates: personalized,
+      fallbackUsed: false,
+      fallbackReason: null,
+      fallbackStrategy: null,
+    };
+  }
+
+  return {
+    candidates: await getFallbackRecommendationCandidates(uid),
+    fallbackUsed: true,
+    fallbackReason: 'No collaborative candidates survived the current exclusion filters.',
+    fallbackStrategy: 'Genre-boosted Bayesian popularity fallback.',
+  };
+}
+
+async function getRecommendations(uid) {
+  const { candidates } = await getRecommendationCandidates(uid);
+  return candidates;
+}
+
+async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 } = {}) {
+  const safeLimit = toPositiveInteger(limit, 30, 80);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:PREFERS_GENRE]->(preferred:Genre)
+      RETURN collect(DISTINCT preferred.name) AS preferredGenres
+    }
+
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(positiveMovie:Movie)
+      OPTIONAL MATCH (positiveMovie)<-[:MATCHES_TMDB]-(positiveMl:MovieLensMovie)-[:IN_GENRE]->(positiveMlGenre:Genre)
+      OPTIONAL MATCH (positiveMovie)-[:IN_GENRE]->(positiveMovieGenre:Genre)
+      WITH collect(DISTINCT positiveMlGenre.name) + collect(DISTINCT positiveMovieGenre.name) AS rawPositiveGenres
+      RETURN [genre IN rawPositiveGenres WHERE genre IS NOT NULL] AS positiveGenres
+    }
+
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:DISLIKED]->(negativeMovie:Movie)
+      OPTIONAL MATCH (negativeMovie)<-[:MATCHES_TMDB]-(negativeMl:MovieLensMovie)-[:IN_GENRE]->(negativeMlGenre:Genre)
+      OPTIONAL MATCH (negativeMovie)-[:IN_GENRE]->(negativeMovieGenre:Genre)
+      WITH collect(DISTINCT negativeMlGenre.name) + collect(DISTINCT negativeMovieGenre.name) AS rawNegativeGenres
+      RETURN [genre IN rawNegativeGenres WHERE genre IS NOT NULL] AS negativeGenres
+    }
+
+    MATCH (m:Movie)
+    WHERE m.tmdbId IS NOT NULL
+      AND coalesce(m.movieLensRatingCount, 0) >= $minRatingCount
+      AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
+      AND NOT m.tmdbId IN $excludedTmdbIds
+
+    OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+    OPTIONAL MATCH (m)-[:IN_GENRE]->(movieGenre:Genre)
+    WITH
+      m,
+      preferredGenres,
+      positiveGenres,
+      negativeGenres,
+      [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS candidateGenres,
+      toFloat(coalesce(m.movieLensRatingCount, 0)) AS ratingCount,
+      toFloat(coalesce(m.movieLensAvgRating, $globalMeanRating)) AS avgRating
+    WITH
+      m,
+      ratingCount,
+      avgRating,
+      size([genre IN candidateGenres WHERE genre IN preferredGenres OR genre IN positiveGenres]) AS familiarGenres,
+      size([genre IN candidateGenres WHERE NOT genre IN preferredGenres AND NOT genre IN positiveGenres]) AS exploratoryGenres,
+      size([genre IN candidateGenres WHERE genre IN negativeGenres]) AS matchedNegativeGenres
+
+    RETURN
+      m.tmdbId AS tmdbId,
+      m.title AS title,
+      0 AS similarUsers,
+      null AS avgSimilarRating,
+      0.0 AS collaborativeScore,
+      (familiarGenres * 15.0) AS genreScore,
+      (avgRating * 10.0) + log(ratingCount + 1.0) AS popularityScore,
+      (matchedNegativeGenres * 25.0) AS negativePenalty,
+      (exploratoryGenres * 40.0) AS explorationBonus,
+      ((familiarGenres * 15.0) + (avgRating * 10.0) + log(ratingCount + 1.0) + (exploratoryGenres * 40.0) - (matchedNegativeGenres * 25.0)) AS finalScore,
+      m.movieLensAvgRating AS globalAvg,
+      m.movieLensRatingCount AS ratingCount,
+      'exploratory' AS source,
+      CASE
+        WHEN exploratoryGenres > 0 THEN 'Explores genres outside your strongest current bubble.'
+        ELSE 'Popular unseen title kept to test uncertain taste edges.'
+      END AS reason
+    ORDER BY
+      explorationBonus DESC,
+      finalScore DESC,
+      ratingCount DESC
+    LIMIT ${safeLimit}
+    `,
+    {
+      uid,
+      excludedTmdbIds,
+      globalMeanRating: 3.5,
+      minRatingCount: 25,
+    }
+  );
+
+  return result.records.map((record) => normalizeRecommendationRecord(record)).filter(Boolean);
+}
+
+async function getRecommendationUserProfile(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:PREFERS_GENRE]->(genre:Genre)
+      RETURN collect(DISTINCT genre.name) AS onboardingGenres
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:SELECTED_FAVORITE]->(movie:Movie)
+      RETURN count(DISTINCT movie) AS favoriteMoviesCount
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:LIKED]->(movie:Movie)
+      RETURN count(DISTINCT movie) AS likedMoviesCount
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:DISLIKED]->(movie:Movie)
+      RETURN count(DISTINCT movie) AS dislikedMoviesCount
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:ALREADY_SEEN]->(movie:Movie)
+      RETURN count(DISTINCT movie) AS alreadySeenCount
+    }
+    CALL {
+      WITH me
+      OPTIONAL MATCH (me)-[:WATCHLISTED]->(movie:Movie)
+      RETURN count(DISTINCT movie) AS watchlistCount
+    }
+    RETURN
+      me.uid AS uid,
+      onboardingGenres,
+      favoriteMoviesCount,
+      likedMoviesCount,
+      dislikedMoviesCount,
+      alreadySeenCount,
+      watchlistCount
+    LIMIT 1
+    `,
+    { uid }
+  );
+
+  if (result.records.length === 0) {
+    return null;
+  }
+
+  const record = result.records[0];
+  const favoriteMoviesCount = toNativeNumber(record.get('favoriteMoviesCount'));
+  const likedMoviesCount = toNativeNumber(record.get('likedMoviesCount'));
+  const dislikedMoviesCount = toNativeNumber(record.get('dislikedMoviesCount'));
+  const alreadySeenCount = toNativeNumber(record.get('alreadySeenCount'));
+  const watchlistCount = toNativeNumber(record.get('watchlistCount'));
+
+  return {
+    uid: record.get('uid') || uid,
+    onboardingGenres: record.get('onboardingGenres') || [],
+    favoriteMoviesCount,
+    likedMoviesCount,
+    dislikedMoviesCount,
+    alreadySeenCount,
+    watchlistCount,
+    totalFeedbackActions:
+      favoriteMoviesCount + likedMoviesCount + dislikedMoviesCount + alreadySeenCount + watchlistCount,
+  };
+}
+
+async function getTopPositiveGenreSignals(uid, limit = 5) {
+  const safeLimit = toPositiveInteger(limit, 5, 20);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(movie:Movie)
+    OPTIONAL MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+    OPTIONAL MATCH (movie)-[:IN_GENRE]->(movieGenre:Genre)
+    WITH
+      CASE type(signal)
+        WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, 4.0)
+        WHEN 'LIKED' THEN 3.0
+        WHEN 'WATCHLISTED' THEN 1.25
+        ELSE 1.0
+      END AS signalWeight,
+      [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
+    UNWIND genreNames AS genreName
+    RETURN genreName AS name, sum(signalWeight) AS score
+    ORDER BY score DESC, name ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
+    name: record.get('name') || '',
+    score: toFiniteNumber(record.get('score')),
+  }));
+}
+
+async function getTopNegativeGenreSignals(uid, limit = 5) {
+  const safeLimit = toPositiveInteger(limit, 5, 20);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[:DISLIKED]->(movie:Movie)
+    OPTIONAL MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+    OPTIONAL MATCH (movie)-[:IN_GENRE]->(movieGenre:Genre)
+    WITH [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
+    UNWIND genreNames AS genreName
+    RETURN genreName AS name, count(*) AS score
+    ORDER BY score DESC, name ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
+    name: record.get('name') || '',
+    score: toFiniteNumber(record.get('score')),
+  }));
+}
+
+async function getTopPositiveMovies(uid, limit = 5) {
+  const safeLimit = toPositiveInteger(limit, 5, 20);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(movie:Movie)
+    RETURN
+      movie.tmdbId AS tmdbId,
+      movie.title AS title,
+      type(signal) AS signalType,
+      CASE type(signal)
+        WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, 4.0)
+        WHEN 'LIKED' THEN 3.0
+        WHEN 'WATCHLISTED' THEN 1.25
+        ELSE 1.0
+      END AS score
+    ORDER BY score DESC, movie.title ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
     tmdbId: toNativeNumber(record.get('tmdbId')),
     title: record.get('title') || '',
-    similarUsers: toNativeNumber(record.get('similarUsers')),
-    avgSimilarRating: record.get('avgSimilarRating'),
-    collaborativeScore: Number(record.get('collaborativeScore')),
-    avgOverlapCount: Number(record.get('avgOverlapCount')),
-    negativePenalty: Number(record.get('negativePenalty')),
-    finalScore: Number(record.get('finalScore')),
-    globalAvg: record.get('globalAvg') == null ? null : Number(record.get('globalAvg')),
-    ratingCount: record.get('ratingCount') == null ? 0 : toNativeNumber(record.get('ratingCount')),
+    signalType: record.get('signalType') || '',
+    score: toFiniteNumber(record.get('score')),
   }));
+}
+
+async function getTopNegativeMovies(uid, limit = 5) {
+  const safeLimit = toPositiveInteger(limit, 5, 20);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[signal:DISLIKED]->(movie:Movie)
+    RETURN
+      movie.tmdbId AS tmdbId,
+      movie.title AS title,
+      type(signal) AS signalType,
+      1.0 AS score
+    ORDER BY movie.title ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
+    tmdbId: toNativeNumber(record.get('tmdbId')),
+    title: record.get('title') || '',
+    signalType: record.get('signalType') || '',
+    score: toFiniteNumber(record.get('score')),
+  }));
+}
+
+async function getCandidatePoolStats(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+    MATCH (m:Movie)
+    WHERE m.tmdbId IS NOT NULL
+    WITH
+      me,
+      m,
+      EXISTS { MATCH (me)-[:ALREADY_SEEN]->(m) } AS alreadySeen,
+      EXISTS { MATCH (me)-[:DISLIKED]->(m) } AS disliked,
+      EXISTS { MATCH (me)-[:LIKED|WATCHLISTED|SELECTED_FAVORITE]->(m) } AS alreadySwiped,
+      (
+        coalesce(m.posterUrl, '') = '' AND
+        coalesce(m.posterPath, '') = '' AND
+        coalesce(m.backdropUrl, '') = '' AND
+        coalesce(m.backdropPath, '') = ''
+      ) AS missingMetadata
+    RETURN
+      count(m) AS totalCandidatesConsidered,
+      sum(CASE WHEN alreadySeen THEN 1 ELSE 0 END) AS filteredAlreadySeen,
+      sum(CASE WHEN NOT alreadySeen AND disliked THEN 1 ELSE 0 END) AS filteredDisliked,
+      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND alreadySwiped THEN 1 ELSE 0 END) AS filteredAlreadySwiped,
+      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND NOT alreadySwiped AND missingMetadata THEN 1 ELSE 0 END) AS filteredMissingMetadata,
+      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND NOT alreadySwiped AND NOT missingMetadata THEN 1 ELSE 0 END) AS remainingAfterFiltering
+    `,
+    { uid }
+  );
+
+  if (result.records.length === 0) {
+    return {
+      totalCandidatesConsidered: 0,
+      filteredAlreadySeen: 0,
+      filteredDisliked: 0,
+      filteredAlreadySwiped: 0,
+      filteredMissingMetadata: 0,
+      remainingAfterFiltering: 0,
+    };
+  }
+
+  const record = result.records[0];
+  return {
+    totalCandidatesConsidered: toNativeNumber(record.get('totalCandidatesConsidered')),
+    filteredAlreadySeen: toNativeNumber(record.get('filteredAlreadySeen')),
+    filteredDisliked: toNativeNumber(record.get('filteredDisliked')),
+    filteredAlreadySwiped: toNativeNumber(record.get('filteredAlreadySwiped')),
+    filteredMissingMetadata: toNativeNumber(record.get('filteredMissingMetadata')),
+    remainingAfterFiltering: toNativeNumber(record.get('remainingAfterFiltering')),
+  };
 }
 
 module.exports = {
@@ -665,11 +1057,23 @@ module.exports = {
   likeMovie,
   dislikeMovie,
   watchlistMovie,
+  markMovieAsSeen,
   saveSelectedFavorites,
   savePreferredGenres,
   removeFromWatchlist,
   removeLike,
   removeDislike,
+  removeSeen,
   getUserLibrary,
+  getPersonalizedRecommendationCandidates,
+  getFallbackRecommendationCandidates,
+  getRecommendationCandidates,
   getRecommendations,
+  getExploratoryCandidates,
+  getRecommendationUserProfile,
+  getTopPositiveGenreSignals,
+  getTopNegativeGenreSignals,
+  getTopPositiveMovies,
+  getTopNegativeMovies,
+  getCandidatePoolStats,
 };

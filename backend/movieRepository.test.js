@@ -186,7 +186,7 @@ test('getRecommendations applies a safe disliked-genre penalty', async (t) => {
   assert.match(personalizedQuery, /OPTIONAL MATCH \(me\)-\[:DISLIKED\]->\(disliked:Movie\)/);
   assert.match(personalizedQuery, /dislikedMl:MovieLensMovie\)-\[:IN_GENRE\]->\(mlGenre:Genre\)/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(disliked\)-\[:IN_GENRE\]->\(movieGenre:Genre\)/);
-  assert.match(personalizedQuery, /dislikedCount >= \$dislikedGenreThreshold/);
+  assert.match(personalizedQuery, /g\.count >= \$dislikedGenreThreshold/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(recMl\)-\[:IN_GENRE\]->\(recMlGenre:Genre\)/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(rec\)-\[:IN_GENRE\]->\(recMovieGenre:Genre\)/);
   assert.match(personalizedQuery, /\$dislikedGenrePenalty \* toFloat\(entry\.count\)/);
@@ -218,6 +218,53 @@ test('getRecommendations uses tiered genre and favorite cold-start fallback', as
   assert.match(fallbackQuery, /LIKED\|DISLIKED\|WATCHLISTED\|ALREADY_SEEN\|SELECTED_FAVORITE/);
   assert.match(fallbackQuery, /ORDER BY\s+finalScore DESC/);
   assert.match(fallbackQuery, /LIMIT 80/);
+});
+
+test('getExploratoryCandidates inlines an integer Cypher limit', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return { records: [] };
+  };
+
+  await movieRepository.getExploratoryCandidates('user-1', {
+    excludedTmdbIds: [10, 20],
+    limit: 18,
+  });
+
+  assert.match(calls[0].query, /LIMIT 18/);
+  assert.equal(Object.prototype.hasOwnProperty.call(calls[0].params, 'limit'), false);
+});
+
+test('debug signal queries inline integer Cypher limits', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return { records: [] };
+  };
+
+  await movieRepository.getTopPositiveGenreSignals('user-1', 5);
+  await movieRepository.getTopNegativeGenreSignals('user-1', 5);
+  await movieRepository.getTopPositiveMovies('user-1', 5);
+  await movieRepository.getTopNegativeMovies('user-1', 5);
+
+  assert.match(calls[0].query, /LIMIT 5/);
+  assert.match(calls[1].query, /LIMIT 5/);
+  assert.match(calls[2].query, /LIMIT 5/);
+  assert.match(calls[3].query, /LIMIT 5/);
+  assert.deepEqual(calls.map((entry) => Object.prototype.hasOwnProperty.call(entry.params, 'limit')), [false, false, false, false]);
 });
 
 test('diversifyRecommendations removes duplicates and caps genre repetition', async () => {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:agreeo/services/backend_movie_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
@@ -9,20 +10,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeMovieService implements MovieService {
-  _FakeMovieService(this.catalog, this.suggestions);
+  _FakeMovieService(this.catalog, this.suggestionBatches);
 
   final List<Movie> catalog;
-  final List<Movie> suggestions;
+  final List<List<Movie>> suggestionBatches;
+  int _dailySuggestionCallCount = 0;
 
   @override
   Future<List<Movie>> getCatalog() async => catalog;
 
   @override
+  Future<List<Movie>> getRecommendedForYou() async =>
+      suggestionBatches.isEmpty ? const <Movie>[] : suggestionBatches.first;
+
+  @override
   Future<List<Movie>> getDailySuggestions({
     required List<String> favoriteGenres,
     required List<String> favoriteMovieIds,
+    int? limit,
   }) async {
-    return suggestions;
+    if (suggestionBatches.isEmpty) {
+      return const <Movie>[];
+    }
+    final index = _dailySuggestionCallCount < suggestionBatches.length
+        ? _dailySuggestionCallCount
+        : suggestionBatches.length - 1;
+    _dailySuggestionCallCount += 1;
+    return suggestionBatches[index];
   }
 
   @override
@@ -48,6 +62,11 @@ class _FakeMovieService implements MovieService {
   @override
   Future<List<Movie>> searchMovies(String query, MovieSearchFilters filters) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getRecommendationDebugStats() async {
+    return <String, dynamic>{};
   }
 }
 
@@ -105,9 +124,12 @@ void main() {
       );
 
       final controller = AgreeoAppController(
-        _FakeMovieService(const <Movie>[], <Movie>[freshMovie]),
+        _FakeMovieService(const <Movie>[], <List<Movie>>[
+          <Movie>[freshMovie],
+        ]),
         MockAuthService(),
         LocalUserMovieStateService(),
+        BackendMovieService(),
       );
 
       await Future<void>.delayed(Duration.zero);
@@ -120,4 +142,48 @@ void main() {
       );
     },
   );
+
+  test('ensureSwipeQueueFilled appends new untouched suggestions', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final firstMovie = _movie('tmdb-200');
+    final secondMovie = _movie('tmdb-300');
+
+    final controller = AgreeoAppController(
+      _FakeMovieService(const <Movie>[], <List<Movie>>[
+        <Movie>[firstMovie],
+        <Movie>[secondMovie],
+      ]),
+      MockAuthService(),
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.state = controller.state.copyWith(
+      hydrated: true,
+      session: AgreeoUserSession(
+        id: 'user-1',
+        displayName: 'User',
+        email: 'user@example.com',
+        bio: 'Bio',
+        joinedAt: DateTime(2026, 4, 11),
+      ),
+      onboarding: const OnboardingState(
+        favoriteGenres: <String>['Drama'],
+        favoriteMovieIds: <String>['tmdb-200'],
+        completed: true,
+      ),
+      catalog: <Movie>[firstMovie],
+      dailySuggestionIds: <String>[firstMovie.id],
+    );
+
+    await controller.ensureSwipeQueueFilled(force: true);
+    await controller.ensureSwipeQueueFilled(force: true);
+
+    expect(controller.state.dailySuggestionIds, contains(firstMovie.id));
+    expect(controller.state.dailySuggestionIds, contains(secondMovie.id));
+  });
 }

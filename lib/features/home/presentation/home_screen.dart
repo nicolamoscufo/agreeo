@@ -48,7 +48,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
     final query = _searchController.text.trim().toLowerCase();
     final hasRemoteSearch = query.isNotEmpty;
 
-    final recommended = _applyFilters(state.remainingDailySuggestions, query);
+    final recommended = _applyFilters(state.recommendedForYou, query);
     final trending = _applyFilters(_buildTrending(state.catalog), query);
     final friends = _applyFilters(
       state.moviesByIds(mockPopularWithFriendsIds),
@@ -179,7 +179,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               _CollectionSection(
                 title: 'Recommended for you',
                 subtitle:
-                    'Based on your favorite genres and saved taste profile.',
+                    'Your best current matches, ranked from your onboarding and feedback signals.',
                 movies: recommended,
               ),
               const SizedBox(height: 22),

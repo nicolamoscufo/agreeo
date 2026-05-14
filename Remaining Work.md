@@ -1,5 +1,70 @@
 # Remaining Work
 
+## Recommendation Separation and Debugging Pass
+
+Completed in this step:
+- Split backend recommendation concepts into distinct `for-you` ranking and `daily-suggestions` taste-learning flows.
+- Added backend support for `ALREADY_SEEN` mutations so swipe feedback can become a real exclusion signal.
+- Added backend debug/stat plumbing for recommendation diagnostics and daily-swipe configuration flags.
+- Wired the active Flutter prototype to separate Home recommendations and Swipe daily suggestions.
+- Synced frontend like/dislike/watchlist/seen actions to backend movie-feedback endpoints.
+- Added a dev-only recommendation debug screen entry from Profile.
+- Refreshed the swipe card presentation and replaced the old inconsistent Movie Details layout.
+
+Follow-up fixes in this step:
+- Restored `Movie Details` to its previous implementation on request.
+- Fixed Neo4j debug/daily query `LIMIT` handling so integer-only Cypher limits do not throw runtime `500` errors.
+- Added stronger server-side fallback behavior so Home does not stay empty and Swipe does not fall back only through the client when recommendation candidates are unavailable.
+- Removed the hardcoded backend daily-suggestions cap of `30` and made the batch size request-driven.
+- Added swipe queue auto-refill so the app appends fresh untouched suggestions when the remaining queue gets low instead of waiting to fully exhaust.
+
+Files changed in this step:
+- `backend/movieRepository.js`
+- `backend/movieController.js`
+- `backend/server.js`
+- `backend/.env.example`
+- `lib/services/backend_movie_service.dart`
+- `lib/shared/services/movie_service.dart`
+- `lib/shared/services/backend_catalog_movie_service.dart`
+- `lib/shared/services/mock_movie_service.dart`
+- `lib/shared/services/user_movie_state_service.dart`
+- `lib/shared/state/agreeo_app_controller.dart`
+- `lib/shared/models/agreeo_models.dart`
+- `lib/features/home/presentation/home_screen.dart`
+- `lib/features/swipe/presentation/swipe_screen.dart`
+- `lib/features/movie_details/presentation/movie_details_screen.dart`
+- `lib/features/debug/presentation/recommendation_debug_screen.dart`
+- `lib/features/profile/presentation/profile_screen.dart`
+- `lib/features/movie_details/presentation/movie_details_screen.dart`
+- `backend/movieRepository.test.js`
+- `lib/shared/services/movie_service.dart`
+- `lib/shared/services/backend_catalog_movie_service.dart`
+- `lib/shared/services/mock_movie_service.dart`
+- `lib/services/backend_movie_service.dart`
+- `lib/shared/state/agreeo_app_controller.dart`
+- `lib/features/swipe/presentation/swipe_screen.dart`
+- `test/shared/state/agreeo_app_controller_test.dart`
+
+Still to do:
+- Run a manual end-to-end pass against a live backend + Neo4j + TMDB setup to validate the new recommendation split and debug stats with real data.
+
+Known bugs / technical debt right now:
+- The recommendation debug screen currently renders the backend payload dynamically rather than via strongly typed Flutter models.
+- `flutter analyze` now passes with only 16 existing info/warning items in older auth and shared movie-widget files outside this change.
+
+Verification completed:
+- Backend syntax checks pass for `movieRepository.js`, `movieController.js`, and `server.js`.
+- Backend tests pass: `12/12`.
+- Full Flutter test suite passes.
+- `flutter analyze` reports only pre-existing non-blocking issues outside the new recommendation/debug/details flow.
+- Swipe queue refill changes verified with passing controller tests and no new analyzer errors in the touched files.
+
+Regression fix notes:
+- `Recommendation debug` previously failed with Neo4j `LIMIT ... must be a non-negative integer`; the debug and exploratory recommendation queries now inline sanitized integer limits.
+- Home no longer depends on an empty Neo4j candidate list alone; the backend now serves a server-side popular fallback when graph candidates are missing or cannot be hydrated.
+- Swipe no longer has to drop immediately to the client-side popular fallback when the backend learning queue is empty; the backend now provides its own broader popular exploration fallback.
+- The frontend debug screen now handles empty/partial payloads gracefully and shows explicit Home/Swipe fallback status, strategy, reason, and source breakdown.
+
 ## Final Recommendation Regression Pass
 
 Final status:

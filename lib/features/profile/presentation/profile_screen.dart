@@ -1,6 +1,8 @@
+import 'package:agreeo/features/debug/presentation/recommendation_debug_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,9 +35,8 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   children: <Widget>[
                     Text(
                       session.displayName,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -43,9 +44,9 @@ class AgreeoProfileScreen extends ConsumerWidget {
                           ? 'Spend less time choosing. More time watching.'
                           : session.bio,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            height: 1.4,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
@@ -54,7 +55,8 @@ class AgreeoProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           FilledButton.tonalIcon(
-            onPressed: () => _showEditProfileSheet(context, controller, session),
+            onPressed: () =>
+                _showEditProfileSheet(context, controller, session),
             icon: const Icon(Icons.edit_rounded),
             label: const Text('Edit profile'),
           ),
@@ -65,7 +67,10 @@ class AgreeoProfileScreen extends ConsumerWidget {
             children: <Widget>[
               _StatCard(label: 'Watched', value: state.watchedCount.toString()),
               _StatCard(label: 'Liked', value: state.likedCount.toString()),
-              _StatCard(label: 'Watchlist', value: state.watchlistCount.toString()),
+              _StatCard(
+                label: 'Watchlist',
+                value: state.watchlistCount.toString(),
+              ),
               _StatCard(label: 'Reviews', value: state.reviewCount.toString()),
               const _StatCard(label: 'Movie Nights', value: '0'),
             ],
@@ -95,14 +100,16 @@ class AgreeoProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           const SectionHeader(
             title: 'Recent activity',
-            subtitle: 'A quick personal feed built from the local movie state history.',
+            subtitle:
+                'A quick personal feed built from the local movie state history.',
           ),
           const SizedBox(height: 14),
           if (activity.isEmpty)
             const EmptyState(
               icon: Icons.auto_awesome_motion_outlined,
               title: 'No recent activity yet',
-              message: 'Start swiping, saving, or reviewing to populate your profile.',
+              message:
+                  'Start swiping, saving, or reviewing to populate your profile.',
             )
           else
             Card(
@@ -121,7 +128,8 @@ class AgreeoProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           const SectionHeader(
             title: 'Settings',
-            subtitle: 'Keep privacy and notifications explicit, even in a mock prototype.',
+            subtitle:
+                'Keep privacy and notifications explicit, even in a mock prototype.',
           ),
           const SizedBox(height: 14),
           Card(
@@ -131,12 +139,15 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.person_outline_rounded),
                   title: const Text('Edit profile'),
                   subtitle: const Text('Update your name and bio.'),
-                  onTap: () => _showEditProfileSheet(context, controller, session),
+                  onTap: () =>
+                      _showEditProfileSheet(context, controller, session),
                 ),
                 ListTile(
                   leading: const Icon(Icons.category_outlined),
                   title: const Text('Manage favorite genres'),
-                  subtitle: const Text('Currently driven by onboarding selections.'),
+                  subtitle: const Text(
+                    'Currently driven by onboarding selections.',
+                  ),
                 ),
                 const Divider(height: 1),
                 SwitchListTile.adaptive(
@@ -205,6 +216,20 @@ class AgreeoProfileScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
+          if (kDebugMode) ...<Widget>[
+            FilledButton.tonalIcon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RecommendationDebugScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.bug_report_outlined),
+              label: const Text('Recommendation debug'),
+            ),
+            const SizedBox(height: 18),
+          ],
           OutlinedButton(
             onPressed: controller.logOut,
             child: const Text('Logout'),
@@ -216,49 +241,54 @@ class AgreeoProfileScreen extends ConsumerWidget {
 
   List<_ProfileActivity> _buildRecentActivity(AgreeoAppState state) {
     final entries = state.movieStates.entries.toList(growable: false)
-      ..sort((left, right) => right.value.updatedAt.compareTo(left.value.updatedAt));
-
-    return entries.take(5).map((entry) {
-      final movie = state.movieById(entry.key);
-      final title = movie?.title ?? 'Unknown title';
-      final userState = entry.value;
-
-      if (userState.hasReview) {
-        return _ProfileActivity(
-          icon: Icons.rate_review_outlined,
-          title: 'Reviewed $title',
-          subtitle: userState.review!,
-        );
-      }
-      if (userState.preference == MoviePreference.liked) {
-        return _ProfileActivity(
-          icon: Icons.thumb_up_alt_outlined,
-          title: 'Liked $title',
-          subtitle: 'Kept as a strong positive preference signal.',
-        );
-      }
-      if (userState.inWatchlist) {
-        return _ProfileActivity(
-          icon: Icons.bookmark_outline_rounded,
-          title: 'Saved $title',
-          subtitle: 'Added to your personal watchlist.',
-        );
-      }
-      if (userState.watched) {
-        return _ProfileActivity(
-          icon: Icons.visibility_outlined,
-          title: 'Watched $title',
-          subtitle: userState.rating == null
-              ? 'Marked as already seen.'
-              : 'Rated ${userState.rating}/5 after watching.',
-        );
-      }
-      return _ProfileActivity(
-        icon: Icons.hide_source_outlined,
-        title: 'Hidden $title',
-        subtitle: 'Removed from future swipe momentum.',
+      ..sort(
+        (left, right) => right.value.updatedAt.compareTo(left.value.updatedAt),
       );
-    }).toList(growable: false);
+
+    return entries
+        .take(5)
+        .map((entry) {
+          final movie = state.movieById(entry.key);
+          final title = movie?.title ?? 'Unknown title';
+          final userState = entry.value;
+
+          if (userState.hasReview) {
+            return _ProfileActivity(
+              icon: Icons.rate_review_outlined,
+              title: 'Reviewed $title',
+              subtitle: userState.review!,
+            );
+          }
+          if (userState.preference == MoviePreference.liked) {
+            return _ProfileActivity(
+              icon: Icons.thumb_up_alt_outlined,
+              title: 'Liked $title',
+              subtitle: 'Kept as a strong positive preference signal.',
+            );
+          }
+          if (userState.inWatchlist) {
+            return _ProfileActivity(
+              icon: Icons.bookmark_outline_rounded,
+              title: 'Saved $title',
+              subtitle: 'Added to your personal watchlist.',
+            );
+          }
+          if (userState.watched) {
+            return _ProfileActivity(
+              icon: Icons.visibility_outlined,
+              title: 'Watched $title',
+              subtitle: userState.rating == null
+                  ? 'Marked as already seen.'
+                  : 'Rated ${userState.rating}/5 after watching.',
+            );
+          }
+          return _ProfileActivity(
+            icon: Icons.hide_source_outlined,
+            title: 'Hidden $title',
+            subtitle: 'Removed from future swipe momentum.',
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<void> _showEditProfileSheet(
@@ -288,10 +318,9 @@ class AgreeoProfileScreen extends ConsumerWidget {
             children: <Widget>[
               Text(
                 'Edit profile',
-                style: Theme.of(sheetContext)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(sheetContext).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -342,26 +371,25 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.55),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

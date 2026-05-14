@@ -22,22 +22,35 @@ class BackendCatalogMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getDailySuggestions({
-    required List<String> favoriteGenres,
-    required List<String> favoriteMovieIds,
-  }) async {
+  Future<List<Movie>> getRecommendedForYou() async {
     try {
-      // Normal path: let the backend own personalized + cold-start fallback.
-      final recommendations = await _backendMovieService.getRecommendations();
+      final recommendations = await _backendMovieService.getRecommendedForYou();
       if (recommendations.isNotEmpty) {
         return recommendations;
       }
-      // Empty response: fall through to popular fallback, not mock content.
     } catch (error) {
-      // Emergency path only: backend request failed completely.
-      // Keep the fallback explicit so normal cold-start users still go through Neo4j.
+      debugPrint('[BackendCatalogMovieService] for-you backend failed: $error');
+    }
+
+    return const <Movie>[];
+  }
+
+  @override
+  Future<List<Movie>> getDailySuggestions({
+    required List<String> favoriteGenres,
+    required List<String> favoriteMovieIds,
+    int? limit,
+  }) async {
+    try {
+      final suggestions = await _backendMovieService.getDailySuggestions(
+        limit: limit,
+      );
+      if (suggestions.isNotEmpty) {
+        return suggestions;
+      }
+    } catch (error) {
       debugPrint(
-        '[BackendCatalogMovieService] recommendation backend failed: $error',
+        '[BackendCatalogMovieService] daily-suggestions backend failed: $error',
       );
     }
 
@@ -107,6 +120,11 @@ class BackendCatalogMovieService implements MovieService {
     return catalog
         .where((movie) => movie.runtime <= 110)
         .toList(growable: false);
+  }
+
+  @override
+  Future<Map<String, dynamic>> getRecommendationDebugStats() {
+    return _backendMovieService.getRecommendationDebugStats();
   }
 
   int? _parseTmdbId(String movieId) {

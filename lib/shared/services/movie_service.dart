@@ -3,9 +3,12 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 abstract class MovieService {
   Future<List<Movie>> getCatalog();
 
+  Future<List<Movie>> getRecommendedForYou();
+
   Future<List<Movie>> getDailySuggestions({
     required List<String> favoriteGenres,
     required List<String> favoriteMovieIds,
+    int? limit,
   });
 
   Future<List<Movie>> searchMovies(String query, MovieSearchFilters filters);
@@ -17,4 +20,6 @@ abstract class MovieService {
   Future<List<Movie>> getMoviesByGenre(String genre);
 
   Future<List<Movie>> getMockShortMovies();
+
+  Future<Map<String, dynamic>> getRecommendationDebugStats();
 }

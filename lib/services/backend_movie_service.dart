@@ -107,8 +107,27 @@ class BackendMovieService {
     );
   }
 
+  Future<void> markAsSeen(Movie movie) async {
+    await _authorizedRequest(
+      'POST',
+      '/me/movies/${_resolveTmdbId(movie)}/seen',
+    );
+  }
+
   Future<void> removeFromWatchlist(int tmdbId) async {
     await _authorizedRequest('DELETE', '/me/movies/$tmdbId/watchlist');
+  }
+
+  Future<void> removeLike(int tmdbId) async {
+    await _authorizedRequest('DELETE', '/me/movies/$tmdbId/like');
+  }
+
+  Future<void> removeDislike(int tmdbId) async {
+    await _authorizedRequest('DELETE', '/me/movies/$tmdbId/dislike');
+  }
+
+  Future<void> removeSeen(int tmdbId) async {
+    await _authorizedRequest('DELETE', '/me/movies/$tmdbId/seen');
   }
 
   Future<UserLibrary> getLibrary() async {
@@ -123,9 +142,34 @@ class BackendMovieService {
   }
 
   Future<List<Movie>> getRecommendations() async {
-    final response = await _authorizedRequest('GET', '/me/recommendations');
+    return getRecommendedForYou();
+  }
+
+  Future<List<Movie>> getRecommendedForYou() async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/me/recommendations/for-you',
+    );
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
+  }
+
+  Future<List<Movie>> getDailySuggestions({int? limit}) async {
+    final path = limit == null || limit <= 0
+        ? '/me/recommendations/daily-suggestions'
+        : '/me/recommendations/daily-suggestions?limit=$limit';
+    final response = await _authorizedRequest('GET', path);
+    final body = _decodeMap(response.body);
+    return _decodeMovieList(body['results']);
+  }
+
+  Future<Map<String, dynamic>> getRecommendationDebugStats() async {
+    final response = await _authorizedRequest(
+      'GET',
+      '/me/recommendations/debug-stats',
+    );
+    final body = _decodeMap(response.body);
+    return body;
   }
 
   Future<http.Response> _authorizedRequest(String method, String path) async {
@@ -182,7 +226,7 @@ class BackendMovieService {
   Movie _decodeMovie(Map<String, dynamic> json) {
     final tmdbId = (json['tmdbId'] as num?)?.toInt();
     final releaseDate = json['releaseDate']?.toString() ?? '';
-    final year = DateTime.tryParse(releaseDate)?.year ?? DateTime.now().year;
+    final year = DateTime.tryParse(releaseDate)?.year ?? 0;
     final genres = _decodeStringList(json['genres']);
     final rating =
         (json['voteAverage'] as num?)?.toDouble() ??

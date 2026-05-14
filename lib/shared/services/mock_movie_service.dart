@@ -9,9 +9,18 @@ class MockMovieService implements MovieService {
   }
 
   @override
+  Future<List<Movie>> getRecommendedForYou() async {
+    return getDailySuggestions(
+      favoriteGenres: const <String>[],
+      favoriteMovieIds: const <String>[],
+    );
+  }
+
+  @override
   Future<List<Movie>> getDailySuggestions({
     required List<String> favoriteGenres,
     required List<String> favoriteMovieIds,
+    int? limit,
   }) async {
     final favoriteMovieGenres = mockMovieCatalog
         .where((movie) => favoriteMovieIds.contains(movie.id))
@@ -75,19 +84,27 @@ class MockMovieService implements MovieService {
   }
 
   @override
+  Future<Map<String, dynamic>> getRecommendationDebugStats() async {
+    return <String, dynamic>{};
+  }
+
+  @override
   Future<List<Movie>> searchMovies(
     String query,
     MovieSearchFilters filters,
   ) async {
     final normalizedQuery = query.trim().toLowerCase();
-    return mockMovieCatalog.where((movie) {
-      final matchesQuery = normalizedQuery.isEmpty ||
-          movie.title.toLowerCase().contains(normalizedQuery) ||
-          movie.originalTitle.toLowerCase().contains(normalizedQuery) ||
-          movie.genres.any(
-            (genre) => genre.toLowerCase().contains(normalizedQuery),
-          );
-      return matchesQuery && filters.matches(movie);
-    }).toList(growable: false);
+    return mockMovieCatalog
+        .where((movie) {
+          final matchesQuery =
+              normalizedQuery.isEmpty ||
+              movie.title.toLowerCase().contains(normalizedQuery) ||
+              movie.originalTitle.toLowerCase().contains(normalizedQuery) ||
+              movie.genres.any(
+                (genre) => genre.toLowerCase().contains(normalizedQuery),
+              );
+          return matchesQuery && filters.matches(movie);
+        })
+        .toList(growable: false);
   }
 }

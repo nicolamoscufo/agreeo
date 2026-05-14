@@ -41,6 +41,95 @@ function imageUrl(path, size) {
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = value == null ? fallback : Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function buildDailySuggestionSettings() {
+  const limitEnabled = String(process.env.ENABLE_DAILY_SWIPE_LIMIT || 'false').toLowerCase() === 'true';
+  const configuredLimit = Number.parseInt(process.env.DAILY_SWIPE_LIMIT || '999999', 10);
+  return {
+    limitEnabled,
+    configuredLimit: Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 999999,
+  };
+}
+
+function recommendationDebugEnabled() {
+  return String(process.env.ENABLE_RECOMMENDATION_DEBUG || 'true').toLowerCase() !== 'false';
+}
+
+function dedupeByTmdbId(items) {
+  const seen = new Set();
+  const deduped = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || item.tmdbId == null) continue;
+    const key = String(item.tmdbId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+  return deduped;
+}
+
+function buildForYouReason(candidate, fallbackUsed) {
+  if (candidate?.reason) {
+    return candidate.reason;
+  }
+  if (fallbackUsed || candidate?.source === 'fallback') {
+    return 'Fallback ranking based on onboarding preferences and reliable catalog quality.';
+  }
+  if (toFiniteNumber(candidate?.negativePenalty) > 0) {
+    return 'Strong collaborative match with a light penalty from repeated negative genre feedback.';
+  }
+  return 'Strong collaborative match with your likes, favorites, and watchlist signals.';
+}
+
+function buildDailyPersonalizedReason(candidate, homeIds) {
+  if (homeIds.has(candidate.tmdbId)) {
+    return 'High-confidence personalized pick kept in the learning queue for fast taste confirmation.';
+  }
+  return 'Personalized candidate sampled slightly deeper in the ranked pool to learn taste without mirroring Home exactly.';
+}
+
+function toPositiveInteger(value, fallback = 30, max = 100) {
+  const numeric = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.min(numeric, max);
+}
+
+function attachRecommendationMetadata(movie, recommendation) {
+  return {
+    ...movie,
+    recommendation: {
+      source: recommendation.source || 'fallback',
+      similarUsers: recommendation.similarUsers ?? 0,
+      avgSimilarRating: recommendation.avgSimilarRating ?? null,
+      collaborativeScore: toFiniteNumber(recommendation.collaborativeScore),
+      genreScore: toFiniteNumber(recommendation.genreScore),
+      popularityScore: toFiniteNumber(recommendation.popularityScore),
+      negativePenalty: toFiniteNumber(recommendation.negativePenalty),
+      explorationBonus: toFiniteNumber(recommendation.explorationBonus),
+      finalScore: toFiniteNumber(recommendation.finalScore),
+      reason: recommendation.reason || '',
+    },
+  };
+}
+
+function summarizeRecommendationSources(results) {
+  const counts = new Map();
+  for (const movie of Array.isArray(results) ? results : []) {
+    const source = movie?.recommendation?.source || 'unknown';
+    counts.set(source, (counts.get(source) || 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .map(([source, count]) => ({ source, count }))
+    .sort((left, right) => right.count - left.count || left.source.localeCompare(right.source));
+}
+
 function normalizeRecommendationTitle(title) {
   return String(title || '')
     .normalize('NFKD')
@@ -131,6 +220,26 @@ async function hydrateRecommendations(
     logger = console,
   } = {}
 ) {
+  const hydratedEntries = await hydrateRecommendationEntries(recommendations, {
+    limit,
+    batchSize,
+    tmdbFetch,
+    findMovieByTmdbId,
+    logger,
+  });
+  return hydratedEntries.map((entry) => entry.movie);
+}
+
+async function hydrateRecommendationEntries(
+  recommendations,
+  {
+    limit = 30,
+    batchSize = 6,
+    tmdbFetch = tmdbGet,
+    findMovieByTmdbId = movieRepository.findMovieByTmdbId,
+    logger = console,
+  } = {}
+) {
   const hydrated = [];
   const candidates = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
 
@@ -145,28 +254,41 @@ async function hydrateRecommendations(
           }
 
           const neoMovie = await findMovieByTmdbId(entry.tmdbId);
-          return {
+          const movie = {
             ...mapTmdbMovie(tmdbMovie, {
               ...(neoMovie || {}),
               movieLensAvgRating: entry.globalAvg ?? neoMovie?.movieLensAvgRating ?? null,
               movieLensRatingCount: entry.ratingCount ?? neoMovie?.movieLensRatingCount ?? 0,
             }),
             recommendation: {
+              source: entry.source || 'personalized',
               similarUsers: entry.similarUsers,
               avgSimilarRating: entry.avgSimilarRating,
+              collaborativeScore: toFiniteNumber(entry.collaborativeScore),
+              genreScore: toFiniteNumber(entry.genreScore),
+              popularityScore: toFiniteNumber(entry.popularityScore),
+              negativePenalty: toFiniteNumber(entry.negativePenalty),
+              explorationBonus: toFiniteNumber(entry.explorationBonus),
+              finalScore: toFiniteNumber(entry.finalScore),
+              reason: entry.reason || '',
             },
           };
+          return { raw: entry, movie };
         } catch (error) {
-          return null; // Salta silenziosamente i film non validi su TMDB
+          if (typeof logger?.warn === 'function') {
+            logger.warn(`Skipping stale TMDB recommendation ${entry.tmdbId}: ${error instanceof Error ? error.message : error}`);
+          }
+          return null;
         }
       })
     );
 
-    for (const movie of batchHydrated) {
-      if (movie) hydrated.push(movie);
+    for (const item of batchHydrated) {
+      if (item) hydrated.push(item);
       if (hydrated.length >= limit) break;
     }
   }
+
   return hydrated.slice(0, limit);
 }
 
@@ -196,7 +318,7 @@ function mapTmdbMovie(tmdbMovie, neoMovie = null) {
     overview: tmdbMovie.overview || '',
     posterPath: tmdbMovie.poster_path || null,
     backdropPath: tmdbMovie.backdrop_path || null,
-    posterUrl: imageUrl(tmdbMovie.poster_path, 'w500'),
+    posterUrl: imageUrl(tmdbMovie.poster_path, 'w780'),
     backdropUrl: imageUrl(tmdbMovie.backdrop_path, 'w780'),
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
     voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
@@ -205,6 +327,9 @@ function mapTmdbMovie(tmdbMovie, neoMovie = null) {
       : Array.isArray(tmdbMovie.genres)
         ? tmdbMovie.genres.map((genre) => genre?.id).filter((id) => Number.isInteger(id))
         : [],
+    genres: Array.isArray(tmdbMovie.genres)
+      ? tmdbMovie.genres.map((genre) => genre?.name).filter((name) => typeof name === 'string' && name.trim() !== '')
+      : [],
     movieLens: mapMovieLens(neoMovie),
   };
 }
@@ -267,6 +392,7 @@ function mapRepositoryMovieToResponse(movie) {
     releaseDate: movie.releaseDate || '',
     director: movie.director || '',
     voteAverage: movie.voteAverage,
+    genres: Array.isArray(movie.genres) ? movie.genres : [],
     genreIds: [],
     movieLens: {
       avgRating: movie.movieLensAvgRating ?? null,
@@ -298,6 +424,60 @@ async function enrichMovies(tmdbMovies) {
   return tmdbMovies.map((movie) => mapTmdbMovie(movie, byTmdbId.get(movie.id) || null));
 }
 
+async function loadPopularFallbackMovies({
+  limit = 30,
+  pages = [1],
+  excludeTmdbIds = [],
+  source = 'popular-fallback',
+  reason = 'No ranked recommendation candidates were available, so popular unseen titles were used as a safe fallback.',
+  explorationBonus = 0,
+} = {}) {
+  const safeLimit = toPositiveInteger(limit, 30, 80);
+  const seenTmdbIds = new Set(
+    excludeTmdbIds
+      .filter((tmdbId) => Number.isInteger(tmdbId))
+      .map((tmdbId) => String(tmdbId))
+  );
+  const results = [];
+
+  for (const page of pages) {
+    if (results.length >= safeLimit) {
+      break;
+    }
+
+    const response = await tmdbGet('/movie/popular', { language: 'en-US', page });
+    const movies = await enrichMovies(Array.isArray(response.results) ? response.results : []);
+
+    for (const movie of movies) {
+      if (!movie || !Number.isInteger(movie.tmdbId)) {
+        continue;
+      }
+
+      const key = String(movie.tmdbId);
+      if (seenTmdbIds.has(key)) {
+        continue;
+      }
+
+      seenTmdbIds.add(key);
+      results.push(
+        attachRecommendationMetadata(movie, {
+          source,
+          popularityScore: toFiniteNumber(movie.voteAverage),
+          explorationBonus,
+          finalScore: toFiniteNumber(movie.voteAverage) + explorationBonus,
+          reason,
+        })
+      );
+
+      if (results.length >= safeLimit) {
+        break;
+      }
+    }
+  }
+
+  return results.slice(0, safeLimit);
+}
+
 async function fetchInteractionMovie(tmdbId) {
   const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, { append_to_response: 'credits' });
   return mapInteractionMovie(tmdbMovie);
@@ -305,6 +485,229 @@ async function fetchInteractionMovie(tmdbId) {
 
 function requestUid(req) {
   return req.user?.uid || req.user?.sub;
+}
+
+function buildTasteLearningPersonalizedPool(candidates) {
+  const ordered = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+  const deeperSlice = ordered.slice(Math.min(3, ordered.length));
+  return deeperSlice.length > 0 ? deeperSlice.concat(ordered.slice(0, Math.min(3, ordered.length))) : ordered;
+}
+
+function buildDailySuggestionQueue(personalizedCandidates, exploratoryCandidates, { limit = 30, personalizedRatio = 0.65 } = {}) {
+  const homeTopIds = new Set(
+    (Array.isArray(personalizedCandidates) ? personalizedCandidates : [])
+      .slice(0, limit)
+      .map((candidate) => candidate?.tmdbId)
+      .filter((tmdbId) => tmdbId != null)
+  );
+  const personalizedPool = buildTasteLearningPersonalizedPool(personalizedCandidates);
+  const exploratoryPool = Array.isArray(exploratoryCandidates) ? exploratoryCandidates.filter(Boolean) : [];
+  const seen = new Set();
+  const queue = [];
+  const personalizedTarget = Math.max(0, Math.round(limit * personalizedRatio));
+  const exploratoryTarget = Math.max(0, limit - personalizedTarget);
+
+  function takeFrom(pool, target, source, reasonBuilder) {
+    let taken = 0;
+    for (const candidate of pool) {
+      if (queue.length >= limit || taken >= target || !candidate || candidate.tmdbId == null) {
+        continue;
+      }
+      const key = String(candidate.tmdbId);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      taken += 1;
+      queue.push({
+        ...candidate,
+        source,
+        reason: reasonBuilder(candidate, homeTopIds),
+        appearsInHomeRecommendations: homeTopIds.has(candidate.tmdbId),
+      });
+    }
+  }
+
+  // Home optimizes for best ranking; the daily queue samples slightly deeper plus exploration.
+  takeFrom(
+    personalizedPool,
+    personalizedTarget,
+    'daily-personalized',
+    (candidate, ids) => buildDailyPersonalizedReason(candidate, ids)
+  );
+  takeFrom(
+    exploratoryPool,
+    exploratoryTarget,
+    'exploratory',
+    (candidate) => candidate.reason || 'Exploratory pick chosen to learn from less-proven genres and popular unseen titles.'
+  );
+
+  if (queue.length < limit) {
+    takeFrom(
+      personalizedPool,
+      limit - queue.length,
+      'daily-personalized',
+      (candidate, ids) => buildDailyPersonalizedReason(candidate, ids)
+    );
+  }
+  if (queue.length < limit) {
+    takeFrom(
+      exploratoryPool,
+      limit - queue.length,
+      'exploratory',
+      (candidate) => candidate.reason || 'Exploratory pick chosen to learn from less-proven genres and popular unseen titles.'
+    );
+  }
+
+  return queue;
+}
+
+async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
+  const safeLimit = toPositiveInteger(limit, 30, 80);
+  const recommendationData = await movieRepository.getRecommendationCandidates(uid);
+  const enrichedCandidates = recommendationData.candidates.map((candidate) => ({
+    ...candidate,
+    reason: buildForYouReason(candidate, recommendationData.fallbackUsed),
+  }));
+
+  if (enrichedCandidates.length === 0) {
+    return {
+      results: await loadPopularFallbackMovies({
+        limit: safeLimit,
+        pages: [1, 2],
+        source: 'popular-fallback',
+        reason: 'No personalized graph candidates were available yet, so popular movies were used as a temporary fallback.',
+      }),
+      meta: {
+        fallbackUsed: true,
+        fallbackReason: 'No recommendation candidates were returned from Neo4j.',
+        fallbackStrategy: 'TMDB popular fallback.',
+      },
+      candidates: [],
+    };
+  }
+
+  const hydratedPool = await hydrateRecommendations(enrichedCandidates, {
+    limit: Math.max(safeLimit * 2, 60),
+    batchSize: 6,
+    logger: console,
+  });
+
+  const rankedResults = diversifyRecommendations(hydratedPool, safeLimit);
+  if (rankedResults.length === 0) {
+    return {
+      results: await loadPopularFallbackMovies({
+        limit: safeLimit,
+        pages: [1, 2],
+        source: 'popular-fallback',
+        reason: 'The ranked recommendation pool could not be hydrated, so popular movies were used as a temporary fallback.',
+      }),
+      meta: {
+        fallbackUsed: true,
+        fallbackReason: 'Recommendation hydration returned no usable movies.',
+        fallbackStrategy: 'TMDB popular fallback after hydration failure.',
+      },
+      candidates: enrichedCandidates,
+    };
+  }
+
+  return {
+    results: rankedResults,
+    meta: {
+      fallbackUsed: recommendationData.fallbackUsed,
+      fallbackReason: recommendationData.fallbackReason,
+      fallbackStrategy: recommendationData.fallbackStrategy,
+    },
+    candidates: enrichedCandidates,
+  };
+}
+
+async function loadDailySuggestions(uid, { limit = 30 } = {}) {
+  const safeLimit = toPositiveInteger(limit, 60, 200);
+  const forYouData = await movieRepository.getRecommendationCandidates(uid);
+  const personalizedCandidates = forYouData.candidates.map((candidate) => ({
+    ...candidate,
+    reason: buildForYouReason(candidate, forYouData.fallbackUsed),
+  }));
+  const exploratoryCandidates = await movieRepository.getExploratoryCandidates(uid, {
+    excludedTmdbIds: personalizedCandidates.slice(0, 8).map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
+    limit: Math.max(Math.round(safeLimit * 0.6), 18),
+  });
+  const queueCandidates = buildDailySuggestionQueue(personalizedCandidates, exploratoryCandidates, { limit: safeLimit });
+
+  if (queueCandidates.length === 0) {
+    const fallbackResults = await loadPopularFallbackMovies({
+      limit: safeLimit,
+      pages: [2, 3, 1],
+      excludeTmdbIds: personalizedCandidates.map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
+      source: 'exploratory-fallback',
+      explorationBonus: 8,
+      reason: 'No learning candidates were available yet, so a broader popular queue was generated to collect fresh taste signals.',
+    });
+
+    return {
+      results: fallbackResults,
+      meta: {
+        fallbackUsed: true,
+        fallbackReason: 'No daily learning candidates were returned from Neo4j.',
+        fallbackStrategy: 'TMDB popular exploration fallback.',
+        personalizedCandidateCount: 0,
+        exploratoryCandidateCount: fallbackResults.length,
+        personalizedRatio: 0.0,
+      },
+      homeCandidates: personalizedCandidates,
+      queueCandidates: fallbackResults,
+      exploratoryCandidates,
+    };
+  }
+
+  const hydrated = await hydrateRecommendations(queueCandidates, {
+    limit: safeLimit,
+    batchSize: 6,
+    logger: console,
+  });
+
+  const finalResults = diversifyRecommendations(hydrated, safeLimit);
+  if (finalResults.length === 0) {
+    const fallbackResults = await loadPopularFallbackMovies({
+      limit: safeLimit,
+      pages: [2, 3, 1],
+      excludeTmdbIds: personalizedCandidates.map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
+      source: 'exploratory-fallback',
+      explorationBonus: 8,
+      reason: 'The learning queue could not be hydrated, so a broader popular queue was generated to keep swipe feedback flowing.',
+    });
+
+    return {
+      results: fallbackResults,
+      meta: {
+        fallbackUsed: true,
+        fallbackReason: 'Daily suggestion hydration returned no usable movies.',
+        fallbackStrategy: 'TMDB popular exploration fallback.',
+        personalizedCandidateCount: 0,
+        exploratoryCandidateCount: fallbackResults.length,
+        personalizedRatio: 0.0,
+      },
+      homeCandidates: personalizedCandidates,
+      queueCandidates: fallbackResults,
+      exploratoryCandidates,
+    };
+  }
+
+  return {
+    results: finalResults,
+    meta: {
+      fallbackUsed: forYouData.fallbackUsed,
+      fallbackReason: forYouData.fallbackReason,
+      fallbackStrategy: forYouData.fallbackStrategy,
+      personalizedCandidateCount: queueCandidates.filter((candidate) => candidate.source === 'daily-personalized').length,
+      exploratoryCandidateCount: queueCandidates.filter((candidate) => candidate.source === 'exploratory').length,
+      personalizedRatio: 0.65,
+    },
+    homeCandidates: personalizedCandidates,
+    queueCandidates,
+    exploratoryCandidates,
+  };
 }
 
 function handleError(res, error, fallbackMessage) {
@@ -399,6 +802,22 @@ exports.watchlist = async (req, res) => {
     return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to add movie to watchlist');
+  }
+};
+
+exports.markSeen = async (req, res) => {
+  const uid = requestUid(req);
+  const tmdbId = parseTmdbId(req.params.tmdbId);
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
+
+  try {
+    const movie = await fetchInteractionMovie(tmdbId);
+    const seen = await movieRepository.markMovieAsSeen(uid, movie);
+    if (!seen) return res.status(404).json({ error: 'App user not found' });
+    const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
+    return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
+  } catch (error) {
+    return handleError(res, error, 'Failed to mark movie as seen');
   }
 };
 
@@ -497,6 +916,19 @@ exports.removeFromWatchlist = async (req, res) => {
   }
 };
 
+exports.removeSeen = async (req, res) => {
+  const uid = requestUid(req);
+  const tmdbId = parseTmdbId(req.params.tmdbId);
+  if (!uid || !tmdbId) return res.status(400).json({ error: 'Invalid request' });
+
+  try {
+    await movieRepository.removeSeen(uid, tmdbId);
+    return res.status(204).send();
+  } catch (error) {
+    return handleError(res, error, 'Failed to remove seen movie');
+  }
+};
+
 exports.library = async (req, res) => {
   const uid = requestUid(req);
   if (!uid) return res.status(401).json({ error: 'Missing user context' });
@@ -509,10 +941,7 @@ exports.library = async (req, res) => {
   }
 };
 
-// ==========================================
-// IL CUORE DELLE RACCOMANDAZIONI (SISTEMATO)
-// ==========================================
-exports.recommendations = async (req, res) => {
+exports.recommendationsForYou = async (req, res) => {
   const uid = requestUid(req);
 
   if (!uid) {
@@ -520,28 +949,156 @@ exports.recommendations = async (req, res) => {
   }
 
   try {
-    // 1. Chiedi 80 candidati grezzi a Neo4j (velocissimo)
-    const rawRecommendations = await movieRepository.getRecommendations(uid);
-
-    // 2. Idrata un pool generoso (60 film) per scoprire i generi e filtrare quelli non validi.
-    // Lotti da 6 velocizzano le richieste a TMDB senza superare i limiti.
-    const hydratedPool = await hydrateRecommendations(rawRecommendations, {
-      limit: 60, 
-      batchSize: 6,
-      logger: console,
-    });
-
-    // 3. ORA diversifica! Avendo i generi caricati, può scegliere la combinazione migliore di 30 film
-    const diversifiedFinal = diversifyRecommendations(hydratedPool, 30);
-
-    return res.json({
-      results: diversifiedFinal,
-    });
+    const response = await loadForYouRecommendations(uid, { limit: 30 });
+    return res.json({ results: response.results, meta: response.meta });
   } catch (error) {
-    return handleError(res, error, 'Failed to load recommendations');
+    return handleError(res, error, 'Failed to load recommended movies');
   }
 };
+
+exports.dailySuggestions = async (req, res) => {
+  const uid = requestUid(req);
+
+  if (!uid) {
+    return res.status(401).json({ error: 'Missing user context' });
+  }
+
+  try {
+    const settings = buildDailySuggestionSettings();
+    const requestedLimit = toPositiveInteger(req.query.limit, 60, 200);
+    const queueLimit = settings.limitEnabled
+      ? toPositiveInteger(Math.min(settings.configuredLimit, requestedLimit), 60, 200)
+      : requestedLimit;
+    const response = await loadDailySuggestions(uid, { limit: queueLimit });
+    return res.json({
+      results: response.results,
+      meta: {
+        ...response.meta,
+        swipeLimitEnabled: settings.limitEnabled,
+        swipeLimit: settings.configuredLimit,
+      },
+    });
+  } catch (error) {
+    return handleError(res, error, 'Failed to load daily suggestions');
+  }
+};
+
+exports.recommendationDebugStats = async (req, res) => {
+  const uid = requestUid(req);
+  if (!uid) {
+    return res.status(401).json({ error: 'Missing user context' });
+  }
+  if (!recommendationDebugEnabled()) {
+    return res.status(404).json({ error: 'Recommendation debug is disabled.' });
+  }
+
+  try {
+    const [
+      userProfile,
+      positiveGenres,
+      negativeGenres,
+      positiveMovies,
+      negativeMovies,
+      candidatePoolStats,
+      forYouData,
+      dailySuggestionData,
+    ] = await Promise.all([
+      movieRepository.getRecommendationUserProfile(uid),
+      movieRepository.getTopPositiveGenreSignals(uid),
+      movieRepository.getTopNegativeGenreSignals(uid),
+      movieRepository.getTopPositiveMovies(uid),
+      movieRepository.getTopNegativeMovies(uid),
+      movieRepository.getCandidatePoolStats(uid),
+      loadForYouRecommendations(uid, { limit: 12 }),
+      loadDailySuggestions(uid, { limit: 20 }),
+    ]);
+
+    const positiveGenreNames = new Set(positiveGenres.map((entry) => entry.name));
+    const negativeGenreNames = new Set(negativeGenres.map((entry) => entry.name));
+    const forYouSourceBreakdown = summarizeRecommendationSources(forYouData.results);
+    const dailySourceBreakdown = summarizeRecommendationSources(dailySuggestionData.results);
+    const forYouSample = forYouData.results.slice(0, 8).map((movie) => {
+      const recommendation = movie.recommendation || {};
+      const movieGenres = Array.isArray(movie.genres) ? movie.genres : [];
+      const derivedGenreScore =
+        movieGenres.filter((genre) => positiveGenreNames.has(genre)).length * 10 -
+        movieGenres.filter((genre) => negativeGenreNames.has(genre)).length * 5;
+      return {
+        tmdbId: movie.tmdbId,
+        title: movie.title,
+        finalScore: toFiniteNumber(recommendation.finalScore),
+        genreScore: derivedGenreScore,
+        popularityScore: toFiniteNumber(recommendation.popularityScore),
+        collaborativeScore: toFiniteNumber(recommendation.collaborativeScore),
+        negativePenalty: toFiniteNumber(recommendation.negativePenalty),
+        explorationBonus: toFiniteNumber(recommendation.explorationBonus),
+        reason: recommendation.reason || buildForYouReason(recommendation, forYouData.meta.fallbackUsed),
+      };
+    });
+
+    const forYouIds = new Set(forYouData.results.map((movie) => movie.tmdbId).filter((tmdbId) => tmdbId != null));
+    const dailyBreakdown = dailySuggestionData.results.slice(0, 12).map((movie) => {
+      const recommendation = movie.recommendation || {};
+      return {
+        tmdbId: movie.tmdbId,
+        title: movie.title,
+        source: recommendation.source || 'daily-personalized',
+        appearedInHomeRecommendations: forYouIds.has(movie.tmdbId),
+        reason: recommendation.reason || '',
+      };
+    });
+
+    return res.json({
+      userProfileSignals: userProfile,
+      recommendationSignals: {
+        topPositiveGenres: positiveGenres,
+        topNegativeGenres: negativeGenres,
+        influentialPositiveMovies: positiveMovies,
+        penalizedNegativeMovies: negativeMovies,
+        usesCollaborativeFiltering: true,
+        usesMovieLensData: true,
+        usesNeo4j: true,
+        usesTmdbHydration: true,
+        responseMode: forYouData.meta.fallbackUsed ? 'fallback' : 'personalized',
+      },
+      forYouFeedStats: {
+        resultCount: forYouData.results.length,
+        fallbackUsed: forYouData.meta.fallbackUsed,
+        fallbackReason: forYouData.meta.fallbackReason,
+        fallbackStrategy: forYouData.meta.fallbackStrategy,
+        sourceBreakdown: forYouSourceBreakdown,
+      },
+      candidatePoolStats,
+      scoringStats: {
+        sampleRecommendations: forYouSample,
+      },
+      dailySuggestionsStats: {
+        personalizedCandidateCount: dailySuggestionData.meta.personalizedCandidateCount,
+        exploratoryCandidateCount: dailySuggestionData.meta.exploratoryCandidateCount,
+        personalizedPercentage: Math.round(dailySuggestionData.meta.personalizedRatio * 100),
+        exploratoryPercentage: Math.round((1 - dailySuggestionData.meta.personalizedRatio) * 100),
+        fallbackUsed: dailySuggestionData.meta.fallbackUsed,
+        fallbackReason: dailySuggestionData.meta.fallbackReason,
+        fallbackStrategy: dailySuggestionData.meta.fallbackStrategy,
+        sourceBreakdown: dailySourceBreakdown,
+        sampleQueue: dailyBreakdown,
+      },
+      fallbackStats: {
+        used: forYouData.meta.fallbackUsed,
+        reason: forYouData.meta.fallbackReason,
+        strategy: forYouData.meta.fallbackStrategy,
+        candidateCount: forYouData.candidates.length,
+      },
+      debugConfig: buildDailySuggestionSettings(),
+    });
+  } catch (error) {
+    return handleError(res, error, 'Failed to load recommendation debug stats');
+  }
+};
+
+exports.recommendations = exports.recommendationsForYou;
 
 exports.diversifyRecommendations = diversifyRecommendations;
 exports.normalizeRecommendationTitle = normalizeRecommendationTitle;
 exports.hydrateRecommendations = hydrateRecommendations;
+exports.hydrateRecommendationEntries = hydrateRecommendationEntries;

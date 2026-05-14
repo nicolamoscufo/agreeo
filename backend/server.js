@@ -117,11 +117,16 @@ app.patch('/me/onboarding', verifyMiddleware, movieController.updateOnboarding);
 app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
 app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
 app.post('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.watchlist);
+app.post('/me/movies/:tmdbId/seen', verifyMiddleware, movieController.markSeen);
 app.delete('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.removeFromWatchlist);
 app.delete('/me/movies/:tmdbId/like', verifyMiddleware, movieController.removeLike);
 app.delete('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.removeDislike);
+app.delete('/me/movies/:tmdbId/seen', verifyMiddleware, movieController.removeSeen);
 app.get('/me/library', verifyMiddleware, movieController.library);
 app.get('/me/recommendations', verifyMiddleware, movieController.recommendations);
+app.get('/me/recommendations/for-you', verifyMiddleware, movieController.recommendationsForYou);
+app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestions);
+app.get('/me/recommendations/debug-stats', verifyMiddleware, movieController.recommendationDebugStats);
 
 app.get('/health/db', async (_, res) => {
   try {

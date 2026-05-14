@@ -2,11 +2,17 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 
 class UserMovieStateMutation {
   const UserMovieStateMutation({
+    required this.movieId,
+    required this.previousState,
+    required this.nextState,
     required this.states,
     required this.undoStack,
     required this.message,
   });
 
+  final String movieId;
+  final UserMovieState previousState;
+  final UserMovieState nextState;
   final Map<String, UserMovieState> states;
   final List<UndoEntry> undoStack;
   final String message;
@@ -133,10 +139,7 @@ class LocalUserMovieStateService implements UserMovieStateService {
       currentUndoStack,
       movieId,
       'Review removed.',
-      (state) => state.copyWith(
-        clearReview: true,
-        updatedAt: DateTime.now(),
-      ),
+      (state) => state.copyWith(clearReview: true, updatedAt: DateTime.now()),
     );
   }
 
@@ -228,10 +231,7 @@ class LocalUserMovieStateService implements UserMovieStateService {
       currentUndoStack,
       movieId,
       'Removed from Watchlist.',
-      (state) => state.copyWith(
-        inWatchlist: false,
-        updatedAt: DateTime.now(),
-      ),
+      (state) => state.copyWith(inWatchlist: false, updatedAt: DateTime.now()),
     );
   }
 
@@ -246,10 +246,7 @@ class LocalUserMovieStateService implements UserMovieStateService {
       currentUndoStack,
       movieId,
       'Removed from watched.',
-      (state) => state.copyWith(
-        watched: false,
-        updatedAt: DateTime.now(),
-      ),
+      (state) => state.copyWith(watched: false, updatedAt: DateTime.now()),
     );
   }
 
@@ -281,6 +278,9 @@ class LocalUserMovieStateService implements UserMovieStateService {
   ) {
     if (currentUndoStack.isEmpty) {
       return UserMovieStateMutation(
+        movieId: '',
+        previousState: UserMovieState.initial(''),
+        nextState: UserMovieState.initial(''),
         states: currentStates,
         undoStack: currentUndoStack,
         message: 'Nothing to undo.',
@@ -293,6 +293,9 @@ class LocalUserMovieStateService implements UserMovieStateService {
     _storeState(updatedStates, entry.previousState);
 
     return UserMovieStateMutation(
+      movieId: entry.movieId,
+      previousState: entry.nextState,
+      nextState: entry.previousState,
       states: updatedStates,
       undoStack: updatedUndoStack,
       message: 'Action undone.',
@@ -306,7 +309,8 @@ class LocalUserMovieStateService implements UserMovieStateService {
     String message,
     UserMovieState Function(UserMovieState currentState) transform,
   ) {
-    final previousState = currentStates[movieId] ?? UserMovieState.initial(movieId);
+    final previousState =
+        currentStates[movieId] ?? UserMovieState.initial(movieId);
     final nextState = transform(previousState);
     final updatedStates = Map<String, UserMovieState>.from(currentStates);
     _storeState(updatedStates, nextState);
@@ -322,16 +326,16 @@ class LocalUserMovieStateService implements UserMovieStateService {
       );
 
     return UserMovieStateMutation(
+      movieId: movieId,
+      previousState: previousState,
+      nextState: nextState,
       states: updatedStates,
       undoStack: updatedUndoStack,
       message: message,
     );
   }
 
-  void _storeState(
-    Map<String, UserMovieState> target,
-    UserMovieState state,
-  ) {
+  void _storeState(Map<String, UserMovieState> target, UserMovieState state) {
     if (state.isUntouched) {
       target.remove(state.movieId);
       return;

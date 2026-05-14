@@ -97,8 +97,10 @@ class Movie {
 
   String get typeLabel => mediaType.label;
   String get runtimeLabel => '${runtime}m';
+  String get yearLabel =>
+      releaseYear > 0 ? releaseYear.toString() : 'Unknown year';
 
-  String get subtitleLine => '$releaseYear • ${runtime}m • ${mediaType.label}';
+  String get subtitleLine => '$yearLabel • ${runtime}m • ${mediaType.label}';
 
   Movie copyWith({
     String? id,
@@ -405,8 +407,7 @@ class ProfilePreferences {
     bool? finalDecisionReached,
   }) {
     return ProfilePreferences(
-      showWatchedToFriends:
-          showWatchedToFriends ?? this.showWatchedToFriends,
+      showWatchedToFriends: showWatchedToFriends ?? this.showWatchedToFriends,
       showLikedToFriends: showLikedToFriends ?? this.showLikedToFriends,
       showWatchlistToFriends:
           showWatchlistToFriends ?? this.showWatchlistToFriends,
@@ -415,8 +416,7 @@ class ProfilePreferences {
           dailySuggestionReminder ?? this.dailySuggestionReminder,
       movieNightInvites: movieNightInvites ?? this.movieNightInvites,
       votingStarted: votingStarted ?? this.votingStarted,
-      finalDecisionReached:
-          finalDecisionReached ?? this.finalDecisionReached,
+      finalDecisionReached: finalDecisionReached ?? this.finalDecisionReached,
     );
   }
 
