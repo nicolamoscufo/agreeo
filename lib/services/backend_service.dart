@@ -1,6 +1,5 @@
 import 'package:agreeo/models/app_models.dart';
 import 'package:agreeo/utils/recommendation_engine.dart';
-import 'package:agreeo/utils/sample_catalog.dart';
 import 'package:agreeo/services/tmdb_service.dart';
 
 class BackendService {
@@ -8,7 +7,7 @@ class BackendService {
     RecommendationEngine? recommendationEngine,
     TmdbService? tmdbService,
   }) : _recommendationEngine =
-            recommendationEngine ?? const RecommendationEngine(),
+           recommendationEngine ?? const RecommendationEngine(),
        _tmdbService = tmdbService ?? TmdbService();
 
   final RecommendationEngine _recommendationEngine;
@@ -33,10 +32,8 @@ class BackendService {
       excludeGenres: const <String>[],
       limit: 20,
     );
-    final catalog = remoteCatalog.isNotEmpty ? remoteCatalog : demoMovieCatalog;
-
     return _recommendationEngine.buildDailyQueue(
-      catalog: catalog,
+      catalog: remoteCatalog,
       preferences: preferences,
       feedback: feedback,
       limit: 7,
@@ -56,10 +53,8 @@ class BackendService {
       excludeGenres: event.constraints.excludeGenres,
       limit: 20,
     );
-    final catalog = remoteCatalog.isNotEmpty ? remoteCatalog : demoMovieCatalog;
-
     return _recommendationEngine.buildShortlist(
-      catalog: catalog,
+      catalog: remoteCatalog,
       feedback: feedback,
       votes: votes,
       memberIds: group.memberIds,
@@ -73,7 +68,10 @@ class BackendService {
     UserPreferences preferences,
   ) async {}
 
-  Future<void> persistFeedback(String uid, MovieFeedbackRecord feedback) async {}
+  Future<void> persistFeedback(
+    String uid,
+    MovieFeedbackRecord feedback,
+  ) async {}
 
   Future<void> persistDailyQueue(String uid, List<Movie> queue) async {}
 

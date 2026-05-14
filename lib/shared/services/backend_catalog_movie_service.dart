@@ -42,26 +42,10 @@ class BackendCatalogMovieService implements MovieService {
     int? limit,
   }) async {
     try {
-      final suggestions = await _backendMovieService.getDailySuggestions(
-        limit: limit,
-      );
-      if (suggestions.isNotEmpty) {
-        return suggestions;
-      }
+      return await _backendMovieService.getDailySuggestions(limit: limit);
     } catch (error) {
       debugPrint(
         '[BackendCatalogMovieService] daily-suggestions backend failed: $error',
-      );
-    }
-
-    try {
-      final popular = await _backendMovieService.getPopularMovies();
-      if (popular.isNotEmpty) {
-        return popular;
-      }
-    } catch (error) {
-      debugPrint(
-        '[BackendCatalogMovieService] popular backend fallback failed: $error',
       );
     }
 

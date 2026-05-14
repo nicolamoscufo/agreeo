@@ -584,9 +584,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     }
 
     final untouchedIds = state.dailySuggestionIds
-        .where((movieId) {
-          return state.userMovieStateFor(movieId).isUntouched;
-        })
+        .where((movieId) => state.userMovieStateFor(movieId).isUntouched)
         .toList(growable: false);
 
     if (!force && untouchedIds.length >= swipeQueueRefillThreshold) {
@@ -600,16 +598,11 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         favoriteMovieIds: state.onboarding.favoriteMovieIds,
         limit: dailySuggestionBatchSize,
       );
-      if (suggestions.isEmpty) {
-        state = state.copyWith(dailySuggestionIds: untouchedIds);
-        return;
-      }
 
       final currentCatalog = _mergeCatalogMovies(state.catalog, [suggestions]);
-      final nextDailyIds = _appendUniqueMovieIds(
-        untouchedIds,
-        suggestions.map((movie) => movie.id),
-      );
+      final nextDailyIds = suggestions
+          .map((movie) => movie.id)
+          .toList(growable: false);
 
       state = state.copyWith(
         catalog: currentCatalog,

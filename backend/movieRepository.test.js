@@ -97,7 +97,7 @@ test('savePreferredGenres persists onboarding genres as PREFERS_GENRE', async (t
   });
 });
 
-test('getRecommendations excludes selected favorites from personalized and fallback results', async (t) => {
+test('getRecommendations excludes selected favorites from personalized recommendations', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
 
@@ -112,22 +112,12 @@ test('getRecommendations excludes selected favorites from personalized and fallb
 
   await movieRepository.getRecommendations('user-1');
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
   assert.match(calls[0].query, /LIKED\|SELECTED_FAVORITE\|WATCHLISTED/);
   assert.match(
     calls[0].query,
     /LIKED\|DISLIKED\|WATCHLISTED\|ALREADY_SEEN\|SELECTED_FAVORITE/
   );
-  assert.match(
-    calls[1].query,
-    /LIKED\|DISLIKED\|WATCHLISTED\|ALREADY_SEEN\|SELECTED_FAVORITE/
-  );
-  assert.deepEqual(calls[1].params, {
-    uid: 'user-1',
-    minFallbackRatingCount: 50,
-    bayesianPriorWeight: 100.0,
-    globalMeanRating: 3.5,
-  });
 });
 
 test('getRecommendations ranks candidates by weighted collaborative score', async (t) => {
@@ -193,7 +183,7 @@ test('getRecommendations applies a safe disliked-genre penalty', async (t) => {
   assert.match(personalizedQuery, /max\(negativePenalty\) AS negativePenalty/);
 });
 
-test('getRecommendations uses tiered genre and favorite cold-start fallback', async (t) => {
+test('getRecommendations does not query a cold-start fallback', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
 
@@ -208,16 +198,8 @@ test('getRecommendations uses tiered genre and favorite cold-start fallback', as
 
   await movieRepository.getRecommendations('user-1');
 
-  const fallbackQuery = calls[1].query;
-  assert.match(fallbackQuery, /\(me\)-\[:PREFERS_GENRE\]->\(preferred:Genre\)/);
-  assert.match(fallbackQuery, /\(me\)-\[:SELECTED_FAVORITE\]->\(favorite:Movie\)/);
-  assert.match(fallbackQuery, /matchedPreferredGenres \* 100\.0 \+ matchedFavoriteGenres \* 10\.0/);
-  assert.match(fallbackQuery, /matchedFavoriteGenres \* 80\.0/);
-  assert.match(fallbackQuery, /\$bayesianPriorWeight/);
-  assert.match(fallbackQuery, /coalesce\(m\.movieLensRatingCount, 0\) >= \$minFallbackRatingCount/);
-  assert.match(fallbackQuery, /LIKED\|DISLIKED\|WATCHLISTED\|ALREADY_SEEN\|SELECTED_FAVORITE/);
-  assert.match(fallbackQuery, /ORDER BY\s+finalScore DESC/);
-  assert.match(fallbackQuery, /LIMIT 80/);
+  assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0].query, /coalesce\(m\.movieLensRatingCount, 0\) >= \$minFallbackRatingCount/);
 });
 
 test('getExploratoryCandidates inlines an integer Cypher limit', async (t) => {

@@ -72,12 +72,9 @@ function dedupeByTmdbId(items) {
   return deduped;
 }
 
-function buildForYouReason(candidate, fallbackUsed) {
+function buildForYouReason(candidate) {
   if (candidate?.reason) {
     return candidate.reason;
-  }
-  if (fallbackUsed || candidate?.source === 'fallback') {
-    return 'Fallback ranking based on onboarding preferences and reliable catalog quality.';
   }
   if (toFiniteNumber(candidate?.negativePenalty) > 0) {
     return 'Strong collaborative match with a light penalty from repeated negative genre feedback.';
@@ -424,60 +421,6 @@ async function enrichMovies(tmdbMovies) {
   return tmdbMovies.map((movie) => mapTmdbMovie(movie, byTmdbId.get(movie.id) || null));
 }
 
-async function loadPopularFallbackMovies({
-  limit = 30,
-  pages = [1],
-  excludeTmdbIds = [],
-  source = 'popular-fallback',
-  reason = 'No ranked recommendation candidates were available, so popular unseen titles were used as a safe fallback.',
-  explorationBonus = 0,
-} = {}) {
-  const safeLimit = toPositiveInteger(limit, 30, 80);
-  const seenTmdbIds = new Set(
-    excludeTmdbIds
-      .filter((tmdbId) => Number.isInteger(tmdbId))
-      .map((tmdbId) => String(tmdbId))
-  );
-  const results = [];
-
-  for (const page of pages) {
-    if (results.length >= safeLimit) {
-      break;
-    }
-
-    const response = await tmdbGet('/movie/popular', { language: 'en-US', page });
-    const movies = await enrichMovies(Array.isArray(response.results) ? response.results : []);
-
-    for (const movie of movies) {
-      if (!movie || !Number.isInteger(movie.tmdbId)) {
-        continue;
-      }
-
-      const key = String(movie.tmdbId);
-      if (seenTmdbIds.has(key)) {
-        continue;
-      }
-
-      seenTmdbIds.add(key);
-      results.push(
-        attachRecommendationMetadata(movie, {
-          source,
-          popularityScore: toFiniteNumber(movie.voteAverage),
-          explorationBonus,
-          finalScore: toFiniteNumber(movie.voteAverage) + explorationBonus,
-          reason,
-        })
-      );
-
-      if (results.length >= safeLimit) {
-        break;
-      }
-    }
-  }
-
-  return results.slice(0, safeLimit);
-}
-
 async function fetchInteractionMovie(tmdbId) {
   const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, { append_to_response: 'credits' });
   return mapInteractionMovie(tmdbMovie);
@@ -567,23 +510,38 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
   const recommendationData = await movieRepository.getRecommendationCandidates(uid);
   const enrichedCandidates = recommendationData.candidates.map((candidate) => ({
     ...candidate,
-    reason: buildForYouReason(candidate, recommendationData.fallbackUsed),
+    reason: buildForYouReason(candidate),
   }));
 
   if (enrichedCandidates.length === 0) {
+    const exploratoryCandidates = await movieRepository.getExploratoryCandidates(uid, { limit: safeLimit });
+    const fallbackCandidates = exploratoryCandidates.filter(c => c && c.tmdbId != null).map((c) => ({
+      ...c,
+      reason: c.reason || 'We are still learning your tastes. Try rating more movies.',
+      source: 'exploratory'
+    }));
+    
+    if (fallbackCandidates.length === 0) {
+      return {
+        results: [],
+        meta: {
+          fallbackUsed: false,
+          fallbackReason: null,
+          fallbackStrategy: null,
+        },
+        candidates: [],
+      };
+    }
+
+    const hydratedPool = await hydrateRecommendations(fallbackCandidates, { limit: safeLimit });
     return {
-      results: await loadPopularFallbackMovies({
-        limit: safeLimit,
-        pages: [1, 2],
-        source: 'popular-fallback',
-        reason: 'No personalized graph candidates were available yet, so popular movies were used as a temporary fallback.',
-      }),
+      results: hydratedPool,
       meta: {
         fallbackUsed: true,
-        fallbackReason: 'No recommendation candidates were returned from Neo4j.',
-        fallbackStrategy: 'TMDB popular fallback.',
+        fallbackReason: 'No personalized recommendations available yet.',
+        fallbackStrategy: 'exploratory',
       },
-      candidates: [],
+      candidates: fallbackCandidates,
     };
   }
 
@@ -596,16 +554,11 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
   const rankedResults = diversifyRecommendations(hydratedPool, safeLimit);
   if (rankedResults.length === 0) {
     return {
-      results: await loadPopularFallbackMovies({
-        limit: safeLimit,
-        pages: [1, 2],
-        source: 'popular-fallback',
-        reason: 'The ranked recommendation pool could not be hydrated, so popular movies were used as a temporary fallback.',
-      }),
+      results: [],
       meta: {
-        fallbackUsed: true,
-        fallbackReason: 'Recommendation hydration returned no usable movies.',
-        fallbackStrategy: 'TMDB popular fallback after hydration failure.',
+        fallbackUsed: false,
+        fallbackReason: null,
+        fallbackStrategy: null,
       },
       candidates: enrichedCandidates,
     };
@@ -623,11 +576,13 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
 }
 
 async function loadDailySuggestions(uid, { limit = 30 } = {}) {
-  const safeLimit = toPositiveInteger(limit, 60, 200);
+  const safeLimit = Number.isInteger(limit) && limit > 0
+    ? Math.min(limit, Number.MAX_SAFE_INTEGER)
+    : toPositiveInteger(limit, 60, Number.MAX_SAFE_INTEGER);
   const forYouData = await movieRepository.getRecommendationCandidates(uid);
   const personalizedCandidates = forYouData.candidates.map((candidate) => ({
     ...candidate,
-    reason: buildForYouReason(candidate, forYouData.fallbackUsed),
+    reason: buildForYouReason(candidate),
   }));
   const exploratoryCandidates = await movieRepository.getExploratoryCandidates(uid, {
     excludedTmdbIds: personalizedCandidates.slice(0, 8).map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
@@ -636,27 +591,18 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
   const queueCandidates = buildDailySuggestionQueue(personalizedCandidates, exploratoryCandidates, { limit: safeLimit });
 
   if (queueCandidates.length === 0) {
-    const fallbackResults = await loadPopularFallbackMovies({
-      limit: safeLimit,
-      pages: [2, 3, 1],
-      excludeTmdbIds: personalizedCandidates.map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
-      source: 'exploratory-fallback',
-      explorationBonus: 8,
-      reason: 'No learning candidates were available yet, so a broader popular queue was generated to collect fresh taste signals.',
-    });
-
     return {
-      results: fallbackResults,
+      results: [],
       meta: {
-        fallbackUsed: true,
-        fallbackReason: 'No daily learning candidates were returned from Neo4j.',
-        fallbackStrategy: 'TMDB popular exploration fallback.',
+        fallbackUsed: false,
+        fallbackReason: null,
+        fallbackStrategy: null,
         personalizedCandidateCount: 0,
-        exploratoryCandidateCount: fallbackResults.length,
+        exploratoryCandidateCount: 0,
         personalizedRatio: 0.0,
       },
       homeCandidates: personalizedCandidates,
-      queueCandidates: fallbackResults,
+      queueCandidates: [],
       exploratoryCandidates,
     };
   }
@@ -669,27 +615,18 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
 
   const finalResults = diversifyRecommendations(hydrated, safeLimit);
   if (finalResults.length === 0) {
-    const fallbackResults = await loadPopularFallbackMovies({
-      limit: safeLimit,
-      pages: [2, 3, 1],
-      excludeTmdbIds: personalizedCandidates.map((candidate) => candidate.tmdbId).filter((tmdbId) => tmdbId != null),
-      source: 'exploratory-fallback',
-      explorationBonus: 8,
-      reason: 'The learning queue could not be hydrated, so a broader popular queue was generated to keep swipe feedback flowing.',
-    });
-
     return {
-      results: fallbackResults,
+      results: [],
       meta: {
-        fallbackUsed: true,
-        fallbackReason: 'Daily suggestion hydration returned no usable movies.',
-        fallbackStrategy: 'TMDB popular exploration fallback.',
+        fallbackUsed: false,
+        fallbackReason: null,
+        fallbackStrategy: null,
         personalizedCandidateCount: 0,
-        exploratoryCandidateCount: fallbackResults.length,
+        exploratoryCandidateCount: 0,
         personalizedRatio: 0.0,
       },
       homeCandidates: personalizedCandidates,
-      queueCandidates: fallbackResults,
+      queueCandidates: [],
       exploratoryCandidates,
     };
   }
@@ -964,11 +901,18 @@ exports.dailySuggestions = async (req, res) => {
   }
 
   try {
+    // Force effectively unlimited daily swipe capacity for testing.
+    // If a numeric `limit` query param is supplied, respect it; otherwise allow a very large default.
     const settings = buildDailySuggestionSettings();
-    const requestedLimit = toPositiveInteger(req.query.limit, 60, 200);
-    const queueLimit = settings.limitEnabled
-      ? toPositiveInteger(Math.min(settings.configuredLimit, requestedLimit), 60, 200)
-      : requestedLimit;
+    const requestedLimit = (function () {
+      const raw = req.query && req.query.limit;
+      const numeric = Number.parseInt(String(raw), 10);
+      if (Number.isInteger(numeric) && numeric > 0) return numeric;
+      return Number.MAX_SAFE_INTEGER;
+    })();
+
+    // For testing we ignore the configured daily cap and use the requested limit directly.
+    const queueLimit = requestedLimit;
     const response = await loadDailySuggestions(uid, { limit: queueLimit });
     return res.json({
       results: response.results,
@@ -1032,7 +976,7 @@ exports.recommendationDebugStats = async (req, res) => {
         collaborativeScore: toFiniteNumber(recommendation.collaborativeScore),
         negativePenalty: toFiniteNumber(recommendation.negativePenalty),
         explorationBonus: toFiniteNumber(recommendation.explorationBonus),
-        reason: recommendation.reason || buildForYouReason(recommendation, forYouData.meta.fallbackUsed),
+        reason: recommendation.reason || buildForYouReason(recommendation),
       };
     });
 
@@ -1059,7 +1003,7 @@ exports.recommendationDebugStats = async (req, res) => {
         usesMovieLensData: true,
         usesNeo4j: true,
         usesTmdbHydration: true,
-        responseMode: forYouData.meta.fallbackUsed ? 'fallback' : 'personalized',
+        responseMode: 'personalized',
       },
       forYouFeedStats: {
         resultCount: forYouData.results.length,
