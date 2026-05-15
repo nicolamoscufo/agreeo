@@ -22,6 +22,34 @@ function parseTmdbIds(value) {
   return tmdbIds;
 }
 
+const TMDB_GENRE_IDS_BY_NAME = {
+  action: 28,
+  adventure: 12,
+  animation: 16,
+  comedy: 35,
+  crime: 80,
+  documentary: 99,
+  drama: 18,
+  family: 10751,
+  fantasy: 14,
+  history: 36,
+  horror: 27,
+  music: 10402,
+  mystery: 9648,
+  romance: 10749,
+  'science fiction': 878,
+  'sci-fi': 878,
+  'tv movie': 10770,
+  thriller: 53,
+  war: 10752,
+  western: 37,
+  'slice of life': 18,
+};
+
+const TMDB_GENRE_NAMES_BY_ID = Object.fromEntries(
+  Object.entries(TMDB_GENRE_IDS_BY_NAME).map(([name, id]) => [id, name])
+);
+
 function parseStringList(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -34,6 +62,111 @@ function parseStringList(value) {
     }
   }
   return items;
+}
+
+function parseSearchFilters(query) {
+  const genre = typeof query.genre === 'string' ? query.genre.trim() : '';
+  const maxRuntimeMinutes = Number.parseInt(String(query.maxRuntimeMinutes ?? ''), 10);
+  const minReleaseYear = Number.parseInt(String(query.minReleaseYear ?? ''), 10);
+  const minRating = Number.parseFloat(String(query.minRating ?? ''));
+
+  return {
+    genre,
+    maxRuntimeMinutes: Number.isInteger(maxRuntimeMinutes) && maxRuntimeMinutes > 0 ? maxRuntimeMinutes : null,
+    minReleaseYear: Number.isInteger(minReleaseYear) && minReleaseYear > 0 ? minReleaseYear : null,
+    minRating: Number.isFinite(minRating) && minRating > 0 ? minRating : null,
+  };
+}
+
+function normalizeGenreName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function genreIdsForNames(names) {
+  return parseStringList(names)
+    .map((name) => TMDB_GENRE_IDS_BY_NAME[normalizeGenreName(name)])
+    .filter((value) => Number.isInteger(value));
+}
+
+function buildSearchRequest(query, rawFilters = {}) {
+  const trimmedQuery = typeof query === 'string' ? query.trim() : '';
+  const filters = parseSearchFilters(rawFilters);
+  const hasFilters =
+    filters.genre !== '' ||
+    filters.maxRuntimeMinutes != null ||
+    filters.minReleaseYear != null ||
+    filters.minRating != null;
+
+  if (!trimmedQuery && !hasFilters) {
+    return null;
+  }
+
+  const path = trimmedQuery ? '/search/movie' : '/discover/movie';
+  const params = {
+    language: 'en-US',
+    include_adult: false,
+    page: 1,
+  };
+
+  if (trimmedQuery) {
+    params.query = trimmedQuery;
+  }
+
+  const genreIds = filters.genre ? genreIdsForNames([filters.genre]) : [];
+  if (genreIds.length > 0) {
+    params.with_genres = genreIds.join(',');
+  }
+
+  if (filters.maxRuntimeMinutes != null) {
+    params['with_runtime.lte'] = filters.maxRuntimeMinutes;
+  }
+
+  if (filters.minReleaseYear != null) {
+    params['primary_release_date.gte'] = `${filters.minReleaseYear}-01-01`;
+  }
+
+  if (filters.minRating != null) {
+    params['vote_average.gte'] = filters.minRating;
+  }
+
+  if (!trimmedQuery) {
+    params.sort_by = 'popularity.desc';
+  }
+
+  return { path, params, filters };
+}
+
+function matchesSearchFilters(movie, filters) {
+  const normalizedGenre = normalizeGenreName(filters.genre);
+  const movieGenres = Array.isArray(movie.genres)
+    ? movie.genres.map((genre) => normalizeGenreName(genre))
+    : [];
+  const movieGenreIds = Array.isArray(movie.genreIds) ? movie.genreIds : [];
+
+  if (
+    normalizedGenre &&
+    !movieGenres.includes(normalizedGenre) &&
+    !movieGenreIds.some((id) => normalizeGenreName(TMDB_GENRE_NAMES_BY_ID[id]) === normalizedGenre)
+  ) {
+    return false;
+  }
+
+  if (filters.maxRuntimeMinutes != null && Number(movie.runtime) > filters.maxRuntimeMinutes) {
+    return false;
+  }
+
+  if (filters.minReleaseYear != null) {
+    const releaseYear = Number.parseInt(String(movie.releaseDate || '').slice(0, 4), 10);
+    if (!Number.isInteger(releaseYear) || releaseYear < filters.minReleaseYear) {
+      return false;
+    }
+  }
+
+  if (filters.minRating != null && Number(movie.rating) < filters.minRating) {
+    return false;
+  }
+
+  return true;
 }
 
 function imageUrl(path, size) {
@@ -307,7 +440,30 @@ function mapMovieLens(neoMovie, fallbackAvg, fallbackCount) {
   return { avgRating, ratingCount };
 }
 
+async function resolveMovieRuntime(tmdbId) {
+  const detail = await tmdbGet(`/movie/${tmdbId}`, { language: 'en-US' });
+  const runtime = Number.isInteger(detail?.runtime) ? detail.runtime : null;
+  if (runtime != null) {
+    await movieRepository.setMovieRuntime(tmdbId, runtime);
+  }
+
+  return runtime;
+}
+
 function mapTmdbMovie(tmdbMovie, neoMovie = null) {
+  const genreIds = Array.isArray(tmdbMovie.genre_ids)
+    ? tmdbMovie.genre_ids.filter((id) => Number.isInteger(id))
+    : Array.isArray(tmdbMovie.genres)
+      ? tmdbMovie.genres.map((genre) => genre?.id).filter((id) => Number.isInteger(id))
+      : [];
+
+  const genres = Array.isArray(tmdbMovie.genres)
+    ? tmdbMovie.genres.map((genre) => genre?.name).filter((name) => typeof name === 'string' && name.trim() !== '')
+    : genreIds
+        .map((id) => TMDB_GENRE_NAMES_BY_ID[id])
+        .filter((name) => typeof name === 'string' && name.trim() !== '')
+        .map((name) => name.replace(/\b\w/g, (char) => char.toUpperCase()));
+
   return {
     tmdbId: tmdbMovie.id,
     title: tmdbMovie.title || tmdbMovie.name || '',
@@ -318,15 +474,10 @@ function mapTmdbMovie(tmdbMovie, neoMovie = null) {
     posterUrl: imageUrl(tmdbMovie.poster_path, 'w780'),
     backdropUrl: imageUrl(tmdbMovie.backdrop_path, 'w780'),
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
+    runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
-    genreIds: Array.isArray(tmdbMovie.genre_ids)
-      ? tmdbMovie.genre_ids.filter((id) => Number.isInteger(id))
-      : Array.isArray(tmdbMovie.genres)
-        ? tmdbMovie.genres.map((genre) => genre?.id).filter((id) => Number.isInteger(id))
-        : [],
-    genres: Array.isArray(tmdbMovie.genres)
-      ? tmdbMovie.genres.map((genre) => genre?.name).filter((name) => typeof name === 'string' && name.trim() !== '')
-      : [],
+    genreIds,
+    genres,
     movieLens: mapMovieLens(neoMovie),
   };
 }
@@ -336,7 +487,6 @@ function mapTmdbMovieDetails(tmdbMovie, neoMovie = null) {
   return {
     ...base,
     director: extractDirector(tmdbMovie.credits),
-    runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     genres: Array.isArray(tmdbMovie.genres)
       ? tmdbMovie.genres.map((g) => g?.name).filter((n) => typeof n === 'string' && n.trim() !== '')
       : [],
@@ -387,6 +537,7 @@ function mapRepositoryMovieToResponse(movie) {
     posterUrl: movie.posterUrl || '',
     backdropUrl: movie.backdropUrl || '',
     releaseDate: movie.releaseDate || '',
+    runtime: movie.runtime == null ? null : movie.runtime,
     director: movie.director || '',
     voteAverage: movie.voteAverage,
     genres: Array.isArray(movie.genres) ? movie.genres : [],
@@ -409,6 +560,7 @@ function mapInteractionMovie(tmdbMovie) {
     posterUrl: imageUrl(tmdbMovie.poster_path, 'w500'),
     backdropUrl: imageUrl(tmdbMovie.backdrop_path, 'w780'),
     releaseDate: tmdbMovie.release_date || tmdbMovie.first_air_date || '',
+    runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
     director: extractDirector(tmdbMovie.credits),
   };
@@ -418,12 +570,28 @@ async function enrichMovies(tmdbMovies) {
   const tmdbIds = tmdbMovies.map((movie) => movie?.id).filter((id) => Number.isInteger(id));
   const neoMovies = await movieRepository.findMoviesByTmdbIds(tmdbIds);
   const byTmdbId = new Map(neoMovies.map((movie) => [movie.tmdbId, movie]));
-  return tmdbMovies.map((movie) => mapTmdbMovie(movie, byTmdbId.get(movie.id) || null));
+
+  const hydratedMovies = await Promise.all(
+    tmdbMovies.map(async (movie) => {
+      const neoMovie = byTmdbId.get(movie.id) || null;
+      const runtime = await resolveMovieRuntime(movie.id);
+      return mapTmdbMovie(
+        runtime == null ? movie : { ...movie, runtime },
+        neoMovie ? { ...neoMovie, runtime } : null
+      );
+    })
+  );
+
+  return hydratedMovies;
 }
 
 async function fetchInteractionMovie(tmdbId) {
   const tmdbMovie = await tmdbGet(`/movie/${tmdbId}`, { append_to_response: 'credits' });
-  return mapInteractionMovie(tmdbMovie);
+  const movie = mapInteractionMovie(tmdbMovie);
+  if (movie.runtime != null) {
+    await movieRepository.setMovieRuntime(tmdbId, movie.runtime);
+  }
+  return movie;
 }
 
 function requestUid(req) {
@@ -654,9 +822,10 @@ function handleError(res, error, fallbackMessage) {
   });
 }
 
-exports.popular = async (_, res) => {
+exports.popular = async (req, res) => {
   try {
-    const response = await tmdbGet('/movie/popular', { language: 'en-US', page: 1 });
+    const page = Number.parseInt(String(req.query.page || '1'), 10) || 1;
+    const response = await tmdbGet('/movie/popular', { language: 'en-US', page });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
     return res.json({ results: movies });
@@ -665,15 +834,63 @@ exports.popular = async (_, res) => {
   }
 };
 
-exports.search = async (req, res) => {
-  const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
-  if (!query) return res.status(400).json({ error: 'Missing query parameter' });
-
+exports.recommendations = async (req, res) => {
   try {
-    const response = await tmdbGet('/search/movie', { query, language: 'en-US', include_adult: false, page: 1 });
+    const page = Number.parseInt(String(req.query.page || '1'), 10) || 1;
+    const response = await tmdbGet('/movie/top_rated', { language: 'en-US', page });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
     return res.json({ results: movies });
+  } catch (error) {
+    return handleError(res, error, 'Failed to load recommendations');
+  }
+};
+
+exports.dailySuggestions = async (req, res) => {
+  try {
+    const page = Number.parseInt(String(req.query.page || '1'), 10) || 1;
+    const response = await tmdbGet('/movie/upcoming', { language: 'en-US', page });
+    const results = Array.isArray(response.results) ? response.results : [];
+    const movies = await enrichMovies(results);
+    return res.json({ results: movies });
+  } catch (error) {
+    return handleError(res, error, 'Failed to load daily suggestions');
+  }
+};
+
+exports.search = async (req, res) => {
+  const searchRequest = buildSearchRequest(req.query.query, req.query);
+  if (!searchRequest) return res.status(400).json({ error: 'Missing query parameter' });
+
+  try {
+    const response = await tmdbGet(searchRequest.path, searchRequest.params);
+    const results = Array.isArray(response.results) ? response.results : [];
+
+    if (results.length === 0) {
+      console.info('[movies.search] TMDB returned 0 results', {
+        path: searchRequest.path,
+        params: searchRequest.params,
+      });
+    } else {
+      console.info('[movies.search] TMDB returned results', {
+        path: searchRequest.path,
+        params: searchRequest.params,
+        tmdbCount: results.length,
+      });
+    }
+
+    const movies = await enrichMovies(results);
+    const filteredMovies = movies.filter((movie) => matchesSearchFilters(movie, searchRequest.filters));
+
+    if (filteredMovies.length === 0) {
+      console.info('[movies.search] No movies after enrichment+filtering', {
+        tmdbCount: results.length,
+        enrichedCount: movies.length,
+        filters: searchRequest.filters,
+      });
+    }
+
+    return res.json({ results: filteredMovies });
   } catch (error) {
     return handleError(res, error, 'Failed to search movies');
   }
@@ -688,7 +905,11 @@ exports.details = async (req, res) => {
       tmdbGet(`/movie/${tmdbId}`, { language: 'en-US', append_to_response: 'credits,videos,images', include_image_language: 'en,null' }),
       movieRepository.findMovieByTmdbId(tmdbId),
     ]);
-    return res.json({ movie: mapTmdbMovieDetails(tmdbMovie, neoMovie) });
+    const movie = mapTmdbMovieDetails(tmdbMovie, neoMovie);
+    if (movie.runtime != null) {
+      await movieRepository.setMovieRuntime(tmdbId, movie.runtime);
+    }
+    return res.json({ movie });
   } catch (error) {
     return handleError(res, error, 'Failed to load movie details');
   }
@@ -893,7 +1114,7 @@ exports.recommendationsForYou = async (req, res) => {
   }
 };
 
-exports.dailySuggestions = async (req, res) => {
+exports.dailySuggestionsAuthenticated = async (req, res) => {
   const uid = requestUid(req);
 
   if (!uid) {
@@ -1039,8 +1260,6 @@ exports.recommendationDebugStats = async (req, res) => {
     return handleError(res, error, 'Failed to load recommendation debug stats');
   }
 };
-
-exports.recommendations = exports.recommendationsForYou;
 
 exports.diversifyRecommendations = diversifyRecommendations;
 exports.normalizeRecommendationTitle = normalizeRecommendationTitle;

@@ -31,6 +31,7 @@ function normalizeMovieRecord(record) {
     posterUrl: record.get('posterUrl') || '',
     backdropUrl: record.get('backdropUrl') || '',
     releaseDate: record.get('releaseDate') || '',
+    runtime: record.get('runtime') == null ? null : toNativeNumber(record.get('runtime')),
     director: record.get('director') || '',
     voteAverage: record.get('voteAverage') == null ? null : Number(record.get('voteAverage')),
     movieLensAvgRating:
@@ -55,6 +56,7 @@ async function mergeTmdbMovie(movie) {
       m.posterUrl = $posterUrl,
       m.backdropUrl = $backdropUrl,
       m.releaseDate = $releaseDate,
+      m.runtime = $runtime,
       m.director = $director,
       m.voteAverage = $voteAverage,
       m.movieLensAvgRating = $movieLensAvgRating,
@@ -70,6 +72,7 @@ async function mergeTmdbMovie(movie) {
       posterUrl: movie.posterUrl || '',
       backdropUrl: movie.backdropUrl || '',
       releaseDate: movie.releaseDate || '',
+      runtime: movie.runtime == null ? null : toNativeNumber(movie.runtime),
       director: movie.director || '',
       voteAverage: movie.voteAverage == null ? null : Number(movie.voteAverage),
       movieLensAvgRating:
@@ -103,6 +106,7 @@ async function findMoviesByTmdbIds(tmdbIds) {
       m.posterUrl AS posterUrl,
       m.backdropUrl AS backdropUrl,
       m.releaseDate AS releaseDate,
+      m.runtime AS runtime,
       m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
@@ -190,6 +194,7 @@ async function findMovieByTmdbId(tmdbId) {
       m.posterUrl AS posterUrl,
       m.backdropUrl AS backdropUrl,
       m.releaseDate AS releaseDate,
+      m.runtime AS runtime,
       m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
@@ -200,6 +205,26 @@ async function findMovieByTmdbId(tmdbId) {
   );
 
   return normalizeMovieRecord(result.records[0]);
+}
+
+async function setMovieRuntime(tmdbId, runtime) {
+  const safeRuntime = runtime == null ? null : toNativeNumber(runtime);
+  if (tmdbId == null || safeRuntime == null || !Number.isFinite(safeRuntime)) {
+    return false;
+  }
+
+  await neo4jService.run(
+    `
+    MATCH (m:Movie {tmdbId: $tmdbId})
+    SET m.runtime = $runtime
+    `,
+    {
+      tmdbId,
+      runtime: safeRuntime,
+    }
+  );
+
+  return true;
 }
 async function likeMovie(uid, movie) {
   await mergeTmdbMovie(movie);
@@ -379,6 +404,7 @@ async function getUserLibrary(uid) {
         overview: m.overview,
         posterPath: m.posterPath,
         backdropPath: m.backdropPath,
+       runtime: record.get('runtime') == null ? null : toNativeNumber(record.get('runtime')),
         posterUrl: m.posterUrl,
         backdropUrl: m.backdropUrl,
         releaseDate: m.releaseDate,
@@ -937,6 +963,7 @@ module.exports = {
   findMovieByTmdbId,
   findMoviesByTmdbIds,
   mergeTmdbMovie,
+  setMovieRuntime,
   likeMovie,
   dislikeMovie,
   watchlistMovie,

@@ -12,10 +12,8 @@ Future<MovieSearchFilters?> showMovieFilterBottomSheet(
     isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
-    builder: (_) => _MovieFilterBottomSheet(
-      initialFilters: initialFilters,
-      genres: genres,
-    ),
+    builder: (_) =>
+        _MovieFilterBottomSheet(initialFilters: initialFilters, genres: genres),
   );
 }
 
@@ -29,7 +27,8 @@ class _MovieFilterBottomSheet extends StatefulWidget {
   final List<String> genres;
 
   @override
-  State<_MovieFilterBottomSheet> createState() => _MovieFilterBottomSheetState();
+  State<_MovieFilterBottomSheet> createState() =>
+      _MovieFilterBottomSheetState();
 }
 
 class _MovieFilterBottomSheetState extends State<_MovieFilterBottomSheet> {
@@ -66,35 +65,6 @@ class _MovieFilterBottomSheetState extends State<_MovieFilterBottomSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              _FilterSection(
-                title: 'Type',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    SelectableChip(
-                      label: 'Any',
-                      selected: _filters.mediaType == null,
-                      onTap: () {
-                        setState(() {
-                          _filters = _filters.copyWith(clearMediaType: true);
-                        });
-                      },
-                    ),
-                    ...CatalogMediaType.values.map(
-                      (type) => SelectableChip(
-                        label: type.label,
-                        selected: _filters.mediaType == type,
-                        onTap: () {
-                          setState(() {
-                            _filters = _filters.copyWith(mediaType: type);
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               _FilterSection(
                 title: 'Genre',
                 child: Wrap(

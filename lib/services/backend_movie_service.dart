@@ -57,11 +57,54 @@ class BackendMovieService {
     return _decodeMovieList(body['results']);
   }
 
-  Future<List<Movie>> searchMovies(String query) async {
+  Future<List<Movie>> getRecommendations({int page = 1}) async {
+    final uri = Uri.parse(
+      '${_config.baseUrl}/movies/recommendations',
+    ).replace(queryParameters: {'page': page.toString()});
+    final response = await _client.get(uri);
+    _ensureSuccess(response);
+    final body = _decodeMap(response.body);
+    return _decodeMovieList(body['results']);
+  }
+
+  Future<List<Movie>> getDailySuggestions({int page = 1}) async {
+    final uri = Uri.parse(
+      '${_config.baseUrl}/movies/daily-suggestions',
+    ).replace(queryParameters: {'page': page.toString()});
+    final response = await _client.get(uri);
+    _ensureSuccess(response);
+    final body = _decodeMap(response.body);
+    return _decodeMovieList(body['results']);
+  }
+
+  Future<List<Movie>> searchMovies(
+    String query, {
+    MovieSearchFilters filters = const MovieSearchFilters(),
+  }) async {
+    final queryParameters = <String, String>{};
+    final trimmedQuery = query.trim();
+
+    if (trimmedQuery.isNotEmpty) {
+      queryParameters['query'] = trimmedQuery;
+    }
+    if (filters.genre != null && filters.genre!.trim().isNotEmpty) {
+      queryParameters['genre'] = filters.genre!.trim();
+    }
+    if (filters.maxRuntimeMinutes != null) {
+      queryParameters['maxRuntimeMinutes'] = filters.maxRuntimeMinutes
+          .toString();
+    }
+    if (filters.minReleaseYear != null) {
+      queryParameters['minReleaseYear'] = filters.minReleaseYear.toString();
+    }
+    if (filters.minRating != null) {
+      queryParameters['minRating'] = filters.minRating!.toStringAsFixed(1);
+    }
+
     final response = await _client.get(
       Uri.parse(
         '${_config.baseUrl}/movies/search',
-      ).replace(queryParameters: <String, String>{'query': query}),
+      ).replace(queryParameters: queryParameters),
     );
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
@@ -141,24 +184,11 @@ class BackendMovieService {
     );
   }
 
-  Future<List<Movie>> getRecommendations() async {
-    return getRecommendedForYou();
-  }
-
   Future<List<Movie>> getRecommendedForYou() async {
     final response = await _authorizedRequest(
       'GET',
       '/me/recommendations/for-you',
     );
-    final body = _decodeMap(response.body);
-    return _decodeMovieList(body['results']);
-  }
-
-  Future<List<Movie>> getDailySuggestions({int? limit}) async {
-    final path = limit == null || limit <= 0
-        ? '/me/recommendations/daily-suggestions'
-        : '/me/recommendations/daily-suggestions?limit=$limit';
-    final response = await _authorizedRequest('GET', path);
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
   }
@@ -246,7 +276,7 @@ class BackendMovieService {
       posterUrl: json['posterUrl']?.toString() ?? '',
       backdropUrl: json['backdropUrl']?.toString() ?? '',
       releaseYear: year,
-      runtime: (json['runtime'] as num?)?.toInt() ?? 110,
+      runtime: (json['runtime'] as num?)?.toInt() ?? 0,
       genres: genres,
       director: director,
       cast: castEntries

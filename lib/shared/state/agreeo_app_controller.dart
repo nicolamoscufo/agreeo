@@ -8,6 +8,7 @@ import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AgreeoAppState {
@@ -542,7 +543,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     );
   }
 
-  Future<void> _refreshDiscoveryFeeds() async {
+  Future<void> _refreshDiscoveryFeeds({int page = 1}) async {
     if (!state.isAuthenticated || !state.onboardingComplete) {
       state = state.copyWith(
         recommendedIds: <String>[],
@@ -552,20 +553,23 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     }
 
     final results = await Future.wait<List<Movie>>([
-      _movieService.getRecommendedForYou(),
-      _movieService.getDailySuggestions(
-        favoriteGenres: state.onboarding.favoriteGenres,
-        favoriteMovieIds: state.onboarding.favoriteMovieIds,
-        limit: dailySuggestionBatchSize,
-      ),
+      page > 1
+          ? _backendMovieService.getRecommendations(page: page)
+          : _movieService.getRecommendedForYou(),
+      page > 1
+          ? _backendMovieService.getDailySuggestions(page: page)
+          : _movieService.getDailySuggestions(
+              favoriteGenres: state.onboarding.favoriteGenres,
+              favoriteMovieIds: state.onboarding.favoriteMovieIds,
+              limit: dailySuggestionBatchSize,
+            ),
     ]);
     final recommended = results[0];
     final suggestions = results[1];
 
-    final currentCatalog = _mergeCatalogMovies(state.catalog, [
-      recommended,
-      suggestions,
-    ]);
+    final currentCatalog = page > 1
+        ? <Movie>[...recommended, ...suggestions]
+        : _mergeCatalogMovies(state.catalog, [recommended, suggestions]);
 
     state = state.copyWith(
       catalog: currentCatalog,
@@ -574,6 +578,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
           .toList(growable: false),
       dailySuggestionIds: _dedupeMovieIds(suggestions.map((movie) => movie.id)),
     );
+  }
+
+  Future<void> refreshHomeFeed({int page = 1}) async {
+    await _refreshDiscoveryFeeds(page: page);
   }
 
   Future<void> _ensureDailySuggestionBuffer({bool force = false}) async {

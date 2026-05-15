@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:agreeo/shared/models/agreeo_models.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -47,7 +48,9 @@ class MoviePosterCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${movie.releaseYear} • ${movie.typeLabel}',
+                movie.runtimeLabel.isEmpty
+                    ? movie.releaseYear.toString()
+                    : '${movie.releaseYear} • ${movie.runtimeLabel}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -74,17 +77,31 @@ class MovieHorizontalCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (movies.isEmpty) {
+      return SizedBox(
+        height: 294,
+        child: Center(
+          child: Text(
+            'No movies',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
+    // Infinite cycling: itemCount is arbitrarily large, actual movie fetched via modulo
+    const int cyclicCount = 10000;
     return SizedBox(
       height: 294,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: movies.length,
+        itemCount: movies.isNotEmpty ? cyclicCount : 0,
         separatorBuilder: (context, index) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
-          return MoviePosterCard(
-            movie: movies[index],
-            onTap: () => onMovieTap(movies[index]),
-          );
+          final movie = movies[index % movies.length];
+          return MoviePosterCard(movie: movie, onTap: () => onMovieTap(movie));
         },
       ),
     );
@@ -116,7 +133,9 @@ class MovieSwipeCard extends StatelessWidget {
       children: [
         // Full Image
         _MovieArtwork(
-          imageUrl: movie.posterUrl.isNotEmpty ? movie.posterUrl : movie.backdropUrl,
+          imageUrl: movie.posterUrl.isNotEmpty
+              ? movie.posterUrl
+              : movie.backdropUrl,
           fallbackSeed: movie.title,
         ),
         // Dark Gradient for Neon readability
@@ -126,10 +145,10 @@ class MovieSwipeCard extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.1),
-                Colors.black.withOpacity(0.5),
-                Colors.black.withOpacity(0.9),
-                Colors.black.withOpacity(1.0),
+                Colors.black.withValues(alpha: 0.1),
+                Colors.black.withValues(alpha: 0.5),
+                Colors.black.withValues(alpha: 0.9),
+                Colors.black.withValues(alpha: 1.0),
               ],
               stops: const [0.0, 0.4, 0.7, 1.0],
             ),
@@ -142,7 +161,8 @@ class MovieSwipeCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (header != null) Align(alignment: Alignment.topCenter, child: header!),
+                if (header != null)
+                  Align(alignment: Alignment.topCenter, child: header!),
                 const Spacer(),
                 // Information
                 Text(
@@ -153,19 +173,16 @@ class MovieSwipeCard extends StatelessWidget {
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
-                    shadows: [
-                      Shadow(
-                        color: Color(0x60C026D3),
-                        blurRadius: 20,
-                      ),
-                    ],
+                    shadows: [Shadow(color: Color(0x60C026D3), blurRadius: 20)],
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${movie.releaseYear} • 2h 46m', 
+                  movie.runtimeLabel.isEmpty
+                      ? movie.releaseYear.toString()
+                      : '${movie.releaseYear} • ${movie.runtimeLabel}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -177,17 +194,23 @@ class MovieSwipeCard extends StatelessWidget {
                   alignment: WrapAlignment.center,
                   children: movie.genres.take(3).map((g) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
+                        color: Colors.black.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF22D3EE), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFF22D3EE),
+                          width: 1.5,
+                        ),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x2022D3EE),
                             blurRadius: 10,
                             spreadRadius: 1,
-                          )
+                          ),
                         ],
                       ),
                       child: Text(
@@ -209,7 +232,7 @@ class MovieSwipeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
@@ -220,11 +243,16 @@ class MovieSwipeCard extends StatelessWidget {
                 Container(
                   width: double.infinity,
                   height: 56,
-                  margin: EdgeInsets.only(bottom: footer != null ? footerReservedSpace : 16),
+                  margin: EdgeInsets.only(
+                    bottom: footer != null ? footerReservedSpace : 16,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     gradient: LinearGradient(
-                      colors: [Colors.white.withOpacity(0.3), Colors.white.withOpacity(0.1)],
+                      colors: [
+                        Colors.white.withValues(alpha: 0.3),
+                        Colors.white.withValues(alpha: 0.1),
+                      ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
@@ -265,10 +293,7 @@ class MovieSwipeCard extends StatelessWidget {
 }
 
 class _MovieArtwork extends StatelessWidget {
-  const _MovieArtwork({
-    required this.imageUrl,
-    this.fallbackSeed = '',
-  });
+  const _MovieArtwork({required this.imageUrl, this.fallbackSeed = ''});
 
   final String imageUrl;
   final String fallbackSeed;
@@ -289,7 +314,11 @@ class _MovieArtwork extends StatelessWidget {
     return Container(
       color: Colors.grey.shade900,
       alignment: Alignment.center,
-      child: Icon(Icons.movie_creation_outlined, color: Colors.white54, size: 48),
+      child: Icon(
+        Icons.movie_creation_outlined,
+        color: Colors.white54,
+        size: 48,
+      ),
     );
   }
 }
@@ -303,7 +332,7 @@ class GenreChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -349,18 +378,19 @@ class PosterGrid extends StatelessWidget {
               decoration: selected
                   ? BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF22D3EE), width: 3),
+                      border: Border.all(
+                        color: const Color(0xFF22D3EE),
+                        width: 3,
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x4022D3EE),
                           blurRadius: 12,
                           spreadRadius: 2,
-                        )
+                        ),
                       ],
                     )
-                  : BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  : BoxDecoration(borderRadius: BorderRadius.circular(16)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: _MovieArtwork(imageUrl: movie.posterUrl),

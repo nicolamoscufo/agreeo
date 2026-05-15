@@ -42,7 +42,7 @@ class BackendCatalogMovieService implements MovieService {
     int? limit,
   }) async {
     try {
-      return await _backendMovieService.getDailySuggestions(limit: limit);
+      return await _backendMovieService.getDailySuggestions();
     } catch (error) {
       debugPrint(
         '[BackendCatalogMovieService] daily-suggestions backend failed: $error',
@@ -57,13 +57,16 @@ class BackendCatalogMovieService implements MovieService {
     String query,
     MovieSearchFilters filters,
   ) async {
-    if (query.trim().isEmpty) {
-      final catalog = await getCatalog();
-      return catalog.where(filters.matches).toList(growable: false);
-    }
-
     try {
-      final results = await _backendMovieService.searchMovies(query);
+      if (query.trim().isEmpty && !filters.hasActiveFilters) {
+        final catalog = await getCatalog();
+        return catalog.where(filters.matches).toList(growable: false);
+      }
+
+      final results = await _backendMovieService.searchMovies(
+        query,
+        filters: filters,
+      );
       return results.where(filters.matches).toList(growable: false);
     } catch (_) {
       return const <Movie>[];

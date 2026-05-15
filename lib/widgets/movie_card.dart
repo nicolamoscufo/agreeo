@@ -312,9 +312,9 @@ class _MovieCardState extends State<MovieCard> {
 
   String _summaryLine(Movie movie) {
     if (movie.runtimeMinutes > 0) {
-      return '${movie.releaseYear} • ${movie.runtimeMinutes} min • ${movie.typeLabel}';
+      return '${movie.releaseYear} • ${movie.runtimeMinutes} min';
     }
-    return '${movie.releaseYear} • ${movie.typeLabel}';
+    return '${movie.releaseYear}';
   }
 }
 

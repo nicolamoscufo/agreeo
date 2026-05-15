@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:agreeo/shared/components/agreeo_bottom_navigation.dart';
+import 'package:agreeo/shared/state/nav_index_provider.dart';
 
 class AgreeoMovieDetailsScreen extends ConsumerStatefulWidget {
   const AgreeoMovieDetailsScreen({super.key, required this.movieId});
@@ -59,7 +61,7 @@ class _AgreeoMovieDetailsScreenState
           final metadata = [
             movie.releaseYear.toString(),
             if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
-            movie.runtimeLabel,
+            if (movie.runtimeLabel.isNotEmpty) movie.runtimeLabel,
           ].join('  |  ');
 
           return Stack(
@@ -87,7 +89,9 @@ class _AgreeoMovieDetailsScreenState
                                   end: Alignment.bottomCenter,
                                   colors: [
                                     Colors.transparent,
-                                    const Color(0xFF111111).withOpacity(0.8),
+                                    const Color(
+                                      0xFF111111,
+                                    ).withValues(alpha: 0.8),
                                     const Color(0xFF111111),
                                   ],
                                   stops: const [0.6, 0.9, 1.0],
@@ -153,12 +157,24 @@ class _AgreeoMovieDetailsScreenState
                               letterSpacing: -0.5,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          if (movie.director.isNotEmpty)
+                            Text(
+                              'Directed by ${movie.director}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          const SizedBox(height: 8),
                           const SizedBox(height: 12),
                           Text(
                             metadata,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha: 0.6),
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -166,13 +182,36 @@ class _AgreeoMovieDetailsScreenState
                           const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(5, (index) {
-                              return Icon(
-                                index < 4 ? Icons.star : Icons.star_border,
-                                color: Colors.amber,
-                                size: 24,
-                              );
-                            }),
+                            children: [
+                              ...List.generate(10, (index) {
+                                final ratingOutOfTen = movie.rating.clamp(
+                                  0.0,
+                                  10.0,
+                                );
+                                final starValue = ratingOutOfTen - index;
+                                final icon = starValue >= 1
+                                    ? Icons.star_rounded
+                                    : starValue >= 0.5
+                                    ? Icons.star_half_rounded
+                                    : Icons.star_border_rounded;
+                                return Icon(
+                                  icon,
+                                  color: Colors.amber,
+                                  size: 18,
+                                );
+                              }),
+                              const SizedBox(width: 10),
+                              Text(
+                                movie.rating > 0
+                                    ? '${movie.rating.toStringAsFixed(1)}/10'
+                                    : 'No rating',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 32),
                           _buildSectionHeader('Plot'),
@@ -180,7 +219,7 @@ class _AgreeoMovieDetailsScreenState
                           Text(
                             movie.overview,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 15,
                               height: 1.5,
                             ),
@@ -188,35 +227,15 @@ class _AgreeoMovieDetailsScreenState
                           const SizedBox(height: 32),
                           _buildSectionHeader('Cast'),
                           const SizedBox(height: 12),
-                          SizedBox(
-                            height: 100,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: movie.cast.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 20),
-                              itemBuilder: (context, index) {
-                                return Column(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 30,
-                                      backgroundColor: Colors.white10,
-                                      child: Icon(
-                                        Icons.person,
-                                        color: Colors.white.withOpacity(0.2),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      movie.cast[index],
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
+                          Text(
+                            movie.cast.isNotEmpty
+                                ? movie.cast.join(', ')
+                                : 'Cast not available',
+                            textAlign: TextAlign.left,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              height: 1.4,
                             ),
                           ),
                           const SizedBox(height: 50),
@@ -226,12 +245,15 @@ class _AgreeoMovieDetailsScreenState
                   ],
                 ),
               ),
-              const Align(
-                alignment: Alignment.bottomCenter,
-                child: _FakeBottomNav(),
-              ),
             ],
           );
+        },
+      ),
+      bottomNavigationBar: AgreeoBottomNavigation(
+        selectedIndex: ref.watch(navIndexProvider),
+        onSelected: (index) {
+          ref.read(navIndexProvider.notifier).state = index;
+          Navigator.of(context).popUntil((r) => r.isFirst);
         },
       ),
     );
@@ -264,7 +286,7 @@ class _GlassButton extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           child: IconButton(
             icon: Icon(icon, color: Colors.white),
             onPressed: onPressed,
@@ -275,28 +297,4 @@ class _GlassButton extends StatelessWidget {
   }
 }
 
-class _FakeBottomNav extends StatelessWidget {
-  const _FakeBottomNav();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.transparent, Colors.black.withOpacity(0.9)],
-        ),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Icon(Icons.home, color: Colors.white, size: 28),
-          Icon(Icons.play_circle_outline, color: Colors.white54, size: 28),
-          Icon(Icons.search, color: Colors.white54, size: 28),
-          Icon(Icons.person_outline, color: Colors.white54, size: 28),
-        ],
-      ),
-    );
-  }
-}
+// Note: bottom navigation replaced by AgreeoBottomNavigation above.

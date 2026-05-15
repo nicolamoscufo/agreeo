@@ -23,6 +23,8 @@ app.post('/auth/register', authController.register);
 app.post('/auth/login', authController.login);
 
 app.get('/movies/popular', movieController.popular);
+app.get('/movies/recommendations', movieController.recommendations);
+app.get('/movies/daily-suggestions', movieController.dailySuggestions);
 app.get('/movies/search', movieController.search);
 app.get('/movies/:tmdbId', movieController.details);
 
@@ -123,9 +125,9 @@ app.delete('/me/movies/:tmdbId/like', verifyMiddleware, movieController.removeLi
 app.delete('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.removeDislike);
 app.delete('/me/movies/:tmdbId/seen', verifyMiddleware, movieController.removeSeen);
 app.get('/me/library', verifyMiddleware, movieController.library);
-app.get('/me/recommendations', verifyMiddleware, movieController.recommendations);
+app.get('/me/recommendations', verifyMiddleware, movieController.recommendationsForYou);
 app.get('/me/recommendations/for-you', verifyMiddleware, movieController.recommendationsForYou);
-app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestions);
+app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestionsAuthenticated);
 app.get('/me/recommendations/debug-stats', verifyMiddleware, movieController.recommendationDebugStats);
 
 app.get('/health/db', async (_, res) => {

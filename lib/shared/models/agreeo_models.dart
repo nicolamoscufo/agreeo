@@ -1,7 +1,7 @@
 enum CatalogMediaType { movie, tv }
 
 extension CatalogMediaTypeX on CatalogMediaType {
-  String get label => this == CatalogMediaType.movie ? 'Movie' : 'TV Series';
+  String get label => this == CatalogMediaType.movie ? 'Movie' : 'Series';
 
   static CatalogMediaType fromJson(Object? value) {
     return CatalogMediaType.values.firstWhere(
@@ -96,11 +96,13 @@ class Movie {
   final String trailerUrl;
 
   String get typeLabel => mediaType.label;
-  String get runtimeLabel => '${runtime}m';
+  String get runtimeLabel => runtime > 0 ? '${runtime}m' : '';
   String get yearLabel =>
       releaseYear > 0 ? releaseYear.toString() : 'Unknown year';
 
-  String get subtitleLine => '$yearLabel • ${runtime}m • ${mediaType.label}';
+  String get subtitleLine => runtimeLabel.isEmpty
+      ? '$yearLabel • ${mediaType.label}'
+      : '$yearLabel • $runtimeLabel • ${mediaType.label}';
 
   Movie copyWith({
     String? id,
@@ -168,7 +170,7 @@ class Movie {
       posterUrl: _stringValue(json['posterUrl']),
       backdropUrl: _stringValue(json['backdropUrl']),
       releaseYear: (json['releaseYear'] as num?)?.toInt() ?? 2025,
-      runtime: (json['runtime'] as num?)?.toInt() ?? 110,
+      runtime: (json['runtime'] as num?)?.toInt() ?? 0,
       genres: _stringList(json['genres']),
       director: _stringValue(json['director']),
       cast: _stringList(json['cast']),

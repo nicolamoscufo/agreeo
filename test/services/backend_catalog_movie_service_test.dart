@@ -13,7 +13,7 @@ class _FakeBackendMovieService extends BackendMovieService {
   final List<Movie> popularMovies;
 
   @override
-  Future<List<Movie>> getRecommendations() async {
+  Future<List<Movie>> getRecommendations({int page = 1}) async {
     if (failRecommendations) {
       throw StateError('backend recommendations failed');
     }

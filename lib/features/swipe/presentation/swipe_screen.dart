@@ -1,5 +1,4 @@
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -32,17 +31,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
 
   Future<void> _runAction(Future<String> Function() action) async {
     try {
-      final message = await action();
-      if (!mounted) {
-        return;
-      }
-      await showUndoSnackbar(
-        context,
-        message: message,
-        onUndo: () async {
-          await ref.read(agreeoAppControllerProvider.notifier).undoLastAction();
-        },
-      );
+      await action();
     } catch (error) {
       if (!mounted) {
         return;
