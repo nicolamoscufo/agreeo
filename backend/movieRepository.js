@@ -921,10 +921,7 @@ async function getCandidatePoolStats(uid) {
       EXISTS { MATCH (me)-[:DISLIKED]->(m) } AS disliked,
       EXISTS { MATCH (me)-[:LIKED|WATCHLISTED|SELECTED_FAVORITE]->(m) } AS alreadySwiped,
       (
-        coalesce(m.posterUrl, '') = '' AND
-        coalesce(m.posterPath, '') = '' AND
-        coalesce(m.backdropUrl, '') = '' AND
-        coalesce(m.backdropPath, '') = ''
+        false
       ) AS missingMetadata
     RETURN
       count(m) AS totalCandidatesConsidered,

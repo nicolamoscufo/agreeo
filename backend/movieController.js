@@ -795,12 +795,12 @@ function handleError(res, error, fallbackMessage) {
 exports.popular = async (req, res) => {
   try {
     const page = Number.parseInt(String(req.query.page || '1'), 10) || 1;
-    const response = await tmdbGet('/movie/popular', { language: 'en-US', page });
+    const response = await tmdbGet('/trending/movie/week', { language: 'en-US', page });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
     return res.json({ results: movies });
   } catch (error) {
-    return handleError(res, error, 'Failed to load popular movies');
+    return handleError(res, error, 'Failed to load trending movies');
   }
 };
 

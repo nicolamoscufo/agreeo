@@ -310,8 +310,27 @@ class _FavoriteMoviesStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // The title is now handled by the parent screen
-        // Search bar disabled for a cleaner look as per mockup, or preserved below
+        TextField(
+          controller: searchController,
+          onChanged: onSearchChanged,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search for movies...',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+            prefixIcon: const Icon(Icons.search, color: Color(0xFF00FFFF)),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.1),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         Expanded(
           child: PosterGrid(
             movies: movies,

@@ -317,16 +317,22 @@ class _RecommendationDebugScreenState
                       ),
                       _KeyValueRow(
                         label: 'Filtered already swiped',
+                        tooltip:
+                            'Movies you have already skipped, liked, or waitlisted today/ever.',
                         value:
                             '${candidatePoolStats['filteredAlreadySwiped'] ?? 0}',
                       ),
                       _KeyValueRow(
                         label: 'Filtered missing metadata',
+                        tooltip:
+                            'Movies excluded globally because they miss basic assets (no poster nor backdrop cover) in our database.',
                         value:
                             '${candidatePoolStats['filteredMissingMetadata'] ?? 0}',
                       ),
                       _KeyValueRow(
                         label: 'Remaining',
+                        tooltip:
+                            'The number of valid candidates passed to the ranking engine.',
                         value:
                             '${candidatePoolStats['remainingAfterFiltering'] ?? 0}',
                       ),
@@ -516,10 +522,11 @@ class _DebugCard extends StatelessWidget {
 }
 
 class _KeyValueRow extends StatelessWidget {
-  const _KeyValueRow({required this.label, required this.value});
+  const _KeyValueRow({required this.label, required this.value, this.tooltip});
 
   final String label;
   final String value;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -530,9 +537,30 @@ class _KeyValueRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                if (tooltip != null) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: tooltip!,
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
+                    showDuration: const Duration(seconds: 4),
+                    child: Icon(
+                      Icons.help_outline,
+                      size: 14,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: 16),
