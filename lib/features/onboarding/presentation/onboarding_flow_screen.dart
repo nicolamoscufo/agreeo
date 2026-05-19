@@ -5,6 +5,7 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
 class AgreeoOnboardingFlowScreen extends ConsumerStatefulWidget {
   const AgreeoOnboardingFlowScreen({super.key});
@@ -19,12 +20,32 @@ class _AgreeoOnboardingFlowScreenState
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
   int _pageIndex = 0;
+  Timer? _searchDebounce;
+  Future<List<Movie>>? _searchFuture;
 
   @override
   void dispose() {
     _pageController.dispose();
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _scheduleSearchRefresh() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final query = _searchController.text.trim();
+      setState(() {
+        if (query.isEmpty) {
+          _searchFuture = null;
+        } else {
+          _searchFuture = ref
+              .read(movieServiceProvider)
+              .searchMovies(query, const MovieSearchFilters());
+        }
+      });
+    });
   }
 
   @override
@@ -33,15 +54,9 @@ class _AgreeoOnboardingFlowScreenState
     final onboarding = state.onboarding;
     final selectedMovieIds = onboarding.favoriteMovieIds.toSet();
     final query = _searchController.text.trim().toLowerCase();
-    final filteredMovies = state.catalog
-        .where((movie) {
-          if (query.isEmpty) {
-            return true;
-          }
-          return movie.title.toLowerCase().contains(query) ||
-              movie.genres.any((genre) => genre.toLowerCase().contains(query));
-        })
-        .toList(growable: false);
+
+    // Only used as fallback when search is empty
+    final localCatalogMovies = state.catalog;
 
     final titleStyle = Theme.of(context).textTheme.headlineMedium?.copyWith(
       color: Colors.white,
@@ -179,8 +194,9 @@ class _AgreeoOnboardingFlowScreenState
                       searchController: _searchController,
                       selectedCount: onboarding.favoriteMovieIds.length,
                       selectedMovieIds: selectedMovieIds,
-                      movies: filteredMovies,
-                      onSearchChanged: (_) => setState(() {}),
+                      movies: localCatalogMovies,
+                      searchFuture: _searchFuture,
+                      onSearchChanged: (_) => _scheduleSearchRefresh(),
                       onToggleMovie: (movie) {
                         ref
                             .read(agreeoAppControllerProvider.notifier)
@@ -294,6 +310,7 @@ class _FavoriteMoviesStep extends StatelessWidget {
     required this.selectedCount,
     required this.selectedMovieIds,
     required this.movies,
+    this.searchFuture,
     required this.onSearchChanged,
     required this.onToggleMovie,
   });
@@ -302,6 +319,7 @@ class _FavoriteMoviesStep extends StatelessWidget {
   final int selectedCount;
   final Set<String> selectedMovieIds;
   final List<Movie> movies;
+  final Future<List<Movie>>? searchFuture;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<Movie> onToggleMovie;
 
@@ -332,11 +350,43 @@ class _FavoriteMoviesStep extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: PosterGrid(
-            movies: movies,
-            selectedIds: selectedMovieIds,
-            onToggle: onToggleMovie,
-          ),
+          child: searchFuture != null
+              ? FutureBuilder<List<Movie>>(
+                  future: searchFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error: ${snapshot.error}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
+                    final results = snapshot.data ?? [];
+                    if (results.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No movies found.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+                    return PosterGrid(
+                      movies: results,
+                      selectedIds: selectedMovieIds,
+                      onToggle: onToggleMovie,
+                    );
+                  },
+                )
+              : PosterGrid(
+                  movies: movies,
+                  selectedIds: selectedMovieIds,
+                  onToggle: onToggleMovie,
+                ),
         ),
       ],
     );

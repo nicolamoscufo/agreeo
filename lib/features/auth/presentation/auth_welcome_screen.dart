@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:flutter/material.dart';
@@ -161,8 +160,9 @@ class _AgreeoAuthWelcomeScreenState
                           ),
                           decoration: _buildInputDecoration('Name'),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty)
+                            if (value == null || value.trim().isEmpty) {
                               return 'Enter your name';
+                            }
                             return null;
                           },
                         ),
@@ -214,8 +214,9 @@ class _AgreeoAuthWelcomeScreenState
                         ),
                         onFieldSubmitted: (_) => _submit(),
                         validator: (value) {
-                          if (value == null || value.length < 6)
+                          if (value == null || value.length < 6) {
                             return 'Use at least 6 characters';
+                          }
                           return null;
                         },
                       ),
