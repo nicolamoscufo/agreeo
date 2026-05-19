@@ -77,6 +77,21 @@ class BackendMovieService {
     return _decodeMovieList(body['results']);
   }
 
+  Future<List<Movie>> getPersonalizedDailySuggestions({int? limit}) async {
+    final queryParameters = <String, String>{};
+    if (limit != null && limit > 0) {
+      queryParameters['limit'] = limit.toString();
+    }
+
+    final path = Uri(
+      path: '/me/recommendations/daily-suggestions',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+    final response = await _authorizedRequest('GET', path);
+    final body = _decodeMap(response.body);
+    return _decodeMovieList(body['results']);
+  }
+
   Future<List<Movie>> searchMovies(
     String query, {
     MovieSearchFilters filters = const MovieSearchFilters(),

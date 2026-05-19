@@ -21,7 +21,7 @@ class RecommendationEngine {
   /// - Reduces decision fatigue through consistent, minimal interactions
   /// - Distributes decision-making over time (core value proposition)
   ///
-  /// Scoring: Genre Match + Service Match + Rating + Recency Boost + Exploration
+  /// Scoring: Genre Match + Rating + Exploration
   List<Movie> buildDailyQueue({
     required List<Movie> catalog,
     required UserPreferences preferences,
@@ -50,26 +50,18 @@ class RecommendationEngine {
           final genreMatches = movie.genres
               .where(preferences.favoriteGenres.contains)
               .length;
-          
+
           final genreScore = genreMatches * 4.5;
           final ratingScore = movie.score;
-
-          // Boost recent content (within last 1 year)
-          final recencyBoost = (movie.releaseYear >= seedDate.year - 1)
-              ? 1.3
-              : 0.0;
 
           // Exploration bonus: probabilistic discovery of content outside usual preferences
           final explorationBonus = random.nextDouble();
 
-          final score =
-              genreScore +
-              ratingScore +
-              recencyBoost +
-              explorationBonus;
+          final score = genreScore + ratingScore + explorationBonus;
 
           return movie.copyWith(score: score);
-        }).toList();
+        })
+        .toList();
 
     // Sort by score descending, then alphabetically for determinism
     scoredMovies.sort((left, right) {
@@ -236,7 +228,6 @@ class RecommendationEngine {
         return movie.mediaType == MediaType.series;
     }
   }
-
 }
 
 class _VoteTally {
