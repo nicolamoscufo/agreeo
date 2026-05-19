@@ -327,16 +327,6 @@ function diversifyRecommendations(candidates, limit = 30) {
     selected.push(candidate);
   }
 
-  // Fallback: se siamo stati troppo selettivi, peschiamo dagli scartati
-  if (selected.length < limit && skipped.length > 0) {
-    for (const candidate of skipped) {
-      if (selected.length >= limit) break;
-      if (isDuplicate(candidate)) continue;
-      markSeen(candidate);
-      selected.push(candidate);
-    }
-  }
-
   return selected.slice(0, limit);
 }
 
@@ -682,34 +672,14 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
   }));
 
   if (enrichedCandidates.length === 0) {
-    const exploratoryCandidates = await movieRepository.getExploratoryCandidates(uid, { limit: safeLimit });
-    const fallbackCandidates = exploratoryCandidates.filter(c => c && c.tmdbId != null).map((c) => ({
-      ...c,
-      reason: c.reason || 'We are still learning your tastes. Try rating more movies.',
-      source: 'exploratory'
-    }));
-    
-    if (fallbackCandidates.length === 0) {
-      return {
-        results: [],
-        meta: {
-          fallbackUsed: false,
-          fallbackReason: null,
-          fallbackStrategy: null,
-        },
-        candidates: [],
-      };
-    }
-
-    const hydratedPool = await hydrateRecommendations(fallbackCandidates, { limit: safeLimit });
     return {
-      results: hydratedPool,
+      results: [],
       meta: {
-        fallbackUsed: true,
-        fallbackReason: 'No personalized recommendations available yet.',
-        fallbackStrategy: 'exploratory',
+        fallbackUsed: false,
+        fallbackReason: null,
+        fallbackStrategy: null,
       },
-      candidates: fallbackCandidates,
+      candidates: [],
     };
   }
 
@@ -849,7 +819,16 @@ exports.recommendations = async (req, res) => {
 exports.dailySuggestions = async (req, res) => {
   try {
     const page = Number.parseInt(String(req.query.page || '1'), 10) || 1;
-    const response = await tmdbGet('/movie/upcoming', { language: 'en-US', page });
+    const maxReleaseDate = new Date();
+    maxReleaseDate.setFullYear(maxReleaseDate.getFullYear() - 2);
+    const response = await tmdbGet('/discover/movie', {
+      language: 'en-US',
+      include_adult: false,
+      page,
+      sort_by: 'vote_average.desc',
+      'vote_count.gte': 500,
+      'primary_release_date.lte': maxReleaseDate.toISOString().slice(0, 10),
+    });
     const results = Array.isArray(response.results) ? response.results : [];
     const movies = await enrichMovies(results);
     return res.json({ results: movies });

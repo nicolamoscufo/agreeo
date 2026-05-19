@@ -42,10 +42,12 @@ class BackendCatalogMovieService implements MovieService {
     int? limit,
   }) async {
     try {
-      return await _backendMovieService.getDailySuggestions();
+      final suggestions = await _backendMovieService
+          .getPersonalizedDailySuggestions(limit: limit);
+      return suggestions;
     } catch (error) {
       debugPrint(
-        '[BackendCatalogMovieService] daily-suggestions backend failed: $error',
+        '[BackendCatalogMovieService] personalized daily suggestions failed: $error',
       );
     }
 

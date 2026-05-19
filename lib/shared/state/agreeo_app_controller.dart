@@ -8,7 +8,6 @@ import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AgreeoAppState {
@@ -554,10 +553,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
     final results = await Future.wait<List<Movie>>([
       page > 1
-          ? _backendMovieService.getRecommendations(page: page)
+          ? Future.value(const <Movie>[])
           : _movieService.getRecommendedForYou(),
       page > 1
-          ? _backendMovieService.getDailySuggestions(page: page)
+          ? Future.value(const <Movie>[])
           : _movieService.getDailySuggestions(
               favoriteGenres: state.onboarding.favoriteGenres,
               favoriteMovieIds: state.onboarding.favoriteMovieIds,
@@ -608,9 +607,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       );
 
       final currentCatalog = _mergeCatalogMovies(state.catalog, [suggestions]);
-      final nextDailyIds = suggestions
-          .map((movie) => movie.id)
-          .toList(growable: false);
+      final nextDailyIds = _appendUniqueMovieIds(
+        state.dailySuggestionIds,
+        suggestions.map((movie) => movie.id),
+      );
 
       state = state.copyWith(
         catalog: currentCatalog,
