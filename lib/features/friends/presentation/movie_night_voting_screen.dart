@@ -91,8 +91,8 @@ class MovieNightVotingScreen extends ConsumerWidget {
                         ),
                       );
                     },
-                    onVote: (voteValue) {
-                      final updated = controller.submitVote(
+                    onVote: (voteValue) async {
+                      final updated = await controller.submitVote(
                         eventId: event.id,
                         movieId: candidate.movie.id,
                         vote: voteValue,

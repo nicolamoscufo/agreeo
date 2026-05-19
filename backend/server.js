@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const authController = require('./authController');
 const movieController = require('./movieController');
+const socialController = require('./socialController');
 const neo4jService = require('./neo4jService');
 const { verifyMiddleware, verifyRefresh, sign, signRefresh } = require('./jwtUtils');
 
@@ -129,6 +130,23 @@ app.get('/me/recommendations', verifyMiddleware, movieController.recommendations
 app.get('/me/recommendations/for-you', verifyMiddleware, movieController.recommendationsForYou);
 app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestionsAuthenticated);
 app.get('/me/recommendations/debug-stats', verifyMiddleware, movieController.recommendationDebugStats);
+
+app.get('/friends', verifyMiddleware, socialController.listFriends);
+app.get('/friends/search', verifyMiddleware, socialController.searchFriends);
+app.post('/friends/requests', verifyMiddleware, socialController.sendFriendRequest);
+app.post('/friends/requests/:id/accept', verifyMiddleware, socialController.acceptFriendRequest);
+app.post('/friends/requests/:id/decline', verifyMiddleware, socialController.declineFriendRequest);
+app.get('/friends/:id/profile', verifyMiddleware, socialController.friendProfile);
+
+app.get('/movie-nights', verifyMiddleware, socialController.listMovieNights);
+app.post('/movie-nights', verifyMiddleware, socialController.createMovieNight);
+app.get('/movie-nights/:id', verifyMiddleware, socialController.movieNight);
+app.patch('/movie-nights/:id', verifyMiddleware, socialController.updateMovieNight);
+app.post('/movie-nights/:id/invite', verifyMiddleware, socialController.inviteFriends);
+app.post('/movie-nights/:id/invite-link', verifyMiddleware, socialController.createInviteLink);
+app.post('/movie-nights/:id/shortlist', verifyMiddleware, socialController.generateShortlist);
+app.post('/movie-nights/:id/votes', verifyMiddleware, socialController.submitVote);
+app.get('/movie-nights/:id/result', verifyMiddleware, socialController.movieNightResult);
 
 app.get('/health/db', async (_, res) => {
   try {

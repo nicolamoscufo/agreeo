@@ -7,16 +7,38 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class FriendProfileScreen extends ConsumerWidget {
+class FriendProfileScreen extends ConsumerStatefulWidget {
   const FriendProfileScreen({super.key, required this.friendId});
 
   final String friendId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FriendProfileScreen> createState() =>
+      _FriendProfileScreenState();
+}
+
+class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() {
+      ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .loadFriendProfile(widget.friendId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final profile = socialState.profileFor(friendId);
+    final profile = socialState.profileFor(widget.friendId);
     if (profile == null) {
+      if (socialState.friends.any((friend) => friend.id == widget.friendId)) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Friend profile')),
+          body: const Center(child: CircularProgressIndicator()),
+        );
+      }
       return Scaffold(
         appBar: AppBar(title: const Text('Friend profile')),
         body: const Center(child: Text('Friend not found')),

@@ -3,6 +3,7 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/services/shortlist_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/services/backend_social_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -82,14 +83,40 @@ class FriendsMovieNightState {
 
 class FriendsMovieNightController
     extends StateNotifier<FriendsMovieNightState> {
-  FriendsMovieNightController(this._ref, this._shortlistService)
-    : super(FriendsMovieNightState.initial()) {
-    Future<void>.microtask(_seedLocalSocialLayer);
+  FriendsMovieNightController(
+    this._ref,
+    this._shortlistService,
+    this._backendSocialService,
+  ) : super(FriendsMovieNightState.initial()) {
+    Future<void>.microtask(_hydrateSocialLayer);
   }
 
   final Ref _ref;
   final ShortlistService _shortlistService;
+  final BackendSocialService _backendSocialService;
   final Uuid _uuid = const Uuid();
+  bool _usingBackend = false;
+
+  Future<void> _hydrateSocialLayer() async {
+    _seedLocalSocialLayer();
+    try {
+      final snapshot = await _backendSocialService.loadSnapshot();
+      final search = await _backendSocialService.searchFriends('');
+      _usingBackend = true;
+      state = state.copyWith(
+        friends: snapshot.friends,
+        incomingRequests: snapshot.incomingRequests,
+        discoverableUsers: search.results,
+        searchResults: search.results,
+        outgoingPendingIds: search.pendingIds,
+        profiles: const <String, FriendProfile>{},
+        friendMovieStates: const <String, Map<String, UserMovieState>>{},
+        movieNights: snapshot.movieNights,
+      );
+    } catch (_) {
+      _usingBackend = false;
+    }
+  }
 
   void searchFriends(String query) {
     final normalized = query.trim().toLowerCase();
@@ -99,15 +126,22 @@ class FriendsMovieNightController
               .where((friend) => friend.name.toLowerCase().contains(normalized))
               .toList(growable: false);
     state = state.copyWith(searchResults: results);
+    if (_usingBackend) {
+      Future<void>.microtask(() => _searchFriendsBackend(query));
+    }
   }
 
   void sendFriendRequest(String userId) {
     if (state.isFriend(userId) || state.isPending(userId)) {
       return;
     }
+    final previous = state;
     state = state.copyWith(
       outgoingPendingIds: <String>{...state.outgoingPendingIds, userId},
     );
+    if (_usingBackend) {
+      Future<void>.microtask(() => _sendFriendRequestBackend(userId, previous));
+    }
   }
 
   void acceptFriendRequest(String requestId) {
@@ -137,6 +171,9 @@ class FriendsMovieNightController
       profiles: profiles,
       friendMovieStates: movieStates,
     );
+    if (_usingBackend) {
+      Future<void>.microtask(() => _acceptFriendRequestBackend(requestId));
+    }
   }
 
   void declineFriendRequest(String requestId) {
@@ -145,9 +182,108 @@ class FriendsMovieNightController
           .where((entry) => entry.id != requestId)
           .toList(growable: false),
     );
+    if (_usingBackend) {
+      Future<void>.microtask(() => _declineFriendRequestBackend(requestId));
+    }
   }
 
-  MovieNightEvent createMovieNight({
+  Future<void> _searchFriendsBackend(String query) async {
+    try {
+      final search = await _backendSocialService.searchFriends(query);
+      state = state.copyWith(
+        discoverableUsers: query.trim().isEmpty
+            ? search.results
+            : state.discoverableUsers,
+        searchResults: search.results,
+        outgoingPendingIds: <String>{
+          ...state.outgoingPendingIds,
+          ...search.pendingIds,
+        },
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _sendFriendRequestBackend(
+    String userId,
+    FriendsMovieNightState previous,
+  ) async {
+    try {
+      await _backendSocialService.sendFriendRequest(userId);
+    } catch (_) {
+      state = previous;
+    }
+  }
+
+  Future<void> _acceptFriendRequestBackend(String requestId) async {
+    try {
+      final snapshot = await _backendSocialService.acceptFriendRequest(
+        requestId,
+      );
+      state = state.copyWith(
+        friends: snapshot.friends,
+        incomingRequests: snapshot.incomingRequests,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _declineFriendRequestBackend(String requestId) async {
+    try {
+      final snapshot = await _backendSocialService.declineFriendRequest(
+        requestId,
+      );
+      state = state.copyWith(
+        friends: snapshot.friends,
+        incomingRequests: snapshot.incomingRequests,
+      );
+    } catch (_) {}
+  }
+
+  Future<FriendProfile?> loadFriendProfile(String userId) async {
+    final existing = state.profileFor(userId);
+    if (existing != null) {
+      return existing;
+    }
+    if (!_usingBackend) {
+      return null;
+    }
+    try {
+      final profile = await _backendSocialService.getFriendProfile(userId);
+      state = state.copyWith(
+        profiles: <String, FriendProfile>{...state.profiles, userId: profile},
+      );
+      return profile;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<MovieNightEvent> createMovieNight({
+    required String name,
+    required DateTime? dateTime,
+    required MovieNightConstraints constraints,
+    required List<String> invitedFriendIds,
+  }) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.createMovieNight(
+          name: name,
+          dateTime: dateTime,
+          constraints: constraints,
+          invitedFriendIds: invitedFriendIds,
+        );
+        _upsertEvent(event);
+        return event;
+      } catch (_) {}
+    }
+    return _createLocalMovieNight(
+      name: name,
+      dateTime: dateTime,
+      constraints: constraints,
+      invitedFriendIds: invitedFriendIds,
+    );
+  }
+
+  MovieNightEvent _createLocalMovieNight({
     required String name,
     required DateTime? dateTime,
     required MovieNightConstraints constraints,
@@ -214,10 +350,20 @@ class FriendsMovieNightController
     return event;
   }
 
-  MovieNightEvent? updateEventConstraints({
+  Future<MovieNightEvent?> updateEventConstraints({
     required String eventId,
     required MovieNightConstraints constraints,
-  }) {
+  }) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.updateMovieNight(
+          eventId: eventId,
+          constraints: constraints,
+        );
+        _upsertEvent(event);
+        return event;
+      } catch (_) {}
+    }
     final event = state.eventById(eventId);
     if (event == null) {
       return null;
@@ -238,7 +384,14 @@ class FriendsMovieNightController
     return updated;
   }
 
-  MovieNightEvent? refreshShortlist(String eventId) {
+  Future<MovieNightEvent?> refreshShortlist(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.refreshShortlist(eventId);
+        _upsertEvent(event);
+        return event;
+      } catch (_) {}
+    }
     final event = state.eventById(eventId);
     if (event == null) {
       return null;
@@ -256,7 +409,17 @@ class FriendsMovieNightController
     return updated;
   }
 
-  MovieNightEvent? startVoting(String eventId) {
+  Future<MovieNightEvent?> startVoting(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.updateMovieNight(
+          eventId: eventId,
+          status: MovieNightStatus.voting,
+        );
+        _upsertEvent(event);
+        return event;
+      } catch (_) {}
+    }
     final event = state.eventById(eventId);
     if (event == null || event.shortlist.isEmpty) {
       return event;
@@ -269,11 +432,22 @@ class FriendsMovieNightController
     return updated;
   }
 
-  MovieNightEvent? submitVote({
+  Future<MovieNightEvent?> submitVote({
     required String eventId,
     required String movieId,
     required MovieNightVoteValue vote,
-  }) {
+  }) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.submitVote(
+          eventId: eventId,
+          movieId: movieId,
+          vote: vote,
+        );
+        _upsertEvent(event);
+        return event;
+      } catch (_) {}
+    }
     final event = state.eventById(eventId);
     if (event == null) {
       return null;
@@ -608,10 +782,25 @@ class FriendsMovieNightController
           .toList(growable: false),
     );
   }
+
+  void _upsertEvent(MovieNightEvent event) {
+    final exists = state.movieNights.any((entry) => entry.id == event.id);
+    state = state.copyWith(
+      movieNights: exists
+          ? state.movieNights
+                .map((entry) => entry.id == event.id ? event : entry)
+                .toList(growable: false)
+          : <MovieNightEvent>[event, ...state.movieNights],
+    );
+  }
 }
 
 final shortlistServiceProvider = Provider<ShortlistService>((ref) {
   return const ShortlistService();
+});
+
+final backendSocialServiceProvider = Provider<BackendSocialService>((ref) {
+  return BackendSocialService();
 });
 
 final friendsMovieNightControllerProvider =
@@ -621,6 +810,7 @@ final friendsMovieNightControllerProvider =
       return FriendsMovieNightController(
         ref,
         ref.watch(shortlistServiceProvider),
+        ref.watch(backendSocialServiceProvider),
       );
     });
 

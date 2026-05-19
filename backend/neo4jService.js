@@ -81,6 +81,12 @@ class Neo4jService {
     `);
 
     await this.run(`
+      CREATE CONSTRAINT movie_night_id IF NOT EXISTS
+      FOR (m:MovieNight)
+      REQUIRE m.id IS UNIQUE
+    `);
+
+    await this.run(`
       CREATE INDEX movie_title IF NOT EXISTS
       FOR (m:Movie)
       ON (m.title)

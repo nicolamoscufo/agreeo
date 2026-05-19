@@ -88,7 +88,7 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
                     if (updated == null) {
                       return;
                     }
-                    controller.updateEventConstraints(
+                    await controller.updateEventConstraints(
                       eventId: event.id,
                       constraints: updated,
                     );
@@ -97,15 +97,20 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
                   label: const Text('Edit constraints'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: () => controller.refreshShortlist(event.id),
+                  onPressed: () async {
+                    await controller.refreshShortlist(event.id);
+                  },
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Generate/refresh shortlist'),
                 ),
                 FilledButton.icon(
                   onPressed: event.shortlist.isEmpty
                       ? null
-                      : () {
-                          controller.startVoting(event.id);
+                      : () async {
+                          await controller.startVoting(event.id);
+                          if (!context.mounted) {
+                            return;
+                          }
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute<void>(
                               builder: (_) =>
@@ -143,7 +148,7 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
                           ),
                         );
                     if (updated != null) {
-                      controller.updateEventConstraints(
+                      await controller.updateEventConstraints(
                         eventId: event.id,
                         constraints: updated,
                       );

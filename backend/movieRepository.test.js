@@ -141,7 +141,7 @@ test('getRecommendations ranks candidates by weighted collaborative score', asyn
   assert.match(personalizedQuery, /WHEN 'LIKED' THEN \$likedWeight/);
   assert.match(personalizedQuery, /WHEN 'WATCHLISTED' THEN \$watchlistedWeight/);
   assert.match(personalizedQuery, /\* \(toFloat\(r1\.rating\) - 3\.0\)/);
-  assert.match(personalizedQuery, /1\.0 \/ log\(toFloat\(coalesce\(seed\.movieLensRatingCount, seedMl\.movieLensRatingCount, 0\)\) \+ 2\.0\)/);
+  assert.match(personalizedQuery, /1\.0 \/ sqrt\(log\(toFloat\(coalesce\(seed\.movieLensRatingCount, seedMl\.movieLensRatingCount, 0\)\) \+ 10\.0\)\)/);
   assert.match(personalizedQuery, /count\(DISTINCT seed\) AS overlapCount/);
   assert.match(personalizedQuery, /sum\(similarityScore \* \(toFloat\(r2\.rating\) - 3\.0\)\) AS collaborativeScore/);
   assert.match(personalizedQuery, /collaborativeScore - negativePenalty AS finalScore/);

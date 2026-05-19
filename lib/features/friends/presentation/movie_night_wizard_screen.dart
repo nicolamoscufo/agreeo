@@ -55,7 +55,9 @@ class _MovieNightWizardScreenState
         child: Stepper(
           currentStep: _step,
           onStepTapped: (step) => setState(() => _step = step),
-          onStepContinue: () => _continue(filteredFriends),
+          onStepContinue: () {
+            _continue(filteredFriends);
+          },
           onStepCancel: _step == 0
               ? null
               : () => setState(() => _step = (_step - 1).clamp(0, 2)),
@@ -180,7 +182,7 @@ class _MovieNightWizardScreenState
     });
   }
 
-  void _continue(List<Friend> filteredFriends) {
+  Future<void> _continue(List<Friend> filteredFriends) async {
     if (_step == 0) {
       if (_nameController.text.trim().isEmpty) {
         _showError('Event name is required.');
@@ -213,7 +215,7 @@ class _MovieNightWizardScreenState
       minimumRating: _minimumRating,
       language: _language,
     );
-    final event = ref
+    final event = await ref
         .read(friendsMovieNightControllerProvider.notifier)
         .createMovieNight(
           name: _nameController.text,
@@ -221,6 +223,9 @@ class _MovieNightWizardScreenState
           constraints: constraints,
           invitedFriendIds: _selectedFriendIds.toList(growable: false),
         );
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => MovieNightWaitingRoomScreen(eventId: event.id),

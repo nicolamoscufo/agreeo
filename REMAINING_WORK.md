@@ -4,14 +4,14 @@
 Friends and Movie Night phase.
 
 ## Last Updated
-2026-05-19 - Friends and Movie Night phase implemented locally and verified with `flutter analyze` and `flutter test`.
+2026-05-19 - Friends and Movie Night backend integration added and verified with `npm test`, `flutter analyze`, and `flutter test`.
 
 ## Current Status
 The Phase 1 Flutter prototype already contains the main app flow: bootstrap gate, backend-backed auth welcome screen, onboarding, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, movie interactions, backend movie read flows, TMDB-backed movie data, and user movie interactions such as like, dislike, and watchlist. Treat Phase 1 core app flow as implemented; do not rebuild Home, Swipe, Library, Movie Details, or Profile unless a small integration change is required.
 
 The social decision-making layer is now implemented in the active Flutter flow: Friends, Friend Profile, Friend Requests, Friend Search, Movie Night creation, Invite Friends flow, Waiting Room, preference-based Shortlist, Voting, and Winner Result.
 
-Friends and Movie Night currently use local replaceable Flutter services/state, not backend endpoints. The shortlist logic is real and deterministic: it uses event constraints, joined participants, available movie catalog, current user `UserMovieState`, and deterministic local friend movie states.
+Friends and Movie Night now use backend endpoints when authenticated backend access is available, with the previous local Flutter state retained as an offline/dev fallback. The shortlist logic is real and deterministic: backend generation uses Neo4j movie/user relationship signals, while the local fallback uses event constraints, joined participants, available movie catalog, current user `UserMovieState`, and deterministic local friend movie states.
 
 The project has moved from Phase 1 core app flow into Friends and Movie Night implementation. Backend/TMDB/Neo4j notes below remain relevant, but this phase should avoid large backend, Neo4j, or architecture refactors.
 
@@ -195,15 +195,15 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 
 Completed so far in this phase: active UI/controller/test implementation is complete and verified.
 
-In progress now: no frontend implementation task remains active; backend persistence for Friends/Movie Night is deferred.
+In progress now: backend persistence for Friends/Movie Night has been added; manual device QA remains.
 
-Remaining now: replace local social data/event persistence with backend endpoints when API scope is approved.
+Remaining now: run manual Friends/Movie Night QA against a local backend + Neo4j dataset.
 
-Where stopped: Friends and Movie Night phase is complete in local Flutter state; no backend endpoints were added.
+Where stopped: backend endpoints and Flutter integration are implemented with local fallback preserved.
 
-Next steps: design and add backend endpoints for friends, requests, movie nights, votes, and results; then migrate local controller calls to backend.
+Next steps: manually verify Friends tab, Friend Profile, Movie Night wizard, Waiting Room, Voting, Result, and Movie Details navigation against backend data.
 
-Architecture concerns: Friends/Movie Night uses local deterministic data for friend profiles and friend votes. Neo4j schema was not expanded in this pass.
+Architecture concerns: local deterministic data remains only as fallback when backend auth/API is unavailable. Neo4j schema was expanded minimally with `MovieNight.id` uniqueness plus social/movie-night relationships.
 
 ### Auth + Neo4j MVP Integration
 - [x] Replace backend `authController.js` with the new `:AppUser` / `uid` version.
@@ -232,14 +232,14 @@ Architecture concerns: Friends/Movie Night uses local deterministic data for fri
 ## Remaining Work
 
 ### Friends and Movie Night Backend Integration
-- [ ] Add backend `GET /friends` and connect `FriendsMovieNightController` friends list to it.
-- [ ] Add backend `GET /friends/search?q=` and replace local friend search users.
-- [ ] Add backend friend request endpoints for send, accept, and decline.
-- [ ] Add backend `GET /friends/:id/profile` with privacy-aware watched, reviews, and watchlist sections.
-- [ ] Add backend Movie Night endpoints for create, update constraints, invite friends, invite link, shortlist, votes, and result.
-- [ ] Persist Movie Night events, participants, shortlist candidates, votes, and winner results outside local Flutter state.
-- [ ] Replace deterministic local friend vote simulation with real participant vote submission once authenticated multi-user flow exists.
-- [ ] Add backend or integration tests once endpoints exist.
+- [x] Add backend `GET /friends` and connect `FriendsMovieNightController` friends list to it.
+- [x] Add backend `GET /friends/search?q=` and replace local friend search users when backend is available.
+- [x] Add backend friend request endpoints for send, accept, and decline.
+- [x] Add backend `GET /friends/:id/profile` with privacy-aware watched, reviews, and watchlist sections.
+- [x] Add backend Movie Night endpoints for create, update constraints, invite friends, invite link, shortlist, votes, and result.
+- [x] Persist Movie Night events, participants, shortlist candidates, votes, and winner results outside local Flutter state.
+- [x] Replace deterministic local friend vote simulation with real participant vote submission on the backend path; keep simulation only for offline fallback.
+- [x] Add backend repository tests and one Flutter controller fallback test.
 
 ### Friends and Movie Night Implementation Notes
 - Friends screen implemented: yes, `lib/features/friends/presentation/friends_screen.dart`.
@@ -252,9 +252,9 @@ Architecture concerns: Friends/Movie Night uses local deterministic data for fri
 - Shortlist generation implemented: yes, deterministic service in `lib/shared/services/shortlist_service.dart`.
 - Shortlist uses: event constraints, joined participants, available movie catalog, current user `UserMovieState`, and deterministic local friend `UserMovieState` maps.
 - Voting and winner logic implemented: yes, vote scoring plus shortlist compatibility score in `ShortlistService.selectWinner`.
-- Backend endpoints added: no; this pass used local replaceable Flutter state only.
-- Backend data currently used: existing movie catalog/details and current-user movie interaction sync from Phase 1 services.
-- Local data currently used: friends, friend requests, friend profiles, Movie Night events, invite links, participant status, friend movie states, friend votes, shortlist persistence, winner persistence.
+- Backend endpoints added: yes; `backend/socialController.js` wires friends, requests, profiles, movie nights, shortlist, votes, and results to `backend/socialRepository.js`.
+- Backend data currently used: existing movie catalog/details, current-user movie interaction sync, friends/requests/profiles, Movie Night events, shortlist candidates, votes, and winner results.
+- Local data currently used: offline/dev fallback only for friends, friend requests, friend profiles, Movie Night events, invite links, participant status, friend movie states, friend vote simulation, shortlist persistence, and winner persistence.
 - Streaming/platform references fully removed from new flow: yes; no provider badges, platform filters, shared platforms, or availability scoring were added.
 
 ## Remaining Phase 1 Work
@@ -404,6 +404,7 @@ Architecture concerns: Friends/Movie Night uses local deterministic data for fri
 - [ ] Open Movie Details and confirm data source consistency.
 - [x] Run `flutter analyze`.
 - [x] Run `flutter test`.
+- [x] Run backend `npm test`.
 - [x] Run backend manually with `npm start`.
 - [x] Run backend health check.
 - [ ] Confirm Neo4j Browser shows expected graph nodes/relationships.
@@ -413,9 +414,9 @@ Architecture concerns: Friends/Movie Night uses local deterministic data for fri
   - `:MATCHES_TMDB`
 
 ## Blocked / Issues
-- [ ] Friends/Movie Night backend endpoints are not implemented yet; current social layer uses local Flutter state.
-- [ ] Friend profiles and friend votes use deterministic local scaffolding until real multi-user backend data exists.
-- [ ] Movie Night events, invites, votes, shortlist, and winner results do not persist across backend sessions yet.
+- [x] Friends/Movie Night backend endpoints are implemented; social layer uses backend when auth/API is available.
+- [x] Friend profiles and friend votes use backend data on the backend path; deterministic scaffolding remains only as fallback.
+- [x] Movie Night events, invites, votes, shortlist, and winner results persist through backend/Neo4j on the backend path.
 - [ ] Manual device/emulator QA for Friends/Movie Night has not been run yet.
 - [ ] Windows desktop smoke run/build is blocked locally because the Visual Studio toolchain is not installed/configured for Flutter desktop builds.
 - [ ] Current Flutter prototype still contains mock Phase 1 services that need to be replaced gradually.
@@ -431,14 +432,14 @@ Architecture concerns: Friends/Movie Night uses local deterministic data for fri
 ## Next Steps
 
 ### Immediate Next Steps
-1. Define minimal backend contracts for Friends, Friend Requests, Friend Profile, Movie Nights, Votes, and Result.
-2. Add backend endpoints only after contract is confirmed.
-3. Map backend persistence to Neo4j relationships without large schema refactor.
-4. Replace local `FriendsMovieNightController` seed data with backend reads/writes.
-5. Replace deterministic local friend vote simulation with real authenticated participant votes.
-6. Persist Movie Night event status, shortlist candidates, votes, and winner.
-7. Add integration tests for backend endpoints and one Flutter flow test for create/wait/vote/result.
-8. Run manual mobile QA for Friends tab, Friend Profile, Movie Night wizard, Waiting Room, Voting, Result, and Movie Details navigation.
+1. [x] Define minimal backend contracts for Friends, Friend Requests, Friend Profile, Movie Nights, Votes, and Result.
+2. [x] Add backend endpoints after contract confirmation.
+3. [x] Map backend persistence to Neo4j relationships without large schema refactor.
+4. [x] Replace local `FriendsMovieNightController` seed data with backend reads/writes when backend is available.
+5. [x] Replace deterministic local friend vote simulation with real authenticated participant votes on backend path.
+6. [x] Persist Movie Night event status, shortlist candidates, votes, and winner.
+7. [x] Add backend repository tests and one Flutter controller fallback test.
+8. [ ] Run manual mobile QA for Friends tab, Friend Profile, Movie Night wizard, Waiting Room, Voting, Result, and Movie Details navigation.
 
 ### Backend Test Checklist
 - [x] `GET /health/db` returns `{ ok: true }`.
