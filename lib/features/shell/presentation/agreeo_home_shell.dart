@@ -1,4 +1,4 @@
-import 'package:agreeo/features/friends/presentation/friends_placeholder_screen.dart';
+import 'package:agreeo/features/friends/presentation/friends_screen.dart';
 import 'package:agreeo/features/home/presentation/home_screen.dart';
 import 'package:agreeo/features/library/presentation/library_screen.dart';
 import 'package:agreeo/features/profile/presentation/profile_screen.dart';
@@ -43,7 +43,7 @@ class _AgreeoHomeShellState extends ConsumerState<AgreeoHomeShell> {
       const AgreeoHomeScreen(),
       const AgreeoLibraryScreen(),
       AgreeoSwipeScreen(onNavigateTab: _selectTab),
-      const FriendsPlaceholderScreen(),
+      const FriendsScreen(),
       const AgreeoProfileScreen(),
     ];
 

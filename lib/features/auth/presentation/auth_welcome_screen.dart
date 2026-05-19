@@ -98,209 +98,210 @@ class _AgreeoAuthWelcomeScreenState
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 40),
-                      // Neon Text Logo
-                      Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Testo sfocato per l'alone / glow
-                            Text(
-                              'Agreeo',
-                              style: GoogleFonts.pacifico(
-                                fontSize: 72,
-                                fontWeight: FontWeight.normal,
-                                foreground: Paint()
-                                  ..shader =
-                                      const LinearGradient(
-                                        colors: [
-                                          Color(0xFFC026D3),
-                                          Color(0xFF22D3EE),
-                                        ],
-                                      ).createShader(
-                                        const Rect.fromLTWH(0, 0, 200, 70),
-                                      )
-                                  ..maskFilter = const MaskFilter.blur(
-                                    BlurStyle.normal,
-                                    12,
-                                  ),
+                      children: [
+                        const SizedBox(height: 40),
+                        // Neon Text Logo
+                        Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Testo sfocato per l'alone / glow
+                              Text(
+                                'Agreeo',
+                                style: GoogleFonts.pacifico(
+                                  fontSize: 72,
+                                  fontWeight: FontWeight.normal,
+                                  foreground: Paint()
+                                    ..shader =
+                                        const LinearGradient(
+                                          colors: [
+                                            Color(0xFFC026D3),
+                                            Color(0xFF22D3EE),
+                                          ],
+                                        ).createShader(
+                                          const Rect.fromLTWH(0, 0, 200, 70),
+                                        )
+                                    ..maskFilter = const MaskFilter.blur(
+                                      BlurStyle.normal,
+                                      12,
+                                    ),
+                                ),
                               ),
-                            ),
-                            // Testo in primo piano nitido
-                            Text(
-                              'Agreeo',
-                              style: GoogleFonts.pacifico(
-                                fontSize: 72,
-                                fontWeight: FontWeight.normal,
-                                foreground: Paint()
-                                  ..shader =
-                                      const LinearGradient(
-                                        colors: [
-                                          Color(0xFFE879F9),
-                                          Color(0xFF67E8F9),
-                                        ],
-                                      ).createShader(
-                                        const Rect.fromLTWH(0, 0, 200, 70),
-                                      ),
+                              // Testo in primo piano nitido
+                              Text(
+                                'Agreeo',
+                                style: GoogleFonts.pacifico(
+                                  fontSize: 72,
+                                  fontWeight: FontWeight.normal,
+                                  foreground: Paint()
+                                    ..shader =
+                                        const LinearGradient(
+                                          colors: [
+                                            Color(0xFFE879F9),
+                                            Color(0xFF67E8F9),
+                                          ],
+                                        ).createShader(
+                                          const Rect.fromLTWH(0, 0, 200, 70),
+                                        ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 40),
+                        const SizedBox(height: 40),
 
-                      if (_isSignUp) ...[
+                        if (_isSignUp) ...[
+                          TextFormField(
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            decoration: _buildInputDecoration('Name'),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Enter your name';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
                         TextFormField(
-                          controller: _nameController,
+                          controller: _emailController,
                           textInputAction: TextInputAction.next,
+                          keyboardType: TextInputType.emailAddress,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                           ),
-                          decoration: _buildInputDecoration('Name'),
+                          decoration: _buildInputDecoration('Email'),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Enter your name';
+                            if (value == null ||
+                                value.trim().isEmpty ||
+                                !value.contains('@')) {
+                              return 'Enter a valid email';
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
-                      ],
 
-                      TextFormField(
-                        controller: _emailController,
-                        textInputAction: TextInputAction.next,
-                        keyboardType: TextInputType.emailAddress,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                        decoration: _buildInputDecoration('Email'),
-                        validator: (value) {
-                          if (value == null ||
-                              value.trim().isEmpty ||
-                              !value.contains('@')) {
-                            return 'Enter a valid email';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                        decoration: _buildInputDecoration('Password').copyWith(
-                          suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: Colors.white54,
-                            ),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
                           ),
-                        ),
-                        onFieldSubmitted: (_) => _submit(),
-                        validator: (value) {
-                          if (value == null || value.length < 6) {
-                            return 'Use at least 6 characters';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Neon Login Button
-                      Container(
-                        width: double.infinity,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFC026D3), Color(0xFF22D3EE)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x60C026D3),
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                              offset: Offset(0, 4),
-                            ), // Glow effect
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(28),
-                            onTap: _submitting ? null : _submit,
-                            child: Center(
-                              child: _submitting
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    )
-                                  : Text(
-                                      _isSignUp ? 'Sign Up' : 'Log In',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      // Bottom Switch Mode
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20, top: 40),
-                        child: GestureDetector(
-                          onTap: _toggleMode,
-                          behavior: HitTestBehavior.opaque,
-                          child: Center(
-                            child: RichText(
-                              text: TextSpan(
-                                text: _isSignUp
-                                    ? 'Already have an account? '
-                                    : 'Don\'t have an account? ',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                children: [
-                                  TextSpan(
-                                    text: _isSignUp ? 'Log in' : 'Sign up',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                          decoration: _buildInputDecoration('Password')
+                              .copyWith(
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: Colors.white54,
                                   ),
-                                ],
+                                ),
+                              ),
+                          onFieldSubmitted: (_) => _submit(),
+                          validator: (value) {
+                            if (value == null || value.length < 6) {
+                              return 'Use at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Neon Login Button
+                        Container(
+                          width: double.infinity,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(28),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFC026D3), Color(0xFF22D3EE)],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x60C026D3),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: Offset(0, 4),
+                              ), // Glow effect
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(28),
+                              onTap: _submitting ? null : _submit,
+                              child: Center(
+                                child: _submitting
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : Text(
+                                        _isSignUp ? 'Sign Up' : 'Log In',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+
+                        const Spacer(),
+
+                        // Bottom Switch Mode
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 20, top: 40),
+                          child: GestureDetector(
+                            onTap: _toggleMode,
+                            behavior: HitTestBehavior.opaque,
+                            child: Center(
+                              child: RichText(
+                                text: TextSpan(
+                                  text: _isSignUp
+                                      ? 'Already have an account? '
+                                      : 'Don\'t have an account? ',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: _isSignUp ? 'Log in' : 'Sign up',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 ),
               ),
             );
@@ -319,11 +320,17 @@ class _AgreeoAuthWelcomeScreenState
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 1,
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+        borderSide: BorderSide(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 1,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),

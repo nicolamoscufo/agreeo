@@ -68,15 +68,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
     }
   }
 
-  // Loading of additional items is triggered per-carousel via onLoadMore callbacks.
-
-  int _nextVisibleCount({required int current, required int total}) {
-    if (total <= current) {
-      return total;
-    }
-    return (current + _sectionBatchSize).clamp(_sectionBatchSize, total);
-  }
-
   void _refreshSearch() {
     _searchDebounce?.cancel();
     final query = _searchController.text.trim();

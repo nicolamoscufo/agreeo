@@ -1,21 +1,43 @@
 # Agreeo Remaining Work
 
 ## Current Phase
-Phase 1 - Core MVP prototype + real auth/database foundation
+Friends and Movie Night phase.
 
 ## Last Updated
-2026-05-10 - Backend `.env` loading added and active Flutter read flows remain on backend movie endpoints
+2026-05-19 - Friends and Movie Night phase implemented locally and verified with `flutter analyze` and `flutter test`.
 
 ## Current Status
-The Phase 1 Flutter prototype already contains the main app flow: bootstrap gate, mock auth welcome screen, onboarding, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, and Friends placeholder. The UI prototype has passed `flutter analyze`, `flutter test`, and a web build smoke test.
+The Phase 1 Flutter prototype already contains the main app flow: bootstrap gate, backend-backed auth welcome screen, onboarding, 5-tab shell, Home, Swipe, Library, Movie Details, Profile, movie interactions, backend movie read flows, TMDB-backed movie data, and user movie interactions such as like, dislike, and watchlist. Treat Phase 1 core app flow as implemented; do not rebuild Home, Swipe, Library, Movie Details, or Profile unless a small integration change is required.
 
-The project is now moving from pure mock prototype toward a real MVP backend foundation. The immediate priority is replacing mock/local auth with backend auth connected to Neo4j, while keeping the app simple and not production-oriented yet.
+The social decision-making layer is now implemented in the active Flutter flow: Friends, Friend Profile, Friend Requests, Friend Search, Movie Night creation, Invite Friends flow, Waiting Room, preference-based Shortlist, Voting, and Winner Result.
+
+Friends and Movie Night currently use local replaceable Flutter services/state, not backend endpoints. The shortlist logic is real and deterministic: it uses event constraints, joined participants, available movie catalog, current user `UserMovieState`, and deterministic local friend movie states.
+
+The project has moved from Phase 1 core app flow into Friends and Movie Night implementation. Backend/TMDB/Neo4j notes below remain relevant, but this phase should avoid large backend, Neo4j, or architecture refactors.
 
 The decided MVP backend model uses Neo4j as the main graph database. App users must be stored as `:AppUser`, not `:User`, because the database will later also contain imported MovieLens users as `:MovieLensUser`.
 
 TMDB will be used as the external movie catalog for posters, descriptions, search, movie details, cast, trailers, and images. MovieLens will be imported into Neo4j to provide historical ratings, tags, and recommendation data. The matching between TMDB movies and MovieLens movies must be done through `links.csv`, using `tmdbId`, not by comparing titles.
 
 ## Completed
+
+### Friends and Movie Night Phase
+- [x] Implemented Friends screen from existing bottom navigation Friends tab.
+- [x] Implemented Friend Profile with privacy-aware Watched, Reviews, and Watchlist sections.
+- [x] Implemented friend search, incoming requests, Add Friend, Pending, and Friends states.
+- [x] Implemented Movie Nights section with event cards and status routing.
+- [x] Implemented Movie Night wizard with Event Basics, Constraints, and Invite Friends steps.
+- [x] Implemented Invite Friends flow with multi-select, search, invite link, and copy action.
+- [x] Implemented Waiting Room with event summary, constraints, participants, invite link, host controls, pending warning, and shortlist preview.
+- [x] Implemented deterministic preference-based shortlist generation in `lib/shared/services/shortlist_service.dart`.
+- [x] Implemented Voting screen with Like, Dislike, Already Seen, and Maybe/Neutral votes.
+- [x] Implemented automatic local voting completion and deterministic winner selection.
+- [x] Implemented Winner Result screen with details, Mark as Watched, Save event, and Back to Friends actions.
+- [x] Reused existing Movie Details route from friend profiles, shortlist preview, voting, and result.
+- [x] Added `test/services/shortlist_service_test.dart` for shortlist filters, scoring, tie-breaks, winner selection, and voting completion.
+- [x] Ran `flutter analyze` successfully.
+- [x] Ran `flutter test` successfully.
+- [x] Avoided streaming/platform/provider references in the new Friends and Movie Night flow.
 
 ### Existing Phase 1 Prototype
 - [x] Read project docs and root config (`README.md`, `pubspec.yaml`, `analysis_options.yaml`).
@@ -159,6 +181,30 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 
 ## In Progress
 
+### Friends and Movie Night Phase
+- [x] Implement Friends screen from existing bottom navigation Friends tab.
+- [x] Implement Friend Profile with privacy-aware sections.
+- [x] Implement friend search, incoming requests, add/pending/friends states.
+- [x] Implement Movie Night wizard: event basics, constraints, invite friends.
+- [x] Implement Waiting Room with host controls, participants, constraints, invite link.
+- [x] Implement deterministic preference-based shortlist generation.
+- [x] Implement Voting screen and automatic winner selection.
+- [x] Implement Winner Result screen with movie details and mark-watched action.
+- [x] Add minimum tests for shortlist and winner logic.
+- [x] Run `flutter analyze` and `flutter test`.
+
+Completed so far in this phase: active UI/controller/test implementation is complete and verified.
+
+In progress now: no frontend implementation task remains active; backend persistence for Friends/Movie Night is deferred.
+
+Remaining now: replace local social data/event persistence with backend endpoints when API scope is approved.
+
+Where stopped: Friends and Movie Night phase is complete in local Flutter state; no backend endpoints were added.
+
+Next steps: design and add backend endpoints for friends, requests, movie nights, votes, and results; then migrate local controller calls to backend.
+
+Architecture concerns: Friends/Movie Night uses local deterministic data for friend profiles and friend votes. Neo4j schema was not expanded in this pass.
+
 ### Auth + Neo4j MVP Integration
 - [x] Replace backend `authController.js` with the new `:AppUser` / `uid` version.
 - [x] Replace backend `neo4jService.js` with the version that creates constraints and supports optional database selection.
@@ -182,6 +228,34 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 - [x] Avoid direct Flutter-side Neo4j user creation during register/login.
 - [x] Keep direct Flutter Neo4j access only temporarily for MVP experiments if needed.
 - [x] Later move all Neo4j writes behind backend endpoints.
+
+## Remaining Work
+
+### Friends and Movie Night Backend Integration
+- [ ] Add backend `GET /friends` and connect `FriendsMovieNightController` friends list to it.
+- [ ] Add backend `GET /friends/search?q=` and replace local friend search users.
+- [ ] Add backend friend request endpoints for send, accept, and decline.
+- [ ] Add backend `GET /friends/:id/profile` with privacy-aware watched, reviews, and watchlist sections.
+- [ ] Add backend Movie Night endpoints for create, update constraints, invite friends, invite link, shortlist, votes, and result.
+- [ ] Persist Movie Night events, participants, shortlist candidates, votes, and winner results outside local Flutter state.
+- [ ] Replace deterministic local friend vote simulation with real participant vote submission once authenticated multi-user flow exists.
+- [ ] Add backend or integration tests once endpoints exist.
+
+### Friends and Movie Night Implementation Notes
+- Friends screen implemented: yes, `lib/features/friends/presentation/friends_screen.dart`.
+- Friend Profile implemented: yes, `lib/features/friends/presentation/friend_profile_screen.dart`.
+- Friend Requests implemented: yes, local incoming request accept/decline and outgoing pending state.
+- Friend Search implemented: yes, local searchable users with Add Friend, Pending, and Friends states.
+- Movie Night wizard implemented: yes, `lib/features/friends/presentation/movie_night_wizard_screen.dart`.
+- Invite friends flow implemented: yes, friend multi-select, search, invite link card, and copy action.
+- Waiting Room implemented: yes, `lib/features/friends/presentation/movie_night_waiting_room_screen.dart`.
+- Shortlist generation implemented: yes, deterministic service in `lib/shared/services/shortlist_service.dart`.
+- Shortlist uses: event constraints, joined participants, available movie catalog, current user `UserMovieState`, and deterministic local friend `UserMovieState` maps.
+- Voting and winner logic implemented: yes, vote scoring plus shortlist compatibility score in `ShortlistService.selectWinner`.
+- Backend endpoints added: no; this pass used local replaceable Flutter state only.
+- Backend data currently used: existing movie catalog/details and current-user movie interaction sync from Phase 1 services.
+- Local data currently used: friends, friend requests, friend profiles, Movie Night events, invite links, participant status, friend movie states, friend votes, shortlist persistence, winner persistence.
+- Streaming/platform references fully removed from new flow: yes; no provider badges, platform filters, shared platforms, or availability scoring were added.
 
 ## Remaining Phase 1 Work
 
@@ -339,6 +413,10 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
   - `:MATCHES_TMDB`
 
 ## Blocked / Issues
+- [ ] Friends/Movie Night backend endpoints are not implemented yet; current social layer uses local Flutter state.
+- [ ] Friend profiles and friend votes use deterministic local scaffolding until real multi-user backend data exists.
+- [ ] Movie Night events, invites, votes, shortlist, and winner results do not persist across backend sessions yet.
+- [ ] Manual device/emulator QA for Friends/Movie Night has not been run yet.
 - [ ] Windows desktop smoke run/build is blocked locally because the Visual Studio toolchain is not installed/configured for Flutter desktop builds.
 - [ ] Current Flutter prototype still contains mock Phase 1 services that need to be replaced gradually.
 - [ ] Some legacy flow files may not map cleanly to Agreeo Phase 1 and should be removed or bypassed later.
@@ -353,26 +431,14 @@ TMDB will be used as the external movie catalog for posters, descriptions, searc
 ## Next Steps
 
 ### Immediate Next Steps
-1. Update backend files:
-   - `authController.js`
-   - `neo4jService.js`
-   - `server.js`
-   - `jwtUtils.js` if needed
-   - `seedInitialUsers.js`
-2. Start Neo4j.
-3. Start backend with `npm start`.
-4. Test:
-   - `GET /health/db`
-   - `POST /auth/register`
-   - `POST /auth/login`
-   - `GET /me`
-   - `PATCH /me/onboarding`
-5. Clean or migrate old `:User` nodes.
-6. Update Flutter `AuthService` to use backend auth response.
-7. Connect Flutter welcome/login/register screens to real backend auth.
-8. Use `onboardingCompleted` to route user after login/register.
-9. Run the MovieLens import against the local Neo4j instance.
-10. Validate TMDB-backed movie endpoints and then connect the remaining Flutter screens.
+1. Define minimal backend contracts for Friends, Friend Requests, Friend Profile, Movie Nights, Votes, and Result.
+2. Add backend endpoints only after contract is confirmed.
+3. Map backend persistence to Neo4j relationships without large schema refactor.
+4. Replace local `FriendsMovieNightController` seed data with backend reads/writes.
+5. Replace deterministic local friend vote simulation with real authenticated participant votes.
+6. Persist Movie Night event status, shortlist candidates, votes, and winner.
+7. Add integration tests for backend endpoints and one Flutter flow test for create/wait/vote/result.
+8. Run manual mobile QA for Friends tab, Friend Profile, Movie Night wizard, Waiting Room, Voting, Result, and Movie Details navigation.
 
 ### Backend Test Checklist
 - [x] `GET /health/db` returns `{ ok: true }`.
@@ -399,14 +465,6 @@ MATCH (u:AppUser {emailNormalized: "demo@example.com"})
 RETURN u.uid, u.email, u.displayName, u.onboardingCompleted;
 
 Do Not Start Yet
-Friends screen
-Friend Profile
-Friend Requests
-Movie Night creation
-Invite friends flow
-Waiting Room
-Shortlist voting
-Winner result screen
 Advanced recommendation algorithm
 Production auth hardening
 Payment/subscription features

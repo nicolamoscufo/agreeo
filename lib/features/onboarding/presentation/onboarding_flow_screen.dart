@@ -53,8 +53,6 @@ class _AgreeoOnboardingFlowScreenState
     final state = ref.watch(agreeoAppControllerProvider);
     final onboarding = state.onboarding;
     final selectedMovieIds = onboarding.favoriteMovieIds.toSet();
-    final query = _searchController.text.trim().toLowerCase();
-
     // Only used as fallback when search is empty
     final localCatalogMovies = state.catalog;
 
