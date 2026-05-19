@@ -523,7 +523,7 @@ async function getPersonalizedRecommendationCandidates(uid) {
           ELSE 1.0
         END
         * (toFloat(r1.rating) - 3.0)
-        * (1.0 / log(toFloat(coalesce(seed.movieLensRatingCount, seedMl.movieLensRatingCount, 0)) + 2.0))
+        * (1.0 / sqrt(log(toFloat(coalesce(seed.movieLensRatingCount, seedMl.movieLensRatingCount, 0)) + 10.0)))
       ) AS similarityScore
     WHERE similarityScore > 0
 
