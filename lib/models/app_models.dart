@@ -520,3 +520,54 @@ class EventVote {
     );
   }
 }
+
+class InAppNotification {
+  const InAppNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.message,
+    this.entityId,
+    required this.extraData,
+    required this.read,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String type;
+  final String title;
+  final String message;
+  final String? entityId;
+  final Map<String, dynamic> extraData;
+  final bool read;
+  final DateTime createdAt;
+
+  factory InAppNotification.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic> extra = {};
+    if (json['extraData'] is Map) {
+      extra = Map<String, dynamic>.from(json['extraData'] as Map);
+    }
+    return InAppNotification(
+      id: json['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'generic',
+      title: json['title']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      entityId: json['entityId']?.toString(),
+      extraData: extra,
+      read: json['read'] == true,
+      createdAt: _decodeDateTime(json['createdAt']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'type': type,
+    'title': title,
+    'message': message,
+    'entityId': entityId,
+    'extraData': extraData,
+    'read': read,
+    'createdAt': _encodeDateTime(createdAt),
+  };
+}
+

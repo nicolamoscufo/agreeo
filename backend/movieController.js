@@ -1,6 +1,8 @@
 const { tmdbGet } = require('./tmdbClient');
 const movieRepository = require('./movieRepository');
 const neo4jService = require('./neo4jService');
+const socketService = require('./socketService');
+const socialRepository = require('./socialRepository');
 
 function parseTmdbId(value) {
   const tmdbId = Number.parseInt(value, 10);
@@ -894,6 +896,38 @@ exports.details = async (req, res) => {
   }
 };
 
+async function notifyMovieStateChange(uid, tmdbId, stateName, value) {
+  try {
+    socketService.emitToUser(uid, 'movie_state_changed', {
+      userId: uid,
+      tmdbId: String(tmdbId),
+      stateName,
+      value
+    });
+
+    const result = await neo4jService.run(
+      `
+      MATCH (u:AppUser {uid: $uid})-[membership:MEMBER_OF]->(event:MovieNight)
+      WHERE event.status IN ['waiting', 'voting']
+      RETURN event.id AS eventId
+      `,
+      { uid }
+    );
+
+    const eventIds = result.records.map(record => record.get('eventId'));
+    for (const eventId of eventIds) {
+      console.info(`[notifyMovieStateChange] Regenerating shortlist for event ${eventId} due to user ${uid} preference change`);
+      const updatedEvent = await socialRepository.generateShortlist(uid, eventId);
+      if (updatedEvent) {
+        const allParticipantIds = updatedEvent.participants.map(p => p.userId);
+        socketService.emitToUsers(allParticipantIds, 'movie_night_updated', { event: updatedEvent });
+      }
+    }
+  } catch (error) {
+    console.error('[notifyMovieStateChange] Error propagating state update:', error);
+  }
+}
+
 exports.like = async (req, res) => {
   const uid = requestUid(req);
   const tmdbId = parseTmdbId(req.params.tmdbId);
@@ -904,6 +938,7 @@ exports.like = async (req, res) => {
     const liked = await movieRepository.likeMovie(uid, movie);
     if (!liked) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'liked', true);
     return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to like movie');
@@ -920,6 +955,7 @@ exports.dislike = async (req, res) => {
     const disliked = await movieRepository.dislikeMovie(uid, movie);
     if (!disliked) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'disliked', true);
     return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to dislike movie');
@@ -936,6 +972,7 @@ exports.watchlist = async (req, res) => {
     const watchlisted = await movieRepository.watchlistMovie(uid, movie);
     if (!watchlisted) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'watchlist', true);
     return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to add movie to watchlist');
@@ -952,6 +989,7 @@ exports.markSeen = async (req, res) => {
     const seen = await movieRepository.markMovieAsSeen(uid, movie);
     if (!seen) return res.status(404).json({ error: 'App user not found' });
     const neoMovie = await movieRepository.findMovieByTmdbId(tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'seen', true);
     return res.json({ ok: true, movie: mapRepositoryMovieToResponse(neoMovie || movie) });
   } catch (error) {
     return handleError(res, error, 'Failed to mark movie as seen');
@@ -1021,6 +1059,7 @@ exports.removeLike = async (req, res) => {
 
   try {
     await movieRepository.removeLike(uid, tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'liked', false);
     return res.status(204).send();
   } catch (error) {
     return handleError(res, error, 'Failed to remove like');
@@ -1034,6 +1073,7 @@ exports.removeDislike = async (req, res) => {
 
   try {
     await movieRepository.removeDislike(uid, tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'disliked', false);
     return res.status(204).send();
   } catch (error) {
     return handleError(res, error, 'Failed to remove dislike');
@@ -1047,6 +1087,7 @@ exports.removeFromWatchlist = async (req, res) => {
 
   try {
     await movieRepository.removeFromWatchlist(uid, tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'watchlist', false);
     return res.status(204).send();
   } catch (error) {
     return handleError(res, error, 'Failed to remove movie from watchlist');
@@ -1060,6 +1101,7 @@ exports.removeSeen = async (req, res) => {
 
   try {
     await movieRepository.removeSeen(uid, tmdbId);
+    notifyMovieStateChange(uid, tmdbId, 'seen', false);
     return res.status(204).send();
   } catch (error) {
     return handleError(res, error, 'Failed to remove seen movie');

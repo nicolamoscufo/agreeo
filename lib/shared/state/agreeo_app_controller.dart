@@ -9,6 +9,7 @@ import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:agreeo/services/real_time_service.dart';
 
 class AgreeoAppState {
   const AgreeoAppState({
@@ -207,6 +208,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   static const int dailySuggestionBatchSize = 60;
 
   AgreeoAppController(
+    this._ref,
     this._movieService,
     this._authService,
     this._userMovieStateService,
@@ -217,6 +219,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
   static const String _storageKey = 'agreeo.prototype.state.v1';
 
+  final Ref _ref;
   final MovieService _movieService;
   final MockAuthService _authService;
   final UserMovieStateService _userMovieStateService;
@@ -255,6 +258,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
             state.recommendedForYou.isEmpty)) {
       await _refreshDiscoveryFeeds();
     }
+
+    if (state.isAuthenticated) {
+      _ref.read(realTimeServiceProvider).connect(state.session!.id);
+    }
   }
 
   Future<void> signUp({
@@ -277,6 +284,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       dailySuggestionIds: <String>[],
     );
     await _persist();
+    _ref.read(realTimeServiceProvider).connect(session.id);
   }
 
   Future<void> logIn({required String email, required String password}) async {
@@ -291,9 +299,11 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       dailySuggestionIds: <String>[],
     );
     await _persist();
+    _ref.read(realTimeServiceProvider).connect(session.id);
   }
 
   Future<void> logOut() async {
+    _ref.read(realTimeServiceProvider).disconnect();
     await _authService.logOut();
     state = AgreeoAppState.initial().copyWith(
       hydrated: true,
@@ -758,6 +768,36 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_storageKey, jsonEncode(state.toJson()));
   }
+
+  Future<void> handleSocketMovieStateChanged({
+    required String tmdbId,
+    required String stateName,
+    required bool value,
+  }) async {
+    final movieId = 'tmdb-$tmdbId';
+    final currentState = state.movieStates[movieId] ?? UserMovieState.initial(movieId);
+    
+    UserMovieState nextState = currentState;
+    if (stateName == 'liked') {
+      nextState = currentState.copyWith(
+        preference: value ? MoviePreference.liked : MoviePreference.neutral,
+      );
+    } else if (stateName == 'disliked') {
+      nextState = currentState.copyWith(
+        preference: value ? MoviePreference.disliked : MoviePreference.neutral,
+      );
+    } else if (stateName == 'watchlist') {
+      nextState = currentState.copyWith(inWatchlist: value);
+    } else if (stateName == 'seen') {
+      nextState = currentState.copyWith(watched: value);
+    }
+
+    final newStates = Map<String, UserMovieState>.from(state.movieStates);
+    newStates[movieId] = nextState;
+
+    state = state.copyWith(movieStates: newStates);
+    await _persist();
+  }
 }
 
 final movieServiceProvider = Provider<MovieService>((ref) {
@@ -779,6 +819,7 @@ final backendMovieServiceProvider = Provider<BackendMovieService>((ref) {
 final agreeoAppControllerProvider =
     StateNotifierProvider<AgreeoAppController, AgreeoAppState>((ref) {
       return AgreeoAppController(
+        ref,
         ref.watch(movieServiceProvider),
         ref.watch(mockAuthServiceProvider),
         ref.watch(userMovieStateServiceProvider),

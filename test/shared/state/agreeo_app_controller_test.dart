@@ -1,13 +1,39 @@
 import 'dart:convert';
 
 import 'package:agreeo/services/backend_movie_service.dart';
+import 'package:agreeo/services/real_time_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeRealTimeService implements RealTimeService {
+  @override
+  void connect(String userId) {}
+
+  @override
+  void disconnect() {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeRef implements Ref {
+  @override
+  T read<T>(ProviderListenable<T> provider) {
+    if (provider as dynamic == realTimeServiceProvider) {
+      return _FakeRealTimeService() as T;
+    }
+    throw UnimplementedError();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _FakeMovieService implements MovieService {
   _FakeMovieService(this.catalog, this.suggestionBatches);
@@ -124,6 +150,7 @@ void main() {
       );
 
       final controller = AgreeoAppController(
+        _FakeRef(),
         _FakeMovieService(const <Movie>[], <List<Movie>>[
           <Movie>[freshMovie],
         ]),
@@ -150,6 +177,7 @@ void main() {
     final secondMovie = _movie('tmdb-300');
 
     final controller = AgreeoAppController(
+      _FakeRef(),
       _FakeMovieService(const <Movie>[], <List<Movie>>[
         <Movie>[firstMovie],
         <Movie>[secondMovie],

@@ -4,6 +4,7 @@ import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/models/app_models.dart' show InAppNotification;
 import 'package:http/http.dart' as http;
 
 class SocialBackendSnapshot {
@@ -257,6 +258,29 @@ class BackendSocialService {
         'POST',
         '/movie-nights/$eventId/votes',
         body: <String, dynamic>{'movieId': movieId, 'vote': vote.name},
+      )).body,
+    );
+    return _decodeMovieNightEvent(_castMap(body['event']));
+  }
+
+  Future<MovieNightEvent> createInviteLink(String eventId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'POST',
+        '/movie-nights/$eventId/invite-link',
+      )).body,
+    );
+    return _decodeMovieNightEvent(_castMap(body['event']));
+  }
+
+  Future<MovieNightEvent> deleteVote({
+    required String eventId,
+    required String movieId,
+  }) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'DELETE',
+        '/movie-nights/$eventId/votes/$movieId',
       )).body,
     );
     return _decodeMovieNightEvent(_castMap(body['event']));
@@ -605,5 +629,32 @@ class BackendSocialService {
       (vote) => vote.name == value?.toString(),
       orElse: () => MovieNightVoteValue.neutral,
     );
+  }
+
+  Future<List<InAppNotification>> loadNotifications() async {
+    try {
+      final response = await _authorizedRequest('GET', '/notifications');
+      final body = _decodeMap(response.body);
+      final list = body['notifications'];
+      if (list is List) {
+        return list
+            .whereType<Map>()
+            .map((item) => InAppNotification.fromJson(item.cast<String, dynamic>()))
+            .toList();
+      }
+    } catch (e) {
+      // ignore
+    }
+    return const <InAppNotification>[];
+  }
+
+  Future<bool> markNotificationAsRead(String notificationId) async {
+    try {
+      final response = await _authorizedRequest('POST', '/notifications/$notificationId/read');
+      final body = _decodeMap(response.body);
+      return body['ok'] == true;
+    } catch (e) {
+      return false;
+    }
   }
 }

@@ -48,6 +48,14 @@ class NotificationService {
     await _showNotification(id: 1003, title: title, body: body);
   }
 
+  Future<void> showGenericNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _showNotification(id: id, title: title, body: body);
+  }
+
   Future<void> _showNotification({
     required int id,
     required String title,

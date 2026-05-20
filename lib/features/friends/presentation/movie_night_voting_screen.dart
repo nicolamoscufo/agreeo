@@ -2,10 +2,8 @@ import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.da
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,10 +19,84 @@ class MovieNightVotingScreen extends ConsumerStatefulWidget {
 
 class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     with MovieNightAutoRefresh<MovieNightVotingScreen> {
+  int _currentIndex = 0;
+  final List<_VoteHistoryEntry> _voteHistory = <_VoteHistoryEntry>[];
+
   @override
   void initState() {
     super.initState();
     startMovieNightPolling(widget.eventId);
+  }
+
+  List<ShortlistCandidate> _unvotedCandidates(MovieNightEvent event,
+      FriendsMovieNightController controller) {
+    return event.shortlist.where((candidate) {
+      final vote = controller.currentUserVoteFor(event.id, candidate.movie.id);
+      return vote == null;
+    }).toList();
+  }
+
+  Future<void> _submitVote(MovieNightEvent event, ShortlistCandidate candidate,
+      MovieNightVoteValue voteValue) async {
+    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
+    
+    _voteHistory.add(_VoteHistoryEntry(
+      candidate: candidate,
+      vote: voteValue,
+    ));
+
+    final updated = await controller.submitVote(
+      eventId: event.id,
+      movieId: candidate.movie.id,
+      vote: voteValue,
+    );
+
+    if (!mounted) return;
+
+    if (updated == null) {
+      _voteHistory.removeLast();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not submit this vote.')),
+      );
+      return;
+    }
+
+    if (updated.status == MovieNightStatus.completed) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => MovieNightResultScreen(eventId: event.id),
+        ),
+      );
+    } else {
+      setState(() {
+        _currentIndex = 0;
+      });
+    }
+  }
+
+  Future<void> _undoLastVote(MovieNightEvent event) async {
+    if (_voteHistory.isEmpty) return;
+    final lastEntry = _voteHistory.removeLast();
+    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
+
+    final updated = await controller.deleteVote(
+      eventId: event.id,
+      movieId: lastEntry.candidate.movie.id,
+    );
+    if (!mounted) return;
+    if (updated != null) {
+      setState(() {
+        _currentIndex = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Undid vote for "${lastEntry.candidate.movie.title}".')),
+      );
+    } else {
+      _voteHistory.add(lastEntry);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not undo vote.')),
+      );
+    }
   }
 
   @override
@@ -51,253 +123,504 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       });
     }
 
-    final currentVotes = event.shortlist.where((candidate) {
-      final vote = controller.currentUserVoteFor(event.id, candidate.movie.id);
-      return vote != null;
-    }).length;
+    final unvoted = _unvotedCandidates(event, controller);
+    final votedCount = event.shortlist.length - unvoted.length;
     final totalCandidates = event.shortlist.length;
-    final waiting = totalCandidates - currentVotes;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Voting')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
-          children: <Widget>[
-            SectionHeader(
-              title: event.name,
-              subtitle: waiting <= 0
-                  ? 'All votes collected. Result is being prepared.'
-                  : '$currentVotes/$totalCandidates movies voted • Waiting for $waiting',
-              trailing: InfoBadge(
-                label:
-                    '${event.joinedParticipants.length} friends voted per movie',
+    if (unvoted.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF060B16),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'All votes in!',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'You\'ve voted on all $totalCandidates movies. Waiting for other participants to finish voting.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  if (_voteHistory.isNotEmpty)
+                    OutlinedButton.icon(
+                      onPressed: () => _undoLastVote(event),
+                      icon: const Icon(Icons.undo_rounded, color: Colors.white),
+                      label: const Text('Undo last vote', style: TextStyle(color: Colors.white)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 18),
-            if (event.shortlist.isEmpty)
-              const EmptyState(
-                icon: Icons.movie_filter_outlined,
-                title: 'No movies matched this group',
-                message: 'Go back and relax constraints before voting.',
-              )
-            else
-              ...event.shortlist.map((candidate) {
-                final vote = controller.currentUserVoteFor(
-                  event.id,
-                  candidate.movie.id,
-                );
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _VotingCandidateCard(
-                    candidate: candidate,
-                    currentVote: vote?.vote,
-                    votedCount: event.votesForMovieFromJoined(
-                      candidate.movie.id,
-                    ),
-                    joinedCount: event.joinedParticipants.length,
-                    onOpenDetails: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => AgreeoMovieDetailsScreen(
-                            movieId: candidate.movie.id,
-                          ),
-                        ),
-                      );
-                    },
-                    onVote: (voteValue) async {
-                      final updated = await controller.submitVote(
-                        eventId: event.id,
-                        movieId: candidate.movie.id,
-                        vote: voteValue,
-                      );
-                      if (updated == null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not submit this vote.'),
-                          ),
-                        );
-                        return;
-                      }
-                      if (updated?.status == MovieNightStatus.completed &&
-                          context.mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                MovieNightResultScreen(eventId: event.id),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                );
-              }),
-          ],
+          ),
         ),
+      );
+    }
+
+    final currentCandidate = unvoted[_currentIndex.clamp(0, unvoted.length - 1)];
+    final nextCandidate = unvoted.length > 1
+        ? unvoted[(_currentIndex + 1).clamp(0, unvoted.length - 1)]
+        : null;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          // Background card (next movie visible behind)
+          if (nextCandidate != null && nextCandidate != currentCandidate)
+            Positioned.fill(
+              child: _VotingImmersiveCard(
+                candidate: nextCandidate,
+                isBackground: true,
+              ),
+            ),
+
+          // Current card (swipeable)
+          Positioned.fill(
+            child: Dismissible(
+              key: ValueKey<String>(currentCandidate.movie.id),
+              direction: DismissDirection.horizontal,
+              resizeDuration: null,
+              movementDuration: const Duration(milliseconds: 240),
+              background: const _SwipeVoteBackground(
+                alignment: Alignment.centerLeft,
+                icon: Icons.favorite_rounded,
+                label: 'Like',
+                color: Color(0xFF16A34A),
+              ),
+              secondaryBackground: const _SwipeVoteBackground(
+                alignment: Alignment.centerRight,
+                icon: Icons.close_rounded,
+                label: 'Dislike',
+                color: Color(0xFFDC2626),
+              ),
+              onDismissed: (direction) {
+                final vote = direction == DismissDirection.startToEnd
+                    ? MovieNightVoteValue.like
+                    : MovieNightVoteValue.dislike;
+                _submitVote(event, currentCandidate, vote);
+              },
+              child: _VotingImmersiveCard(
+                candidate: currentCandidate,
+                isBackground: false,
+                progress: '${votedCount + 1}/$totalCandidates',
+                onInfoTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AgreeoMovieDetailsScreen(
+                        movieId: currentCandidate.movie.id,
+                      ),
+                    ),
+                  );
+                },
+                actions: _VotingCardActions(
+                  canUndo: _voteHistory.isNotEmpty,
+                  onUndo: () => _undoLastVote(event),
+                  onDislike: () => _submitVote(
+                    event, currentCandidate, MovieNightVoteValue.dislike,
+                  ),
+                  onAlreadySeen: () => _submitVote(
+                    event, currentCandidate, MovieNightVoteValue.alreadySeen,
+                  ),
+                  onLike: () => _submitVote(
+                    event, currentCandidate, MovieNightVoteValue.like,
+                  ),
+                  onNeutral: () => _submitVote(
+                    event, currentCandidate, MovieNightVoteValue.neutral,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _VotingCandidateCard extends StatelessWidget {
-  const _VotingCandidateCard({
+class _VoteHistoryEntry {
+  const _VoteHistoryEntry({required this.candidate, required this.vote});
+  final ShortlistCandidate candidate;
+  final MovieNightVoteValue vote;
+}
+
+class _VotingImmersiveCard extends StatelessWidget {
+  const _VotingImmersiveCard({
     required this.candidate,
-    required this.currentVote,
-    required this.votedCount,
-    required this.joinedCount,
-    required this.onOpenDetails,
-    required this.onVote,
+    required this.isBackground,
+    this.onInfoTap,
+    this.actions,
+    this.progress,
   });
 
   final ShortlistCandidate candidate;
-  final MovieNightVoteValue? currentVote;
-  final int votedCount;
-  final int joinedCount;
-  final VoidCallback onOpenDetails;
-  final ValueChanged<MovieNightVoteValue> onVote;
+  final bool isBackground;
+  final VoidCallback? onInfoTap;
+  final Widget? actions;
+  final String? progress;
 
   @override
   Widget build(BuildContext context) {
     final movie = candidate.movie;
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: SizedBox(
-                    width: 86,
-                    height: 128,
-                    child: CachedNetworkImage(
-                      imageUrl: movie.posterUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => Container(
-                        color: const Color(0xFF1F2937),
-                        child: const Icon(Icons.movie_creation_outlined),
-                      ),
-                    ),
+    final imageUrl = movie.posterUrl.isNotEmpty
+        ? movie.posterUrl.replaceFirst('/w500/', '/w780/')
+        : movie.backdropUrl;
+    final metadata = <String>[
+      if (movie.releaseYear > 0) movie.releaseYear.toString(),
+      if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
+    ].join(' • ');
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        isBackground ? 26 : 16,
+        isBackground ? 36 : 18,
+        isBackground ? 26 : 16,
+        isBackground ? 120 : 18,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x66000000),
+              blurRadius: 30,
+              offset: Offset(0, 18),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (imageUrl.isNotEmpty)
+                CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  errorWidget: (context, url, error) =>
+                      Container(color: const Color(0xFF0F172A)),
+                )
+              else
+                Container(color: const Color(0xFF0F172A)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0x22060B16),
+                      Color(0x66060B16),
+                      Color(0xE6060B16),
+                    ],
+                    stops: <double>[0, 0.45, 1],
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
-                        movie.title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: <Widget>[
+                          if (progress != null && !isBackground)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                progress!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                          if (onInfoTap != null)
+                            Material(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(999),
+                              child: InkWell(
+                                onTap: onInfoTap,
+                                borderRadius: BorderRadius.circular(999),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                        ],
+                      ),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            if (candidate.explanationTags.isNotEmpty) ...<Widget>[
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: candidate.explanationTags
+                                    .take(3)
+                                    .map((tag) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(growable: false),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Text(
+                              movie.title,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 34,
+                                fontWeight: FontWeight.w900,
+                                height: 1.05,
+                                letterSpacing: -0.6,
+                              ),
+                            ),
+                            if (metadata.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 10),
+                              Text(
+                                metadata,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                            if (movie.overview.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Flexible(
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    movie.overview,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.82),
+                                      fontSize: 14,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            if (actions != null) actions!,
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(movie.subtitleLine),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: movie.genres
-                            .take(3)
-                            .map((genre) => GenreChip(label: genre))
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('$votedCount/$joinedCount friends voted'),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: candidate.explanationTags
-                  .map((tag) => Chip(label: Text(tag)))
-                  .toList(growable: false),
-            ),
-            if (kDebugMode) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                'Compatibility ${candidate.compatibilityScore.toStringAsFixed(1)}',
-                style: theme.textTheme.bodySmall,
               ),
             ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                OutlinedButton.icon(
-                  onPressed: onOpenDetails,
-                  icon: const Icon(Icons.info_outline_rounded),
-                  label: const Text('Details'),
-                ),
-                _VoteButton(
-                  label: 'Like',
-                  icon: Icons.thumb_up_alt_outlined,
-                  vote: MovieNightVoteValue.like,
-                  currentVote: currentVote,
-                  onVote: onVote,
-                ),
-                _VoteButton(
-                  label: 'Dislike',
-                  icon: Icons.thumb_down_alt_outlined,
-                  vote: MovieNightVoteValue.dislike,
-                  currentVote: currentVote,
-                  onVote: onVote,
-                ),
-                _VoteButton(
-                  label: 'Already Seen',
-                  icon: Icons.visibility_outlined,
-                  vote: MovieNightVoteValue.alreadySeen,
-                  currentVote: currentVote,
-                  onVote: onVote,
-                ),
-                _VoteButton(
-                  label: 'Maybe',
-                  icon: Icons.remove_circle_outline_rounded,
-                  vote: MovieNightVoteValue.neutral,
-                  currentVote: currentVote,
-                  onVote: onVote,
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _VoteButton extends StatelessWidget {
-  const _VoteButton({
-    required this.label,
+class _SwipeVoteBackground extends StatelessWidget {
+  const _SwipeVoteBackground({
+    required this.alignment,
     required this.icon,
-    required this.vote,
-    required this.currentVote,
-    required this.onVote,
+    required this.label,
+    required this.color,
   });
 
-  final String label;
+  final Alignment alignment;
   final IconData icon;
-  final MovieNightVoteValue vote;
-  final MovieNightVoteValue? currentVote;
-  final ValueChanged<MovieNightVoteValue> onVote;
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final selected = currentVote == vote;
-    return FilterChip(
-      selected: selected,
-      avatar: Icon(icon, size: 18),
-      label: Text(label),
-      onSelected: (_) => onVote(vote),
+    return Container(
+      color: color.withValues(alpha: 0.8),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      alignment: alignment,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, color: Colors.white, size: 48),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VotingCardActions extends StatelessWidget {
+  const _VotingCardActions({
+    required this.canUndo,
+    required this.onUndo,
+    required this.onDislike,
+    required this.onAlreadySeen,
+    required this.onLike,
+    required this.onNeutral,
+  });
+
+  final bool canUndo;
+  final VoidCallback onUndo;
+  final VoidCallback onDislike;
+  final VoidCallback onAlreadySeen;
+  final VoidCallback onLike;
+  final VoidCallback onNeutral;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmall = constraints.maxWidth < 340;
+        final baseSize = isSmall ? 46.0 : 52.0;
+        final mainSize = isSmall ? 54.0 : 64.0;
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            _VotingActionButton(
+              icon: Icons.undo_rounded,
+              semanticLabel: 'Undo',
+              size: baseSize,
+              enabled: canUndo,
+              onTap: onUndo,
+            ),
+            _VotingActionButton(
+              icon: Icons.close_rounded,
+              semanticLabel: 'Dislike',
+              size: mainSize,
+              onTap: onDislike,
+            ),
+            _VotingActionButton(
+              icon: Icons.remove_red_eye_outlined,
+              semanticLabel: 'Already seen',
+              size: baseSize,
+              onTap: onAlreadySeen,
+            ),
+            _VotingActionButton(
+              icon: Icons.favorite_rounded,
+              semanticLabel: 'Like',
+              size: mainSize,
+              onTap: onLike,
+            ),
+            _VotingActionButton(
+              icon: Icons.horizontal_rule_rounded,
+              semanticLabel: 'Maybe',
+              size: baseSize,
+              onTap: onNeutral,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _VotingActionButton extends StatelessWidget {
+  const _VotingActionButton({
+    required this.icon,
+    required this.semanticLabel,
+    required this.size,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String semanticLabel;
+  final double size;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Semantics(
+          button: true,
+          label: semanticLabel,
+          child: Material(
+            color: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 4,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: Icon(
+                  icon,
+                  color: Colors.black,
+                  size: size * 0.45,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

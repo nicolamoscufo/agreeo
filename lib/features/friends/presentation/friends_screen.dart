@@ -161,9 +161,20 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
             SectionHeader(
               title: 'Movie Nights',
               subtitle: 'Active and completed group decisions stay here.',
-              trailing: IconButton.filledTonal(
-                onPressed: _openCreateMovieNight,
-                icon: const Icon(Icons.add_rounded),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  IconButton.filledTonal(
+                    onPressed: _openJoinMovieNightDialog,
+                    icon: const Icon(Icons.link_rounded),
+                    tooltip: 'Join via Invite Link',
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: _openCreateMovieNight,
+                    icon: const Icon(Icons.add_rounded),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 14),
@@ -207,6 +218,76 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const MovieNightWizardScreen()),
     );
+  }
+
+  void _openJoinMovieNightDialog() {
+    final linkController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Join Movie Night'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                'Paste the invite link or event ID shared by a friend to join their Movie Night.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: linkController,
+                decoration: const InputDecoration(
+                  labelText: 'Invite link or ID',
+                  hintText: 'agreeo://invite/mn_...',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.link),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final raw = linkController.text.trim();
+                if (raw.isEmpty) return;
+                // Extract event ID from link format "agreeo://invite/<eventId>" or raw ID
+                String eventId = raw;
+                if (raw.contains('agreeo://invite/')) {
+                  eventId = raw.split('agreeo://invite/').last;
+                }
+                if (raw.contains('/invite/')) {
+                  eventId = raw.split('/invite/').last;
+                }
+                Navigator.of(dialogContext).pop();
+                _joinMovieNightById(eventId);
+              },
+              child: const Text('Join'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _joinMovieNightById(String eventId) async {
+    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
+    final event = await controller.resolveMovieNightInvite(eventId);
+    if (!mounted) return;
+    if (event != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Joined "${event.name}"!')),
+      );
+      _openEvent(event);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not join Movie Night. Check the link and try again.')),
+      );
+    }
   }
 
   void _openEvent(MovieNightEvent event) {

@@ -94,14 +94,13 @@ class _MovieNightWizardScreenState
       _WizardPageData(
         eyebrow: 'Step 3 of 3',
         title: 'Bring the crew',
-        subtitle: 'Invite friends now, or copy the link for later.',
+        subtitle: 'Invite friends now to your movie night.',
         icon: Icons.groups_rounded,
         accent: const Color(0xFFF97316),
         child: _InviteStep(
           friends: filteredFriends,
           selectedFriendIds: _selectedFriendIds,
           searchController: _friendSearchController,
-          previewLink: 'agreeo://invite/new-night',
           onSearchChanged: (value) => setState(() {
             _friendSearch = value.trim();
           }),
@@ -110,16 +109,6 @@ class _MovieNightWizardScreenState
               _selectedFriendIds.remove(friendId);
             }
           }),
-          onCopyLink: () async {
-            await Clipboard.setData(
-              const ClipboardData(text: 'agreeo://invite/new-night'),
-            );
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invite link copied.')),
-              );
-            }
-          },
         ),
       ),
     ];
@@ -731,19 +720,15 @@ class _InviteStep extends StatelessWidget {
     required this.friends,
     required this.selectedFriendIds,
     required this.searchController,
-    required this.previewLink,
     required this.onSearchChanged,
     required this.onToggleFriend,
-    required this.onCopyLink,
   });
 
   final List<Friend> friends;
   final Set<String> selectedFriendIds;
   final TextEditingController searchController;
-  final String previewLink;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onToggleFriend;
-  final VoidCallback onCopyLink;
 
   @override
   Widget build(BuildContext context) {
@@ -774,18 +759,6 @@ class _InviteStep extends StatelessWidget {
               ),
             ),
           ),
-        const SizedBox(height: 16),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.link_rounded),
-            title: const Text('Shareable invite link'),
-            subtitle: Text(previewLink),
-            trailing: IconButton(
-              onPressed: onCopyLink,
-              icon: const Icon(Icons.copy_rounded),
-            ),
-          ),
-        ),
       ],
     );
   }

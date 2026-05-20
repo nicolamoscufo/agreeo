@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto');
 const neo4jService = require('./neo4jService');
+const { tmdbGet } = require('./tmdbClient');
 
 function toNativeNumber(value) {
   if (value == null) return value;
@@ -333,28 +334,36 @@ async function acceptFriendRequest(uid, requestId) {
     SET r.status = 'accepted', r.updatedAt = datetime()
     MERGE (me)-[a:FRIEND]-(from)
     ON CREATE SET a.createdAt = datetime()
-    RETURN from.uid AS friendId
+    RETURN from.uid AS friendId, coalesce(me.displayName, me.email, 'Someone') AS accepterName, coalesce(from.displayName, from.email, 'Someone') AS senderName
     LIMIT 1
     `,
     { uid, requestId }
   );
 
-  return result.records.length > 0;
+  return result.records.length > 0 ? {
+    friendId: result.records[0].get('friendId'),
+    accepterName: result.records[0].get('accepterName'),
+    senderName: result.records[0].get('senderName')
+  } : null;
 }
 
 async function declineFriendRequest(uid, requestId) {
   const result = await neo4jService.run(
     `
-    MATCH (:AppUser {uid: $uid})<-[r:SENT_FRIEND_REQUEST {requestId: $requestId, status: 'pending'}]-(:AppUser)
+    MATCH (me:AppUser {uid: $uid})<-[r:SENT_FRIEND_REQUEST {requestId: $requestId, status: 'pending'}]-(from:AppUser)
     SET r.status = 'declined', r.updatedAt = datetime()
-    RETURN r.requestId AS requestId
+    RETURN from.uid AS friendId, coalesce(me.displayName, me.email, 'Someone') AS declinerName
     LIMIT 1
     `,
     { uid, requestId }
   );
 
-  return result.records.length > 0;
+  return result.records.length > 0 ? {
+    friendId: result.records[0].get('friendId'),
+    declinerName: result.records[0].get('declinerName')
+  } : null;
 }
+
 
 async function removeFriend(uid, friendId) {
   const result = await neo4jService.run(
@@ -507,8 +516,8 @@ async function createMovieNight(uid, data) {
     MERGE (host)-[hosts:HOSTS]->(event)
     ON CREATE SET hosts.createdAt = datetime()
     MERGE (host)-[part:PARTICIPATES_IN]->(event)
-    SET part.status = 'joined', part.isHost = true, part.updatedAt = datetime()
     ON CREATE SET part.createdAt = datetime()
+    SET part.status = 'joined', part.isHost = true, part.updatedAt = datetime()
     RETURN event.id AS eventId
     `,
     {
@@ -830,7 +839,125 @@ async function clearVotesOnly(eventId) {
   );
 }
 
+const TMDB_GENRE_IDS_BY_NAME = {
+  action: 28,
+  adventure: 12,
+  animation: 16,
+  comedy: 35,
+  crime: 80,
+  documentary: 99,
+  drama: 18,
+  family: 10751,
+  fantasy: 14,
+  history: 36,
+  horror: 27,
+  music: 10402,
+  mystery: 9648,
+  romance: 10749,
+  science_fiction: 878,
+  'science fiction': 878,
+  'sci-fi': 878,
+  tv_movie: 10770,
+  'tv movie': 10770,
+  thriller: 53,
+  war: 10752,
+  western: 37,
+};
+
+const TMDB_GENRE_NAMES_BY_ID = Object.fromEntries(
+  Object.entries(TMDB_GENRE_IDS_BY_NAME).map(([name, id]) => [id, name])
+);
+
+function mapGenreNameToId(name) {
+  if (!name) return null;
+  const clean = String(name).trim().toLowerCase();
+  return TMDB_GENRE_IDS_BY_NAME[clean] || null;
+}
+
 async function loadCandidateMovies(constraints, limit = 150) {
+  try {
+    const params = {
+      language: 'en-US',
+      include_adult: false,
+      page: 1,
+      'vote_count.gte': 100,
+    };
+
+    if (constraints.maxDurationMinutes && constraints.maxDurationMinutes > 0) {
+      params['with_runtime.lte'] = constraints.maxDurationMinutes;
+    }
+    if (constraints.minimumRating && constraints.minimumRating > 0) {
+      params['vote_average.gte'] = constraints.minimumRating;
+    }
+
+    const withGenres = (constraints.includedGenres || [])
+      .map(mapGenreNameToId)
+      .filter(Boolean)
+      .join(',');
+    if (withGenres) {
+      params['with_genres'] = withGenres;
+    }
+
+    const withoutGenres = (constraints.excludedGenres || [])
+      .map(mapGenreNameToId)
+      .filter(Boolean)
+      .join(',');
+    if (withoutGenres) {
+      params['without_genres'] = withoutGenres;
+    }
+
+    console.info('[loadCandidateMovies] Discovering TMDB movies with params:', params);
+    const tmdbResponse = await tmdbGet('/discover/movie', params);
+
+    if (tmdbResponse && Array.isArray(tmdbResponse.results)) {
+      for (const m of tmdbResponse.results) {
+        if (!m || !m.id) continue;
+
+        const genres = (m.genre_ids || [])
+          .map(id => TMDB_GENRE_NAMES_BY_ID[id])
+          .filter(Boolean)
+          .map(name => name.replace(/\b\w/g, char => char.toUpperCase()));
+
+        const releaseDate = m.release_date || '';
+        const posterUrl = m.poster_path ? `https://image.tmdb.org/t/p/w780${m.poster_path}` : '';
+        const backdropUrl = m.backdrop_path ? `https://image.tmdb.org/t/p/w780${m.backdrop_path}` : '';
+
+        // Merge movie node
+        await neo4jService.run(
+          `
+          MERGE (m:Movie {tmdbId: $tmdbId})
+          SET
+            m.title = $title,
+            m.originalTitle = $originalTitle,
+            m.overview = $overview,
+            m.posterPath = $posterPath,
+            m.backdropPath = $backdropPath,
+            m.posterUrl = $posterUrl,
+            m.backdropUrl = $backdropUrl,
+            m.releaseDate = $releaseDate,
+            m.voteAverage = $voteAverage,
+            m.genres = $genres
+          `,
+          {
+            tmdbId: m.id,
+            title: m.title || '',
+            originalTitle: m.original_title || m.title || '',
+            overview: m.overview || '',
+            posterPath: m.poster_path || null,
+            backdropPath: m.backdrop_path || null,
+            posterUrl,
+            backdropUrl,
+            releaseDate,
+            voteAverage: m.vote_average || 0.0,
+            genres,
+          }
+        );
+      }
+    }
+  } catch (error) {
+    console.error('[loadCandidateMovies] Error discovering/merging from TMDB API:', error);
+  }
+
   const safeLimit = toPositiveInteger(limit, 150, 500);
   const result = await neo4jService.run(
     `
@@ -1056,11 +1183,117 @@ async function submitVote(uid, eventId, movieId, voteValue) {
   return event;
 }
 
+async function deleteVote(uid, eventId, movieId) {
+  const tmdbId = Number.parseInt(String(movieId).replace('tmdb-', ''), 10);
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0) return null;
+  
+  await neo4jService.run(
+    `
+    MATCH (user:AppUser {uid: $uid})-[vote:VOTED_IN {eventId: $eventId}]->(movie:Movie {tmdbId: $tmdbId})
+    DELETE vote
+    `,
+    { uid, eventId, tmdbId }
+  );
+
+  await neo4jService.run(
+    `
+    MATCH (event:MovieNight {id: $eventId})
+    SET event.status = 'voting', event.winnerMovieId = null, event.updatedAt = datetime()
+    `,
+    { eventId }
+  );
+
+  return getMovieNight(uid, eventId);
+}
+
 async function getMovieNightResult(uid, eventId) {
   const event = await getMovieNight(uid, eventId);
   if (!event) return null;
   const winner = event.shortlist.find((candidate) => `tmdb-${candidate.movie.tmdbId}` === event.winnerMovieId) || null;
   return { event, result: { winner } };
+}
+
+async function createNotification(recipientId, type, title, message, entityId = null, extraData = {}) {
+  const id = randomId('notif');
+  const extraDataStr = JSON.stringify(extraData);
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $recipientId})
+    CREATE (n:InAppNotification {
+      id: $id,
+      type: $type,
+      title: $title,
+      message: $message,
+      entityId: $entityId,
+      extraData: $extraDataStr,
+      read: false,
+      createdAt: datetime()
+    })
+    CREATE (u)-[:HAS_NOTIFICATION]->(n)
+    RETURN n.id AS id
+    `,
+    { recipientId, id, type, title, message, entityId, extraDataStr }
+  );
+  return result.records.length > 0 ? id : null;
+}
+
+async function listNotifications(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[:HAS_NOTIFICATION]->(n:InAppNotification)
+    RETURN 
+      n.id AS id,
+      n.type AS type,
+      n.title AS title,
+      n.message AS message,
+      n.entityId AS entityId,
+      n.extraData AS extraData,
+      n.read AS read,
+      toString(n.createdAt) AS createdAt
+    ORDER BY n.createdAt DESC
+    `,
+    { uid }
+  );
+  return result.records.map(record => {
+    let extraData = {};
+    try {
+      extraData = JSON.parse(record.get('extraData') || '{}');
+    } catch (e) {}
+    return {
+      id: record.get('id'),
+      type: record.get('type'),
+      title: record.get('title'),
+      message: record.get('message'),
+      entityId: record.get('entityId'),
+      extraData,
+      read: record.get('read') === true,
+      createdAt: record.get('createdAt')
+    };
+  });
+}
+
+async function markNotificationAsRead(uid, notificationId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[:HAS_NOTIFICATION]->(n:InAppNotification {id: $notificationId})
+    SET n.read = true
+    RETURN n.id AS id
+    `,
+    { uid, notificationId }
+  );
+  return result.records.length > 0;
+}
+
+async function getUserDisplayName(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})
+    RETURN coalesce(u.displayName, u.email, 'Someone') AS displayName
+    LIMIT 1
+    `,
+    { uid }
+  );
+  return result.records.length > 0 ? result.records[0].get('displayName') : 'Someone';
 }
 
 module.exports = {
@@ -1082,8 +1315,15 @@ module.exports = {
   createInviteLink,
   generateShortlist,
   submitVote,
+  deleteVote,
   getMovieNightResult,
   buildShortlist,
   hasEveryoneVoted,
   selectWinner,
+  createNotification,
+  listNotifications,
+  markNotificationAsRead,
+  getUserDisplayName,
 };
+
+

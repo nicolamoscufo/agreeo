@@ -102,6 +102,10 @@ class FriendsMovieNightController
     Future<void>.microtask(_hydrateSocialLayer);
   }
 
+  Future<void> refreshSocialLayer() async {
+    await _hydrateSocialLayer();
+  }
+
   final Ref _ref;
   final ShortlistService _shortlistService;
   final BackendSocialService _backendSocialService;
@@ -742,6 +746,56 @@ class FriendsMovieNightController
       );
     }
 
+    _replaceEvent(updated);
+    return updated;
+  }
+
+  Future<MovieNightEvent?> createInviteLink(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.createInviteLink(eventId);
+        _upsertEvent(event);
+        return event;
+      } catch (error) {
+        debugPrint('Error creating invite link on backend: $error');
+        return null;
+      }
+    }
+    final event = state.eventById(eventId);
+    if (event == null) return null;
+    final updated = event.copyWith(inviteLink: 'agreeo://invite/$eventId');
+    _replaceEvent(updated);
+    return updated;
+  }
+
+  Future<MovieNightEvent?> deleteVote({
+    required String eventId,
+    required String movieId,
+  }) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.deleteVote(
+          eventId: eventId,
+          movieId: movieId,
+        );
+        _upsertEvent(event);
+        return event;
+      } catch (error) {
+        debugPrint('Error deleting backend Movie Night vote: $error');
+        return null;
+      }
+    }
+    final event = state.eventById(eventId);
+    if (event == null) return null;
+    final appState = _ref.read(agreeoAppControllerProvider);
+    final currentUserId = appState.session?.id ?? 'local-host';
+    final nextVotes = event.votes.where(
+      (entry) => !(entry.userId == currentUserId && entry.movieId == movieId),
+    ).toList();
+    final updated = event.copyWith(
+      votes: nextVotes,
+      updatedAt: DateTime.now(),
+    );
     _replaceEvent(updated);
     return updated;
   }

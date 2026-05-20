@@ -2,13 +2,16 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
 const authController = require('./authController');
 const movieController = require('./movieController');
 const socialController = require('./socialController');
 const neo4jService = require('./neo4jService');
+const socketService = require('./socketService');
 const { verifyMiddleware, verifyRefresh, sign, signRefresh } = require('./jwtUtils');
 
 const app = express();
+const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
 app.use(cors());
@@ -149,7 +152,12 @@ app.post('/movie-nights/:id/join', verifyMiddleware, socialController.joinMovieN
 app.post('/movie-nights/:id/invite-link', verifyMiddleware, socialController.createInviteLink);
 app.post('/movie-nights/:id/shortlist', verifyMiddleware, socialController.generateShortlist);
 app.post('/movie-nights/:id/votes', verifyMiddleware, socialController.submitVote);
+app.delete('/movie-nights/:id/votes/:movieId', verifyMiddleware, socialController.deleteVote);
 app.get('/movie-nights/:id/result', verifyMiddleware, socialController.movieNightResult);
+
+// Notification endpoints
+app.get('/notifications', verifyMiddleware, socialController.listNotifications);
+app.post('/notifications/:id/read', verifyMiddleware, socialController.markNotificationAsRead);
 
 app.get('/health/db', async (_, res) => {
   try {
@@ -170,9 +178,12 @@ app.get('/health/db', async (_, res) => {
 async function start() {
   try {
     await neo4jService.initialize();
+    
+    // Initialize Socket.io
+    socketService.init(server);
 
-    app.listen(port, () => {
-      console.log(`Auth server listening on port ${port}`);
+    server.listen(port, () => {
+      console.log(`Auth server with Socket.io listening on port ${port}`);
     });
   } catch (error) {
     console.error('Failed to start auth server:', error);
@@ -182,4 +193,5 @@ async function start() {
 
 start();
 
-module.exports = app;
+module.exports = server;
+

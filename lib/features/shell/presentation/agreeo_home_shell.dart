@@ -15,6 +15,8 @@ import 'package:agreeo/shared/state/movie_night_invite_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agreeo/shared/state/nav_index_provider.dart';
+import 'package:agreeo/features/shell/presentation/notifications_page.dart';
+import 'package:agreeo/providers/notifications_provider.dart';
 
 class AgreeoHomeShell extends ConsumerStatefulWidget {
   const AgreeoHomeShell({super.key, this.initialIndex = 0});
@@ -106,13 +108,94 @@ class _AgreeoHomeShellState extends ConsumerState<AgreeoHomeShell> {
     ];
 
     final currentIndex = ref.watch(navIndexProvider);
+    final showAppBar = currentIndex != 2;
 
     return Scaffold(
       extendBody: true,
+      appBar: showAppBar
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: Text(
+                'Agreeo',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 24,
+                  letterSpacing: -0.5,
+                  foreground: Paint()
+                    ..shader = const LinearGradient(
+                      colors: <Color>[
+                        Color(0xFF38BDF8),
+                        Color(0xFF818CF8),
+                      ],
+                    ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
+                ),
+              ),
+              centerTitle: false,
+              actions: const [
+                _NotificationBadgeButton(),
+              ],
+            )
+          : null,
       body: IndexedStack(index: currentIndex, children: screens),
       bottomNavigationBar: AgreeoBottomNavigation(
         selectedIndex: currentIndex,
         onSelected: _selectTab,
+      ),
+    );
+  }
+}
+
+class _NotificationBadgeButton extends ConsumerWidget {
+  const _NotificationBadgeButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(notificationsProvider);
+    final count = state.unreadCount;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, size: 28),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationsPage(),
+                ),
+              );
+            },
+          ),
+          if (count > 0)
+            Positioned(
+              right: 6,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 18,
+                  minHeight: 18,
+                ),
+                child: Text(
+                  count > 9 ? '9+' : '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

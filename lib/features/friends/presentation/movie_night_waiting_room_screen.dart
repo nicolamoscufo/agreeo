@@ -94,8 +94,6 @@ class _MovieNightWaitingRoomScreenState
             const SizedBox(height: 18),
             _SummaryCard(event: event),
             const SizedBox(height: 18),
-            _InviteLinkCard(inviteLink: event.inviteLink),
-            const SizedBox(height: 18),
             _ParticipantsCard(participants: event.participants),
             if (canJoin) ...<Widget>[
               const SizedBox(height: 12),
@@ -135,13 +133,34 @@ class _MovieNightWaitingRoomScreenState
               const SectionHeader(
                 title: 'Host controls',
                 subtitle:
-                    'Adjust constraints, refresh the shortlist, or start voting.',
+                    'Adjust constraints, share invite link, refresh the shortlist, or start voting.',
               ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: <Widget>[
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final updatedEvent = await controller.createInviteLink(event.id);
+                      if (!context.mounted) return;
+                      final link = updatedEvent?.inviteLink;
+                      if (link != null && link.isNotEmpty) {
+                        await Clipboard.setData(ClipboardData(text: link));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invite link copied to clipboard!')),
+                          );
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not create invite link.')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.share_rounded),
+                    label: const Text('Share invite link'),
+                  ),
                   FilledButton.tonalIcon(
                     onPressed: () async {
                       final updatedConstraints =
@@ -177,16 +196,29 @@ class _MovieNightWaitingRoomScreenState
                       final updated = await controller.refreshShortlist(
                         event.id,
                       );
-                      if (updated == null && context.mounted) {
+                      if (!context.mounted) return;
+                      if (updated == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Could not refresh shortlist.'),
                           ),
                         );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Shortlist updated: ${updated.shortlist.length} movies.',
+                            ),
+                          ),
+                        );
                       }
                     },
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Generate/refresh shortlist'),
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: Text(
+                      event.shortlist.isEmpty
+                          ? 'Generate shortlist'
+                          : 'Regenerate shortlist (${event.shortlist.length})',
+                    ),
                   ),
                   FilledButton.icon(
                     onPressed: event.shortlist.isEmpty
@@ -223,6 +255,27 @@ class _MovieNightWaitingRoomScreenState
                 title: 'Waiting for host',
                 subtitle: 'Only the host can edit constraints or start voting.',
               ),
+              if (event.inviteLink.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.link_rounded),
+                    title: const Text('Invite link'),
+                    subtitle: Text(event.inviteLink, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.copy_rounded),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: event.inviteLink));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invite link copied!')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: 24),
             const SectionHeader(
@@ -236,27 +289,19 @@ class _MovieNightWaitingRoomScreenState
                 icon: Icons.movie_filter_outlined,
                 title: 'No movies matched this group',
                 message:
-                    'Try removing some excluded genres or increasing the maximum duration.',
+                    'Tap "Generate shortlist" above to discover movies from TMDB, or try adjusting constraints.',
                 action: isHost
                     ? FilledButton.tonal(
                         onPressed: () async {
-                          final updated =
-                              await showModalBottomSheet<MovieNightConstraints>(
-                                context: context,
-                                isScrollControlled: true,
-                                showDragHandle: true,
-                                builder: (_) => _EditConstraintsSheet(
-                                  initialConstraints: event.constraints,
-                                ),
-                              );
-                          if (updated != null) {
-                            await controller.updateEventConstraints(
-                              eventId: event.id,
-                              constraints: updated,
+                          final updated = await controller.refreshShortlist(event.id);
+                          if (!context.mounted) return;
+                          if (updated == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Could not generate shortlist.')),
                             );
                           }
                         },
-                        child: const Text('Edit constraints'),
+                        child: const Text('Generate shortlist now'),
                       )
                     : null,
               )
@@ -344,33 +389,6 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _InviteLinkCard extends StatelessWidget {
-  const _InviteLinkCard({required this.inviteLink});
-
-  final String inviteLink;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.link_rounded),
-        title: const Text('Invite link'),
-        subtitle: Text(inviteLink),
-        trailing: IconButton(
-          icon: const Icon(Icons.copy_rounded),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: inviteLink));
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Invite link copied.')),
-              );
-            }
-          },
-        ),
-      ),
-    );
-  }
-}
 
 class _ParticipantsCard extends StatelessWidget {
   const _ParticipantsCard({required this.participants});
