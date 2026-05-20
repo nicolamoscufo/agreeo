@@ -9,7 +9,7 @@ class ShortlistService {
     required List<MovieNightParticipant> participants,
     required List<Movie> movies,
     required Map<String, Map<String, UserMovieState>> userMovieStates,
-    int limit = 5,
+    int limit = 10,
   }) {
     if (eventConstraints.hasGenreConflict) {
       return const <ShortlistCandidate>[];

@@ -1,4 +1,3 @@
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/services/shortlist_service.dart';
@@ -19,6 +18,7 @@ class FriendsMovieNightState {
     required this.profiles,
     required this.friendMovieStates,
     required this.movieNights,
+    required this.inflightEventIds,
   });
 
   factory FriendsMovieNightState.initial() {
@@ -32,6 +32,7 @@ class FriendsMovieNightState {
       profiles: <String, FriendProfile>{},
       friendMovieStates: <String, Map<String, UserMovieState>>{},
       movieNights: <MovieNightEvent>[],
+      inflightEventIds: <String>{},
     );
   }
 
@@ -44,6 +45,7 @@ class FriendsMovieNightState {
   final Map<String, FriendProfile> profiles;
   final Map<String, Map<String, UserMovieState>> friendMovieStates;
   final List<MovieNightEvent> movieNights;
+  final Set<String> inflightEventIds;
 
   bool isFriend(String userId) {
     return friends.any((friend) => friend.id == userId);
@@ -76,6 +78,7 @@ class FriendsMovieNightState {
     Map<String, FriendProfile>? profiles,
     Map<String, Map<String, UserMovieState>>? friendMovieStates,
     List<MovieNightEvent>? movieNights,
+    Set<String>? inflightEventIds,
   }) {
     return FriendsMovieNightState(
       friends: friends ?? this.friends,
@@ -88,6 +91,7 @@ class FriendsMovieNightState {
       profiles: profiles ?? this.profiles,
       friendMovieStates: friendMovieStates ?? this.friendMovieStates,
       movieNights: movieNights ?? this.movieNights,
+      inflightEventIds: inflightEventIds ?? this.inflightEventIds,
     );
   }
 }
@@ -102,6 +106,17 @@ class FriendsMovieNightController
     Future<void>.microtask(_hydrateSocialLayer);
   }
 
+  void _markEventInFlight(String eventId) {
+    state = state.copyWith(
+      inflightEventIds: {...state.inflightEventIds, eventId},
+    );
+  }
+
+  void _clearEventInFlight(String eventId) {
+    final copy = Set<String>.from(state.inflightEventIds)..remove(eventId);
+    state = state.copyWith(inflightEventIds: copy);
+  }
+
   Future<void> refreshSocialLayer() async {
     await _hydrateSocialLayer();
   }
@@ -114,7 +129,6 @@ class FriendsMovieNightController
   String _latestSearchKey = '';
 
   Future<void> _hydrateSocialLayer() async {
-    _seedLocalSocialLayer();
     try {
       final snapshot = await _backendSocialService.loadSnapshot();
       final search = await _backendSocialService.searchFriends('');
@@ -183,18 +197,7 @@ class FriendsMovieNightController
         );
       }
       return;
-    }
-
-    final catalog = _catalogMovies();
-    final profiles = Map<String, FriendProfile>.from(state.profiles);
-    final movieStates = Map<String, Map<String, UserMovieState>>.from(
-      state.friendMovieStates,
-    );
-    profiles[request.fromUser.id] = _buildProfile(request.fromUser, catalog, 7);
-    movieStates[request.fromUser.id] = _buildMovieStates(
-      request.fromUser.id,
-      catalog,
-    );
+    } // Mock profiles removed
 
     state = state.copyWith(
       friends: state.isFriend(request.fromUser.id)
@@ -208,8 +211,6 @@ class FriendsMovieNightController
         requestId: requestId,
         userId: request.fromUser.id,
       ),
-      profiles: profiles,
-      friendMovieStates: movieStates,
     );
     if (_usingBackend) {
       Future<void>.microtask(
@@ -457,10 +458,7 @@ class FriendsMovieNightController
       );
     }
 
-    final shortlist = _generateShortlist(
-      participants: participants,
-      constraints: constraints,
-    );
+    final shortlist = const <ShortlistCandidate>[];
     final event = MovieNightEvent(
       id: eventId,
       name: name.trim().isEmpty ? 'Movie Night' : name.trim(),
@@ -504,10 +502,7 @@ class FriendsMovieNightController
     if (event == null) {
       return null;
     }
-    final shortlist = _generateShortlist(
-      participants: event.participants,
-      constraints: constraints,
-    );
+    final shortlist = const <ShortlistCandidate>[];
     final updated = event.copyWith(
       constraints: constraints,
       shortlist: shortlist,
@@ -536,10 +531,7 @@ class FriendsMovieNightController
       return null;
     }
     final updated = event.copyWith(
-      shortlist: _generateShortlist(
-        participants: event.participants,
-        constraints: event.constraints,
-      ),
+      shortlist: const <ShortlistCandidate>[],
       votes: const <MovieNightVote>[],
       clearWinnerMovieId: true,
       updatedAt: DateTime.now(),
@@ -628,10 +620,7 @@ class FriendsMovieNightController
 
     final updated = event.copyWith(
       participants: participants,
-      shortlist: _generateShortlist(
-        participants: participants,
-        constraints: event.constraints,
-      ),
+      shortlist: const <ShortlistCandidate>[],
       votes: const <MovieNightVote>[],
       status: MovieNightStatus.waiting,
       clearWinnerMovieId: true,
@@ -642,29 +631,105 @@ class FriendsMovieNightController
   }
 
   Future<MovieNightEvent?> startVoting(String eventId) async {
-    if (_usingBackend) {
-      try {
-        final event = await _backendSocialService.updateMovieNight(
-          eventId: eventId,
-          status: MovieNightStatus.voting,
-        );
-        _upsertEvent(event);
+    // Idempotency guard: avoid duplicate transitions for the same event
+    if (state.inflightEventIds.contains(eventId)) {
+      return null;
+    }
+    _markEventInFlight(eventId);
+    try {
+      final event = state.eventById(eventId);
+      if (event == null) return null;
+
+      // Only allow transition if current status is waiting
+      if (event.status != MovieNightStatus.waiting) {
         return event;
-      } catch (error) {
-        debugPrint('Error starting backend Movie Night voting: $error');
-        return null;
       }
+
+      if (_usingBackend) {
+        try {
+          final updatedEvent = await _backendSocialService.updateMovieNight(
+            eventId: eventId,
+            status: MovieNightStatus.voting,
+          );
+          _upsertEvent(updatedEvent);
+          return updatedEvent;
+        } catch (error) {
+          debugPrint('Error starting backend Movie Night voting: $error');
+          return null;
+        }
+      }
+
+      // Local fallback: generate mock shortlist if empty
+      var shortlist = event.shortlist;
+      if (shortlist.isEmpty) {
+        const mockBreakdown = ScoreBreakdown(
+          watchlistSaves: 1,
+          likes: 2,
+          dislikes: 0,
+          watched: 0,
+          positiveRatings: 1,
+          includedGenreMatches: 2,
+          groupBonus: 0.05,
+          groupPenalty: 0.0,
+          total: 0.95,
+        );
+        shortlist = [
+          ShortlistCandidate(
+            movie: Movie(
+              id: '550',
+              tmdbId: 550,
+              title: 'Fight Club',
+              originalTitle: 'Fight Club',
+              overview: 'An insomniac office worker and a soapmaker form an underground fight club.',
+              posterUrl: 'https://image.tmdb.org/t/p/w500/pB8BM7pv12mEaaA8v17fSSJbxr9.jpg',
+              backdropUrl: '',
+              releaseYear: 1999,
+              runtime: 139,
+              genres: const ['Drama', 'Thriller'],
+              director: 'David Fincher',
+              cast: const ['Brad Pitt', 'Edward Norton'],
+              rating: 8.4,
+              mediaType: CatalogMediaType.movie,
+              trailerUrl: '',
+            ),
+            compatibilityScore: 0.95,
+            explanationTags: const ['Highly compatible'],
+            scoreBreakdown: mockBreakdown,
+          ),
+          ShortlistCandidate(
+            movie: Movie(
+              id: '27205',
+              tmdbId: 27205,
+              title: 'Inception',
+              originalTitle: 'Inception',
+              overview: 'A thief who steals corporate secrets through the use of dream-sharing technology.',
+              posterUrl: 'https://image.tmdb.org/t/p/w500/oYu2QhxWgVnsD2yc76eia2tIYpq.jpg',
+              backdropUrl: '',
+              releaseYear: 2010,
+              runtime: 148,
+              genres: const ['Action', 'Sci-Fi'],
+              director: 'Christopher Nolan',
+              cast: const ['Leonardo DiCaprio'],
+              rating: 8.3,
+              mediaType: CatalogMediaType.movie,
+              trailerUrl: '',
+            ),
+            compatibilityScore: 0.88,
+            explanationTags: const ['Highly compatible'],
+            scoreBreakdown: mockBreakdown,
+          ),
+        ];
+      }
+      final updated = event.copyWith(
+        status: MovieNightStatus.voting,
+        shortlist: shortlist,
+        updatedAt: DateTime.now(),
+      );
+      _replaceEvent(updated);
+      return updated;
+    } finally {
+      _clearEventInFlight(eventId);
     }
-    final event = state.eventById(eventId);
-    if (event == null || event.shortlist.isEmpty) {
-      return event;
-    }
-    final updated = event.copyWith(
-      status: MovieNightStatus.voting,
-      updatedAt: DateTime.now(),
-    );
-    _replaceEvent(updated);
-    return updated;
   }
 
   Future<MovieNightEvent?> submitVote({
@@ -706,28 +771,6 @@ class FriendsMovieNightController
       ),
     ];
 
-    for (final participant in event.joinedParticipants) {
-      if (participant.userId == currentUserId) {
-        continue;
-      }
-      final alreadyVoted = nextVotes.any(
-        (entry) =>
-            entry.userId == participant.userId && entry.movieId == movieId,
-      );
-      if (alreadyVoted) {
-        continue;
-      }
-      nextVotes.add(
-        MovieNightVote(
-          eventId: eventId,
-          userId: participant.userId,
-          movieId: movieId,
-          vote: _voteFromParticipantPreference(participant.userId, movieId),
-          createdAt: now,
-        ),
-      );
-    }
-
     var updated = event.copyWith(
       status: MovieNightStatus.voting,
       votes: nextVotes,
@@ -768,6 +811,60 @@ class FriendsMovieNightController
     return updated;
   }
 
+  Future<MovieNightEvent?> inviteFriends({
+    required String eventId,
+    required List<String> friendIds,
+  }) async {
+    if (state.inflightEventIds.contains(eventId)) {
+      return null;
+    }
+    _markEventInFlight(eventId);
+    try {
+      if (_usingBackend) {
+        final event = await _backendSocialService.inviteFriends(
+          eventId: eventId,
+          friendIds: friendIds,
+        );
+        _upsertEvent(event);
+        return event;
+      }
+
+      // Local mock fallback:
+      final event = state.eventById(eventId);
+      if (event == null) return null;
+
+      final updatedParticipants = List<MovieNightParticipant>.from(event.participants);
+      for (final friendId in friendIds) {
+        if (!updatedParticipants.any((p) => p.userId == friendId)) {
+          final friendIndex = state.friends.indexWhere((f) => f.id == friendId);
+          if (friendIndex != -1) {
+            final friend = state.friends[friendIndex];
+            updatedParticipants.add(
+              MovieNightParticipant(
+                userId: friendId,
+                name: friend.name,
+                avatarUrl: friend.avatarUrl,
+                status: MovieNightParticipantStatus.pending,
+                isHost: false,
+              ),
+            );
+          }
+        }
+      }
+      final updated = event.copyWith(
+        participants: updatedParticipants,
+        updatedAt: DateTime.now(),
+      );
+      _replaceEvent(updated);
+      return updated;
+    } catch (error) {
+      debugPrint('Error inviting friends: $error');
+      return null;
+    } finally {
+      _clearEventInFlight(eventId);
+    }
+  }
+
   Future<MovieNightEvent?> deleteVote({
     required String eventId,
     required String movieId,
@@ -789,13 +886,13 @@ class FriendsMovieNightController
     if (event == null) return null;
     final appState = _ref.read(agreeoAppControllerProvider);
     final currentUserId = appState.session?.id ?? 'local-host';
-    final nextVotes = event.votes.where(
-      (entry) => !(entry.userId == currentUserId && entry.movieId == movieId),
-    ).toList();
-    final updated = event.copyWith(
-      votes: nextVotes,
-      updatedAt: DateTime.now(),
-    );
+    final nextVotes = event.votes
+        .where(
+          (entry) =>
+              !(entry.userId == currentUserId && entry.movieId == movieId),
+        )
+        .toList();
+    final updated = event.copyWith(votes: nextVotes, updatedAt: DateTime.now());
     _replaceEvent(updated);
     return updated;
   }
@@ -815,139 +912,6 @@ class FriendsMovieNightController
     );
   }
 
-  void _seedLocalSocialLayer() {
-    final catalog = _catalogMovies();
-    final friends = <Friend>[
-      Friend(
-        id: 'friend-carla',
-        name: 'Carla Rossi',
-        avatarUrl: '',
-        watchedCount: 38,
-        reviewsCount: 12,
-        privacySettings: PrivacySettings.open(),
-      ),
-      const Friend(
-        id: 'friend-marco',
-        name: 'Marco Bianchi',
-        avatarUrl: '',
-        watchedCount: 21,
-        reviewsCount: 7,
-        privacySettings: PrivacySettings(
-          canShowWatched: true,
-          canShowReviews: true,
-          canShowWatchlist: false,
-        ),
-      ),
-      Friend(
-        id: 'friend-lina',
-        name: 'Lina Costa',
-        avatarUrl: '',
-        watchedCount: 44,
-        reviewsCount: 19,
-        privacySettings: PrivacySettings.open(),
-      ),
-    ];
-    final discoverable = <Friend>[
-      const Friend(
-        id: 'friend-giulia',
-        name: 'Giulia Moretti',
-        avatarUrl: '',
-        watchedCount: 16,
-        reviewsCount: 4,
-        privacySettings: PrivacySettings(
-          canShowWatched: true,
-          canShowReviews: false,
-          canShowWatchlist: false,
-        ),
-      ),
-      Friend(
-        id: 'friend-leo',
-        name: 'Leo Martin',
-        avatarUrl: '',
-        watchedCount: 29,
-        reviewsCount: 9,
-        privacySettings: PrivacySettings.open(),
-      ),
-      const Friend(
-        id: 'friend-nina',
-        name: 'Nina Ahmed',
-        avatarUrl: '',
-        watchedCount: 11,
-        reviewsCount: 2,
-        privacySettings: PrivacySettings(
-          canShowWatched: false,
-          canShowReviews: true,
-          canShowWatchlist: false,
-        ),
-      ),
-    ];
-    const requester = Friend(
-      id: 'friend-omar',
-      name: 'Omar Silva',
-      avatarUrl: '',
-      watchedCount: 18,
-      reviewsCount: 5,
-      privacySettings: PrivacySettings(
-        canShowWatched: true,
-        canShowReviews: true,
-        canShowWatchlist: false,
-      ),
-    );
-
-    final profiles = <String, FriendProfile>{};
-    final movieStates = <String, Map<String, UserMovieState>>{};
-    for (var index = 0; index < friends.length; index++) {
-      final friend = friends[index];
-      profiles[friend.id] = _buildProfile(friend, catalog, index);
-      movieStates[friend.id] = _buildMovieStates(friend.id, catalog);
-    }
-    profiles[requester.id] = _buildProfile(requester, catalog, 5);
-    movieStates[requester.id] = _buildMovieStates(requester.id, catalog);
-
-    final incomingRequests = <FriendRequest>[
-      FriendRequest(
-        id: 'request-omar',
-        fromUser: requester,
-        toUserId:
-            _ref.read(agreeoAppControllerProvider).session?.id ?? 'local-host',
-        status: FriendRequestStatus.pending,
-        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-    ];
-
-    state = state.copyWith(
-      friends: friends,
-      incomingRequests: incomingRequests,
-      incomingRequestIdsByUserId: _incomingRequestIds(incomingRequests),
-      discoverableUsers: discoverable,
-      searchResults: discoverable,
-      profiles: profiles,
-      friendMovieStates: movieStates,
-    );
-  }
-
-  List<ShortlistCandidate> _generateShortlist({
-    required List<MovieNightParticipant> participants,
-    required MovieNightConstraints constraints,
-  }) {
-    return _shortlistService.generateShortlist(
-      eventConstraints: constraints,
-      participants: participants,
-      movies: _catalogMovies(),
-      userMovieStates: _allUserMovieStates(),
-      limit: 5,
-    );
-  }
-
-  Map<String, Map<String, UserMovieState>> _allUserMovieStates() {
-    final appState = _ref.read(agreeoAppControllerProvider);
-    final currentUserId = appState.session?.id ?? 'local-host';
-    return <String, Map<String, UserMovieState>>{
-      ...state.friendMovieStates,
-      currentUserId: appState.movieStates,
-    };
-  }
-
   void _applySocialSnapshot(SocialBackendSnapshot snapshot) {
     state = state.copyWith(
       friends: snapshot.friends,
@@ -959,11 +923,7 @@ class FriendsMovieNightController
   }
 
   FriendsMovieNightState _stateWithoutUser(String userId) {
-    final profiles = Map<String, FriendProfile>.from(state.profiles)
-      ..remove(userId);
-    final movieStates = Map<String, Map<String, UserMovieState>>.from(
-      state.friendMovieStates,
-    )..remove(userId);
+    // Profiles and movie states are managed by backend; no local mutation needed here.
     final incomingRequestIds = Map<String, String>.from(
       state.incomingRequestIdsByUserId,
     )..remove(userId);
@@ -983,8 +943,6 @@ class FriendsMovieNightController
           .toList(growable: false),
       outgoingPendingIds: <String>{...state.outgoingPendingIds}..remove(userId),
       incomingRequestIdsByUserId: incomingRequestIds,
-      profiles: profiles,
-      friendMovieStates: movieStates,
     );
   }
 
@@ -1006,123 +964,6 @@ class FriendsMovieNightController
     };
   }
 
-  MovieNightVoteValue _voteFromParticipantPreference(
-    String userId,
-    String movieId,
-  ) {
-    final movieState =
-        _allUserMovieStates()[userId]?[movieId] ??
-        UserMovieState.initial(movieId);
-    if (movieState.preference == MoviePreference.disliked) {
-      return MovieNightVoteValue.dislike;
-    }
-    if (movieState.preference == MoviePreference.liked ||
-        movieState.inWatchlist ||
-        (movieState.rating ?? 0) >= 4) {
-      return MovieNightVoteValue.like;
-    }
-    if (movieState.watched) {
-      return MovieNightVoteValue.alreadySeen;
-    }
-    return MovieNightVoteValue.neutral;
-  }
-
-  List<Movie> _catalogMovies() {
-    final currentCatalog = _ref
-        .read(agreeoAppControllerProvider)
-        .catalog
-        .where((movie) => movie.mediaType == CatalogMediaType.movie)
-        .toList(growable: false);
-    final moviesById = <String, Movie>{
-      for (final movie in mockMovieCatalog.where(
-        (movie) => movie.mediaType == CatalogMediaType.movie,
-      ))
-        movie.id: movie,
-      for (final movie in currentCatalog) movie.id: movie,
-    };
-    return moviesById.values.toList(growable: false);
-  }
-
-  FriendProfile _buildProfile(Friend friend, List<Movie> catalog, int offset) {
-    final states = _buildMovieStates(friend.id, catalog);
-    final watched = catalog
-        .where((movie) => states[movie.id]?.watched == true)
-        .take(6)
-        .toList(growable: false);
-    final watchlist = catalog
-        .where((movie) => states[movie.id]?.inWatchlist == true)
-        .take(6)
-        .toList(growable: false);
-    final fallbackWatched = watched.isEmpty
-        ? catalog.skip(offset).take(4).toList(growable: false)
-        : watched;
-    final reviews = fallbackWatched
-        .take(3)
-        .map((movie) {
-          final rating = states[movie.id]?.rating ?? 4;
-          return FriendMovieReview(
-            movie: movie,
-            rating: rating,
-            reviewPreview:
-                '${movie.title} kept the whole room talking after credits.',
-            date: DateTime.now().subtract(Duration(days: 8 + offset)),
-          );
-        })
-        .toList(growable: false);
-
-    return FriendProfile(
-      friend: friend.copyWith(
-        watchedCount: friend.watchedCount,
-        reviewsCount: reviews.length + friend.reviewsCount,
-      ),
-      watchedMovies: fallbackWatched,
-      reviews: reviews,
-      watchlist: watchlist.isEmpty
-          ? catalog.reversed.take(4).toList(growable: false)
-          : watchlist,
-    );
-  }
-
-  Map<String, UserMovieState> _buildMovieStates(
-    String userId,
-    List<Movie> catalog,
-  ) {
-    final seed = _stableSeed(userId);
-    final states = <String, UserMovieState>{};
-    for (var index = 0; index < catalog.length; index++) {
-      final movie = catalog[index];
-      final signal = seed + index * 17;
-      final disliked = signal % 11 == 0;
-      final liked = !disliked && signal % 4 == 0;
-      final inWatchlist = !disliked && signal % 5 == 0;
-      final watched = signal % 6 == 0;
-      final rating = watched || liked ? 3 + (signal % 3) : null;
-      states[movie.id] = UserMovieState.initial(movie.id).copyWith(
-        preference: disliked
-            ? MoviePreference.disliked
-            : liked
-            ? MoviePreference.liked
-            : MoviePreference.neutral,
-        inWatchlist: inWatchlist,
-        watched: watched,
-        rating: rating,
-        review: watched && signal % 2 == 0
-            ? 'Strong group-night candidate with a memorable final act.'
-            : null,
-        updatedAt: DateTime.now().subtract(Duration(days: index + 1)),
-      );
-    }
-    return states;
-  }
-
-  int _stableSeed(String value) {
-    var seed = 0;
-    for (final unit in value.codeUnits) {
-      seed = (seed * 31 + unit) % 100000;
-    }
-    return seed;
-  }
-
   void _replaceEvent(MovieNightEvent event) {
     state = state.copyWith(
       movieNights: state.movieNights
@@ -1140,6 +981,17 @@ class FriendsMovieNightController
                 .toList(growable: false)
           : <MovieNightEvent>[event, ...state.movieNights],
     );
+  }
+
+  void handleSocketMovieNightUpdated(MovieNightEvent event) {
+    if (state.inflightEventIds.contains(event.id)) {
+      return;
+    }
+    final local = state.eventById(event.id);
+    if (local != null && local.updatedAt.isAfter(event.updatedAt)) {
+      return;
+    }
+    _upsertEvent(event);
   }
 }
 

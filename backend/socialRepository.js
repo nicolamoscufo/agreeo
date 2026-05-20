@@ -114,8 +114,12 @@ function normalizeMovie(raw) {
     overview: movie.overview || '',
     posterPath: movie.posterPath || null,
     backdropPath: movie.backdropPath || null,
-    posterUrl: movie.posterUrl || '',
-    backdropUrl: movie.backdropUrl || '',
+    posterUrl: (movie.posterPath && (!movie.posterUrl || !movie.posterUrl.startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w780${movie.posterPath}`
+      : (movie.posterUrl || ''),
+    backdropUrl: (movie.backdropPath && (!movie.backdropUrl || !movie.backdropUrl.startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w1280${movie.backdropPath}`
+      : (movie.backdropUrl || ''),
     releaseDate: movie.releaseDate || '',
     runtime: movie.runtime == null ? 0 : toNativeNumber(movie.runtime),
     voteAverage: movie.voteAverage == null ? null : Number(movie.voteAverage),
@@ -797,7 +801,7 @@ async function generateShortlist(uid, eventId) {
     joinedParticipants.map((participant) => participant.userId),
     movies.map((movie) => movie.tmdbId).filter((tmdbId) => Number.isInteger(tmdbId))
   );
-  const shortlist = buildShortlist({ constraints, participants: joinedParticipants, movies, states, limit: 5 });
+  const shortlist = buildShortlist({ constraints, participants: joinedParticipants, movies, states, limit: 10 });
 
   await neo4jService.run(
     `

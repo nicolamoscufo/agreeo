@@ -273,6 +273,20 @@ class BackendSocialService {
     return _decodeMovieNightEvent(_castMap(body['event']));
   }
 
+  Future<MovieNightEvent> inviteFriends({
+    required String eventId,
+    required List<String> friendIds,
+  }) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'POST',
+        '/movie-nights/$eventId/invite',
+        body: <String, dynamic>{'friendIds': friendIds},
+      )).body,
+    );
+    return _decodeMovieNightEvent(_castMap(body['event']));
+  }
+
   Future<MovieNightEvent> deleteVote({
     required String eventId,
     required String movieId,
@@ -413,6 +427,10 @@ class BackendSocialService {
         .toList(growable: false);
   }
 
+  MovieNightEvent decodeMovieNightEvent(Map<String, dynamic> json) {
+    return _decodeMovieNightEvent(json);
+  }
+
   MovieNightEvent _decodeMovieNightEvent(Map<String, dynamic> json) {
     return MovieNightEvent(
       id: _string(json['id']),
@@ -534,14 +552,30 @@ class BackendSocialService {
     final rating =
         _nullableDouble(json['voteAverage']) ??
         ((_nullableDouble(movieLens['avgRating']) ?? 0) * 2);
+    var posterUrl = _string(json['posterUrl']);
+    final posterPath = _nullableString(json['posterPath']);
+    if (posterUrl.isEmpty && posterPath != null && posterPath.isNotEmpty) {
+      posterUrl = 'https://image.tmdb.org/t/p/w780$posterPath';
+    } else if (posterUrl.isNotEmpty && !posterUrl.startsWith('http')) {
+      posterUrl = 'https://image.tmdb.org/t/p/w780$posterUrl';
+    }
+
+    var backdropUrl = _string(json['backdropUrl']);
+    final backdropPath = _nullableString(json['backdropPath']);
+    if (backdropUrl.isEmpty && backdropPath != null && backdropPath.isNotEmpty) {
+      backdropUrl = 'https://image.tmdb.org/t/p/w1280$backdropPath';
+    } else if (backdropUrl.isNotEmpty && !backdropUrl.startsWith('http')) {
+      backdropUrl = 'https://image.tmdb.org/t/p/w1280$backdropUrl';
+    }
+
     return Movie(
       id: tmdbId == null ? _string(json['id']) : 'tmdb-$tmdbId',
       tmdbId: tmdbId,
       title: _string(json['title']),
       originalTitle: _string(json['originalTitle'], _string(json['title'])),
       overview: _string(json['overview']),
-      posterUrl: _string(json['posterUrl']),
-      backdropUrl: _string(json['backdropUrl']),
+      posterUrl: posterUrl,
+      backdropUrl: backdropUrl,
       releaseYear: year,
       runtime: _int(json['runtime']),
       genres: _stringList(json['genres']),

@@ -1,4 +1,3 @@
-import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
@@ -17,8 +16,8 @@ class MovieNightVotingScreen extends ConsumerStatefulWidget {
       _MovieNightVotingScreenState();
 }
 
-class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
-    with MovieNightAutoRefresh<MovieNightVotingScreen> {
+class _MovieNightVotingScreenState
+    extends ConsumerState<MovieNightVotingScreen> {
   int _currentIndex = 0;
   final List<_VoteHistoryEntry> _voteHistory = <_VoteHistoryEntry>[];
   bool _navigatedToResult = false;
@@ -26,25 +25,26 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
   @override
   void initState() {
     super.initState();
-    startMovieNightPolling(widget.eventId);
   }
 
-  List<ShortlistCandidate> _unvotedCandidates(MovieNightEvent event,
-      FriendsMovieNightController controller) {
+  List<ShortlistCandidate> _unvotedCandidates(
+    MovieNightEvent event,
+    FriendsMovieNightController controller,
+  ) {
     return event.shortlist.where((candidate) {
       final vote = controller.currentUserVoteFor(event.id, candidate.movie.id);
       return vote == null;
     }).toList();
   }
 
-  Future<void> _submitVote(MovieNightEvent event, ShortlistCandidate candidate,
-      MovieNightVoteValue voteValue) async {
+  Future<void> _submitVote(
+    MovieNightEvent event,
+    ShortlistCandidate candidate,
+    MovieNightVoteValue voteValue,
+  ) async {
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
-    
-    _voteHistory.add(_VoteHistoryEntry(
-      candidate: candidate,
-      vote: voteValue,
-    ));
+
+    _voteHistory.add(_VoteHistoryEntry(candidate: candidate, vote: voteValue));
 
     final updated = await controller.submitVote(
       eventId: event.id,
@@ -84,13 +84,15 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
         _currentIndex = 0;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Undid vote for "${lastEntry.candidate.movie.title}".')),
+        SnackBar(
+          content: Text('Undid vote for "${lastEntry.candidate.movie.title}".'),
+        ),
       );
     } else {
       _voteHistory.add(lastEntry);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not undo vote.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not undo vote.')));
     }
   }
 
@@ -127,53 +129,83 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       return Scaffold(
         backgroundColor: const Color(0xFF060B16),
         body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  const Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 64,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'All votes in!',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'You\'ve voted on all $totalCandidates movies. Waiting for other participants to finish voting.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  if (_voteHistory.isNotEmpty)
-                    OutlinedButton.icon(
-                      onPressed: () => _undoLastVote(event),
-                      icon: const Icon(Icons.undo_rounded, color: Colors.white),
-                      label: const Text('Undo last vote', style: TextStyle(color: Colors.white)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 12,
+                left: 12,
+                child: ClipOval(
+                  child: Material(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
-            ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 64,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'All votes in!',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'You\'ve voted on all $totalCandidates movies. Waiting for other participants to finish voting.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      if (_voteHistory.isNotEmpty)
+                        OutlinedButton.icon(
+                          onPressed: () => _undoLastVote(event),
+                          icon: const Icon(Icons.undo_rounded, color: Colors.white),
+                          label: const Text(
+                            'Undo last vote',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    final currentCandidate = unvoted[_currentIndex.clamp(0, unvoted.length - 1)];
+    final currentCandidate =
+        unvoted[_currentIndex.clamp(0, unvoted.length - 1)];
     final nextCandidate = unvoted.length > 1
         ? unvoted[(_currentIndex + 1).clamp(0, unvoted.length - 1)]
         : null;
@@ -234,16 +266,46 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                   canUndo: _voteHistory.isNotEmpty,
                   onUndo: () => _undoLastVote(event),
                   onDislike: () => _submitVote(
-                    event, currentCandidate, MovieNightVoteValue.dislike,
+                    event,
+                    currentCandidate,
+                    MovieNightVoteValue.dislike,
                   ),
                   onAlreadySeen: () => _submitVote(
-                    event, currentCandidate, MovieNightVoteValue.alreadySeen,
+                    event,
+                    currentCandidate,
+                    MovieNightVoteValue.alreadySeen,
                   ),
                   onLike: () => _submitVote(
-                    event, currentCandidate, MovieNightVoteValue.like,
+                    event,
+                    currentCandidate,
+                    MovieNightVoteValue.like,
                   ),
                   onNeutral: () => _submitVote(
-                    event, currentCandidate, MovieNightVoteValue.neutral,
+                    event,
+                    currentCandidate,
+                    MovieNightVoteValue.neutral,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 12,
+            left: 12,
+            child: SafeArea(
+              child: ClipOval(
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -279,9 +341,14 @@ class _VotingImmersiveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final movie = candidate.movie;
-    final imageUrl = movie.posterUrl.isNotEmpty
-        ? movie.posterUrl.replaceFirst('/w500/', '/w780/')
-        : movie.backdropUrl;
+    String imageUrl = movie.posterUrl.isNotEmpty ? movie.posterUrl : movie.backdropUrl;
+    if (imageUrl.isNotEmpty) {
+      if (!imageUrl.startsWith('http')) {
+        imageUrl = 'https://image.tmdb.org/t/p/w780$imageUrl';
+      } else {
+        imageUrl = imageUrl.replaceFirst('/w500/', '/w780/');
+      }
+    }
     final metadata = <String>[
       if (movie.releaseYear > 0) movie.releaseYear.toString(),
       if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
@@ -345,7 +412,9 @@ class _VotingImmersiveCard extends StatelessWidget {
                           if (progress != null && !isBackground)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 6),
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(999),
@@ -386,28 +455,38 @@ class _VotingImmersiveCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            if (candidate.explanationTags.isNotEmpty) ...<Widget>[
+                            if (candidate
+                                .explanationTags
+                                .isNotEmpty) ...<Widget>[
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 4,
                                 children: candidate.explanationTags
                                     .take(3)
-                                    .map((tag) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(999),
+                                    .map(
+                                      (tag) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.15,
                                           ),
-                                          child: Text(
-                                            tag,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
                                           ),
-                                        ))
+                                        ),
+                                        child: Text(
+                                          tag,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    )
                                     .toList(growable: false),
                               ),
                               const SizedBox(height: 10),
@@ -444,7 +523,9 @@ class _VotingImmersiveCard extends StatelessWidget {
                                   child: Text(
                                     movie.overview,
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.82),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.82,
+                                      ),
                                       fontSize: 14,
                                       height: 1.45,
                                     ),
@@ -607,11 +688,7 @@ class _VotingActionButton extends StatelessWidget {
               child: SizedBox(
                 width: size,
                 height: size,
-                child: Icon(
-                  icon,
-                  color: Colors.black,
-                  size: size * 0.45,
-                ),
+                child: Icon(icon, color: Colors.black, size: size * 0.45),
               ),
             ),
           ),

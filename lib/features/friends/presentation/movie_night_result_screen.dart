@@ -1,4 +1,3 @@
-import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
@@ -18,12 +17,11 @@ class MovieNightResultScreen extends ConsumerStatefulWidget {
       _MovieNightResultScreenState();
 }
 
-class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
-    with MovieNightAutoRefresh<MovieNightResultScreen> {
+class _MovieNightResultScreenState
+    extends ConsumerState<MovieNightResultScreen> {
   @override
   void initState() {
     super.initState();
-    startMovieNightPolling(widget.eventId);
   }
 
   @override

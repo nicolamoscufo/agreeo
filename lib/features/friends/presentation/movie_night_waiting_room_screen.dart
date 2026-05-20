@@ -1,4 +1,3 @@
-import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
@@ -21,14 +20,12 @@ class MovieNightWaitingRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _MovieNightWaitingRoomScreenState
-    extends ConsumerState<MovieNightWaitingRoomScreen>
-    with MovieNightAutoRefresh<MovieNightWaitingRoomScreen> {
+    extends ConsumerState<MovieNightWaitingRoomScreen> {
   bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
-    startMovieNightPolling(widget.eventId);
   }
 
   @override
@@ -90,14 +87,40 @@ class _MovieNightWaitingRoomScreenState
           children: <Widget>[
             SectionHeader(
               title: event.name,
-              subtitle:
-                  'Confirm the group and constraints before voting.',
+              subtitle: 'Confirm the group and constraints before voting.',
               trailing: InfoBadge(label: _statusLabel(event.status)),
             ),
             const SizedBox(height: 18),
             _SummaryCard(event: event),
             const SizedBox(height: 18),
             _ParticipantsCard(participants: event.participants),
+            if (event.inviteLink.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.link_rounded),
+                  title: const Text('Invite Link'),
+                  subtitle: Text(
+                    event.inviteLink,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.copy_rounded),
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: event.inviteLink),
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invite link copied!')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
             if (canJoin) ...<Widget>[
               const SizedBox(height: 12),
               _JoinMovieNightCard(
@@ -140,8 +163,8 @@ class _MovieNightWaitingRoomScreenState
               ),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 12,
+                runSpacing: 12,
                 children: <Widget>[
                   FilledButton.tonalIcon(
                     onPressed: () async {
@@ -150,11 +173,9 @@ class _MovieNightWaitingRoomScreenState
                       final link = updatedEvent?.inviteLink;
                       if (link != null && link.isNotEmpty) {
                         await Clipboard.setData(ClipboardData(text: link));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invite link copied to clipboard!')),
-                          );
-                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invite link copied to clipboard!')),
+                        );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Could not create invite link.')),
@@ -163,6 +184,37 @@ class _MovieNightWaitingRoomScreenState
                     },
                     icon: const Icon(Icons.share_rounded),
                     label: const Text('Share invite link'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final existingIds = event.participants.map((p) => p.userId).toSet();
+                      final invitedIds = await showModalBottomSheet<List<String>>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => _InviteFriendsSheet(
+                          friends: socialState.friends,
+                          existingParticipantIds: existingIds,
+                        ),
+                      );
+                      if (invitedIds == null || invitedIds.isEmpty) return;
+                      final updated = await controller.inviteFriends(
+                        eventId: event.id,
+                        friendIds: invitedIds,
+                      );
+                      if (!context.mounted) return;
+                      if (updated == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not invite friends.')),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invitations sent!')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.person_add_rounded),
+                    label: const Text('Invite friends'),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () async {
@@ -194,24 +246,44 @@ class _MovieNightWaitingRoomScreenState
                     icon: const Icon(Icons.tune_rounded),
                     label: const Text('Edit constraints'),
                   ),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final updated = await controller.startVoting(
+                  Builder(
+                    builder: (context) {
+                      final isInFlight = socialState.inflightEventIds.contains(
                         event.id,
                       );
-                      if (!context.mounted) {
-                        return;
-                      }
-                      if (updated == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not start voting.'),
-                          ),
-                        );
-                      }
+                      final canStart = !isInFlight;
+                      return FilledButton.icon(
+                        onPressed: canStart
+                            ? () async {
+                                final updated = await controller.startVoting(
+                                  event.id,
+                                );
+                                if (!context.mounted) return;
+                                if (updated == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Could not start voting.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                        icon: isInFlight
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.how_to_vote_rounded),
+                        label: isInFlight
+                            ? const Text('Starting...')
+                            : const Text('Start voting'),
+                      );
                     },
-                    icon: const Icon(Icons.how_to_vote_rounded),
-                    label: const Text('Start voting'),
                   ),
                 ],
               ),
@@ -220,27 +292,6 @@ class _MovieNightWaitingRoomScreenState
                 title: 'Waiting for host',
                 subtitle: 'Only the host can edit constraints or start voting.',
               ),
-              if (event.inviteLink.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 12),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.link_rounded),
-                    title: const Text('Invite link'),
-                    subtitle: Text(event.inviteLink, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.copy_rounded),
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: event.inviteLink));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invite link copied!')),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
             ],
           ],
         ),
@@ -308,7 +359,6 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-
 class _ParticipantsCard extends StatelessWidget {
   const _ParticipantsCard({required this.participants});
 
@@ -372,7 +422,6 @@ class _JoinMovieNightCard extends StatelessWidget {
     );
   }
 }
-
 
 class _EditConstraintsSheet extends StatefulWidget {
   const _EditConstraintsSheet({required this.initialConstraints});
@@ -551,4 +600,116 @@ String _dateLabel(DateTime dateTime) {
   final time =
       '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   return '$date $time';
+}
+
+class _InviteFriendsSheet extends StatefulWidget {
+  const _InviteFriendsSheet({
+    required this.friends,
+    required this.existingParticipantIds,
+  });
+
+  final List<Friend> friends;
+  final Set<String> existingParticipantIds;
+
+  @override
+  State<_InviteFriendsSheet> createState() => _InviteFriendsSheetState();
+}
+
+class _InviteFriendsSheetState extends State<_InviteFriendsSheet> {
+  final Set<String> _selectedIds = {};
+  String _searchQuery = '';
+  late final List<Friend> _inviteableFriends;
+
+  @override
+  void initState() {
+    super.initState();
+    _inviteableFriends = widget.friends
+        .where((f) => !widget.existingParticipantIds.contains(f.id))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _searchQuery.isEmpty
+        ? _inviteableFriends
+        : _inviteableFriends
+            .where((f) => f.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          8,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Invite Friends',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Search friends',
+                prefixIcon: Icon(Icons.search_rounded),
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (val) => setState(() => _searchQuery = val.trim()),
+            ),
+            const SizedBox(height: 16),
+            if (filtered.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text('No inviteable friends found.'),
+                ),
+              )
+            else
+              SizedBox(
+                height: 250,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final friend = filtered[index];
+                    final isSelected = _selectedIds.contains(friend.id);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      title: Text(friend.name),
+                      secondary: UserAvatar(initials: friend.initials),
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedIds.add(friend.id);
+                          } else {
+                            _selectedIds.remove(friend.id);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _selectedIds.isEmpty
+                    ? null
+                    : () => Navigator.of(context).pop(_selectedIds.toList()),
+                child: Text('Invite selected (${_selectedIds.length})'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

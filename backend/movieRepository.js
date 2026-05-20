@@ -28,8 +28,12 @@ function normalizeMovieRecord(record) {
     overview: record.get('overview') || '',
     posterPath: record.get('posterPath') || null,
     backdropPath: record.get('backdropPath') || null,
-    posterUrl: record.get('posterUrl') || '',
-    backdropUrl: record.get('backdropUrl') || '',
+    posterUrl: (record.get('posterPath') && (!record.get('posterUrl') || !(record.get('posterUrl') || '').startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w780${record.get('posterPath')}`
+      : (record.get('posterUrl') || ''),
+    backdropUrl: (record.get('backdropPath') && (!record.get('backdropUrl') || !(record.get('backdropUrl') || '').startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w1280${record.get('backdropPath')}`
+      : (record.get('backdropUrl') || ''),
     releaseDate: record.get('releaseDate') || '',
     runtime: record.get('runtime') == null ? null : toNativeNumber(record.get('runtime')),
     director: record.get('director') || '',

@@ -5,6 +5,7 @@ import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
+import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 
 class RealTimeService {
@@ -160,9 +161,14 @@ class RealTimeService {
 
   void _handleMovieNightVotingStarted(dynamic data) {
     String eventName = 'Movie Night';
+    String? eventId;
+    MovieNightEvent? decodedEvent;
     try {
       if (data is Map && data['event'] is Map) {
-        eventName = data['event']['name'] ?? 'Movie Night';
+        final eventMap = Map<String, dynamic>.from(data['event'] as Map);
+        decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
+        eventName = decodedEvent.name;
+        eventId = decodedEvent.id;
       }
     } catch (_) {}
 
@@ -171,17 +177,28 @@ class RealTimeService {
       title: 'Voting Started',
       body: 'Voting has started for "$eventName"!',
     );
-    _refreshAll();
+    if (decodedEvent != null) {
+      _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+    } else if (eventId != null) {
+      _ref.read(friendsMovieNightControllerProvider.notifier).refreshMovieNight(eventId);
+    } else {
+      _refreshAll();
+    }
   }
 
   void _handleMovieNightCompleted(dynamic data) {
     String eventName = 'Movie Night';
     String winnerTitle = '';
+    String? eventId;
+    MovieNightEvent? decodedEvent;
     try {
       if (data is Map) {
         winnerTitle = data['winnerTitle'] ?? '';
         if (data['event'] is Map) {
-          eventName = data['event']['name'] ?? 'Movie Night';
+          final eventMap = Map<String, dynamic>.from(data['event'] as Map);
+          decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
+          eventName = decodedEvent.name;
+          eventId = decodedEvent.id;
         }
       }
     } catch (_) {}
@@ -191,10 +208,26 @@ class RealTimeService {
       title: 'Movie Night Completed',
       body: 'Decision reached for "$eventName"! Winner: $winnerTitle.',
     );
-    _refreshAll();
+    if (decodedEvent != null) {
+      _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+    } else if (eventId != null) {
+      _ref.read(friendsMovieNightControllerProvider.notifier).refreshMovieNight(eventId);
+    } else {
+      _refreshAll();
+    }
   }
 
   void _handleMovieNightUpdated(dynamic data) {
+    try {
+      if (data is Map && data['event'] is Map) {
+        final eventMap = Map<String, dynamic>.from(data['event'] as Map);
+        final decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
+        _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+        return;
+      }
+    } catch (e) {
+      debugPrint('[RealTimeService] Error parsing movie_night_updated: $e');
+    }
     _refreshSocial();
   }
 
