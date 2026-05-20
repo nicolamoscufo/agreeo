@@ -5,6 +5,8 @@ import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/utils/movie_night_utils.dart';
+import 'package:agreeo/services/real_time_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +35,7 @@ class _MovieNightWaitingRoomScreenState
     final socialState = ref.watch(friendsMovieNightControllerProvider);
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
     final appState = ref.watch(agreeoAppControllerProvider);
+    final isLive = ref.watch(realTimeConnectionProvider);
     final event = socialState.eventById(widget.eventId);
     if (event == null) {
       return Scaffold(
@@ -80,221 +83,334 @@ class _MovieNightWaitingRoomScreenState
         currentParticipant?.status == MovieNightParticipantStatus.pending;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Waiting Room')),
+      appBar: AppBar(
+        title: const Text('Waiting Room'),
+        actions: <Widget>[
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _ConnectionBadge(isLive: isLive),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
-          children: <Widget>[
-            SectionHeader(
-              title: event.name,
-              subtitle: 'Confirm the group and constraints before voting.',
-              trailing: InfoBadge(label: _statusLabel(event.status)),
-            ),
-            const SizedBox(height: 18),
-            _SummaryCard(event: event),
-            const SizedBox(height: 18),
-            _ParticipantsCard(participants: event.participants),
-            if (event.inviteLink.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.link_rounded),
-                  title: const Text('Invite Link'),
-                  subtitle: Text(
-                    event.inviteLink,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.copy_rounded),
-                    onPressed: () async {
-                      await Clipboard.setData(
-                        ClipboardData(text: event.inviteLink),
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invite link copied!')),
-                        );
-                      }
-                    },
-                  ),
-                ),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await controller.refreshMovieNight(event.id);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+            children: <Widget>[
+              SectionHeader(
+                title: event.name,
+                subtitle: 'Confirm the group and constraints before voting.',
+                trailing: InfoBadge(label: movieNightStatusLabel(event.status)),
               ),
-            ],
-            if (canJoin) ...<Widget>[
-              const SizedBox(height: 12),
-              _JoinMovieNightCard(
-                onJoin: () async {
-                  final updated = await controller.joinMovieNight(event.id);
-                  if (!context.mounted) {
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        updated == null
-                            ? 'Could not join this Movie Night.'
-                            : 'You joined this Movie Night.',
-                      ),
+              const SizedBox(height: 18),
+              _SummaryCard(event: event),
+              const SizedBox(height: 18),
+              _ParticipantsCard(participants: event.participants),
+              if (event.inviteLink.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.link_rounded),
+                    title: const Text('Invite Link'),
+                    subtitle: Text(
+                      event.inviteLink,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  );
-                },
-              ),
-            ],
-            if (pendingCount > 0) ...<Widget>[
-              const SizedBox(height: 12),
-              Card(
-                color: Theme.of(
-                  context,
-                ).colorScheme.errorContainer.withValues(alpha: 0.55),
-                child: const ListTile(
-                  leading: Icon(Icons.warning_amber_rounded),
-                  title: Text('Some friends have not joined yet.'),
-                  subtitle: Text('The host can still start voting.'),
-                ),
-              ),
-            ],
-            const SizedBox(height: 22),
-            if (isHost) ...<Widget>[
-              const SectionHeader(
-                title: 'Host controls',
-                subtitle:
-                    'Adjust constraints, share invite link, or start voting.',
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: <Widget>[
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final updatedEvent = await controller.createInviteLink(event.id);
-                      if (!context.mounted) return;
-                      final link = updatedEvent?.inviteLink;
-                      if (link != null && link.isNotEmpty) {
-                        await Clipboard.setData(ClipboardData(text: link));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invite link copied to clipboard!')),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.copy_rounded),
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: event.inviteLink),
                         );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not create invite link.')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.share_rounded),
-                    label: const Text('Share invite link'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final existingIds = event.participants.map((p) => p.userId).toSet();
-                      final invitedIds = await showModalBottomSheet<List<String>>(
-                        context: context,
-                        isScrollControlled: true,
-                        showDragHandle: true,
-                        builder: (_) => _InviteFriendsSheet(
-                          friends: socialState.friends,
-                          existingParticipantIds: existingIds,
-                        ),
-                      );
-                      if (invitedIds == null || invitedIds.isEmpty) return;
-                      final updated = await controller.inviteFriends(
-                        eventId: event.id,
-                        friendIds: invitedIds,
-                      );
-                      if (!context.mounted) return;
-                      if (updated == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not invite friends.')),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Invitations sent!')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.person_add_rounded),
-                    label: const Text('Invite friends'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final updatedConstraints =
-                          await showModalBottomSheet<MovieNightConstraints>(
-                            context: context,
-                            isScrollControlled: true,
-                            showDragHandle: true,
-                            builder: (_) => _EditConstraintsSheet(
-                              initialConstraints: event.constraints,
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Invite link copied!'),
                             ),
                           );
-                      if (updatedConstraints == null) {
-                        return;
-                      }
-                      final updatedEvent = await controller
-                          .updateEventConstraints(
-                            eventId: event.id,
-                            constraints: updatedConstraints,
-                          );
-                      if (updatedEvent == null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Could not update constraints.'),
-                          ),
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+              if (canJoin) ...<Widget>[
+                const SizedBox(height: 12),
+                _JoinMovieNightCard(
+                  onJoin: () async {
+                    final updated = await controller.joinMovieNight(event.id);
+                    if (!context.mounted) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          updated == null
+                              ? 'Could not join this Movie Night.'
+                              : 'You joined this Movie Night.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              if (pendingCount > 0) ...<Widget>[
+                const SizedBox(height: 12),
+                Card(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.errorContainer.withValues(alpha: 0.55),
+                  child: const ListTile(
+                    leading: Icon(Icons.warning_amber_rounded),
+                    title: Text('Some friends have not joined yet.'),
+                    subtitle: Text('The host can still start voting.'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 22),
+              if (isHost) ...<Widget>[
+                const SectionHeader(
+                  title: 'Host controls',
+                  subtitle:
+                      'Adjust constraints, share invite link, or start voting.',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: <Widget>[
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final updatedEvent = await controller.createInviteLink(
+                          event.id,
                         );
-                      }
-                    },
-                    icon: const Icon(Icons.tune_rounded),
-                    label: const Text('Edit constraints'),
-                  ),
-                  Builder(
-                    builder: (context) {
-                      final isInFlight = socialState.inflightEventIds.contains(
-                        event.id,
-                      );
-                      final canStart = !isInFlight;
-                      return FilledButton.icon(
-                        onPressed: canStart
-                            ? () async {
-                                final updated = await controller.startVoting(
-                                  event.id,
-                                );
-                                if (!context.mounted) return;
-                                if (updated == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Could not start voting.',
-                                      ),
-                                    ),
+                        if (!context.mounted) return;
+                        final link = updatedEvent?.inviteLink;
+                        if (link != null && link.isNotEmpty) {
+                          await Clipboard.setData(ClipboardData(text: link));
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Invite link copied to clipboard!'),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not create invite link.'),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.share_rounded),
+                      label: const Text('Share invite link'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final existingIds = event.participants
+                            .map((p) => p.userId)
+                            .toSet();
+                        final invitedIds =
+                            await showModalBottomSheet<List<String>>(
+                              context: context,
+                              isScrollControlled: true,
+                              showDragHandle: true,
+                              builder: (_) => _InviteFriendsSheet(
+                                friends: socialState.friends,
+                                existingParticipantIds: existingIds,
+                              ),
+                            );
+                        if (invitedIds == null || invitedIds.isEmpty) return;
+                        final updated = await controller.inviteFriends(
+                          eventId: event.id,
+                          friendIds: invitedIds,
+                        );
+                        if (!context.mounted) return;
+                        if (updated == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not invite friends.'),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invitations sent!')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.person_add_rounded),
+                      label: const Text('Invite friends'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final updatedConstraints =
+                            await showModalBottomSheet<MovieNightConstraints>(
+                              context: context,
+                              isScrollControlled: true,
+                              showDragHandle: true,
+                              builder: (_) => _EditConstraintsSheet(
+                                initialConstraints: event.constraints,
+                              ),
+                            );
+                        if (updatedConstraints == null) {
+                          return;
+                        }
+                        final updatedEvent = await controller
+                            .updateEventConstraints(
+                              eventId: event.id,
+                              constraints: updatedConstraints,
+                            );
+                        if (updatedEvent == null && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Could not update constraints.'),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.tune_rounded),
+                      label: const Text('Edit constraints'),
+                    ),
+                    Builder(
+                      builder: (context) {
+                        final isInFlight = socialState.inflightEventIds
+                            .contains(event.id);
+                        final canStart = !isInFlight;
+                        return FilledButton.icon(
+                          onPressed: canStart
+                              ? () async {
+                                  final updated = await controller.startVoting(
+                                    event.id,
                                   );
+                                  if (!context.mounted) return;
+                                  if (updated == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not start voting.',
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 }
-                              }
-                            : null,
-                        icon: isInFlight
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.how_to_vote_rounded),
-                        label: isInFlight
-                            ? const Text('Starting...')
-                            : const Text('Start voting'),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ] else ...<Widget>[
-              const SectionHeader(
-                title: 'Waiting for host',
-                subtitle: 'Only the host can edit constraints or start voting.',
-              ),
+                              : null,
+                          icon: isInFlight
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.how_to_vote_rounded),
+                          label: isInFlight
+                              ? const Text('Starting...')
+                              : const Text('Start voting'),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ] else ...<Widget>[
+                const SectionHeader(
+                  title: 'Waiting for host',
+                  subtitle:
+                      'Only the host can edit constraints or start voting.',
+                ),
+                const SizedBox(height: 12),
+                _NonHostInfoCard(
+                  event: event,
+                  canLeave: currentParticipant != null,
+                  onLeave: () => _leaveEvent(event),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _leaveEvent(MovieNightEvent event) async {
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Leave this Movie Night?'),
+          content: Text(
+            'You will leave "${event.name}" and stop receiving updates.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Leave event'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldLeave != true) {
+      return;
+    }
+    final left = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .leaveMovieNight(event.id);
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          left
+              ? 'You left this Movie Night.'
+              : 'Could not leave this Movie Night.',
+        ),
+      ),
+    );
+    if (left) {
+      Navigator.of(context).pop();
+    }
+  }
+}
+
+class _ConnectionBadge extends StatelessWidget {
+  const _ConnectionBadge({required this.isLive});
+
+  final bool isLive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isLive ? 'Live' : 'Offline',
+            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+          ),
+        ],
       ),
     );
   }
@@ -327,7 +443,11 @@ class _SummaryCard extends StatelessWidget {
               children: <Widget>[
                 Chip(label: Text(event.contentTypeLabel)),
                 if (event.dateTime != null)
-                  Chip(label: Text(_dateLabel(event.dateTime!))),
+                  Chip(
+                    label: Text(
+                      movieNightDateLabel(event.dateTime, includeTime: true),
+                    ),
+                  ),
                 if (constraints.includedGenres.isNotEmpty)
                   Chip(
                     label: Text(
@@ -352,6 +472,51 @@ class _SummaryCard extends StatelessWidget {
                   Chip(label: Text('Language ${constraints.language}')),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NonHostInfoCard extends StatelessWidget {
+  const _NonHostInfoCard({
+    required this.event,
+    required this.canLeave,
+    required this.onLeave,
+  });
+
+  final MovieNightEvent event;
+  final bool canLeave;
+  final VoidCallback onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'What happens next',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            Text(movieNightConstraintsLabel(event.constraints)),
+            const SizedBox(height: 10),
+            const Text(
+              'The system will shortlist movies from everyone\'s taste and constraints, then the group votes together.',
+            ),
+            const SizedBox(height: 14),
+            if (canLeave)
+              OutlinedButton.icon(
+                onPressed: onLeave,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Leave event'),
+              ),
           ],
         ),
       ),
@@ -572,19 +737,6 @@ class _GenreSheetWrap extends StatelessWidget {
   }
 }
 
-String _statusLabel(MovieNightStatus status) {
-  switch (status) {
-    case MovieNightStatus.draft:
-      return 'Draft';
-    case MovieNightStatus.waiting:
-      return 'Waiting for friends';
-    case MovieNightStatus.voting:
-      return 'Voting';
-    case MovieNightStatus.completed:
-      return 'Completed';
-  }
-}
-
 MovieNightParticipant? _participantFor(MovieNightEvent event, String userId) {
   for (final participant in event.participants) {
     if (participant.userId == userId) {
@@ -592,14 +744,6 @@ MovieNightParticipant? _participantFor(MovieNightEvent event, String userId) {
     }
   }
   return null;
-}
-
-String _dateLabel(DateTime dateTime) {
-  final date =
-      '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
-  final time =
-      '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  return '$date $time';
 }
 
 class _InviteFriendsSheet extends StatefulWidget {
@@ -633,8 +777,11 @@ class _InviteFriendsSheetState extends State<_InviteFriendsSheet> {
     final filtered = _searchQuery.isEmpty
         ? _inviteableFriends
         : _inviteableFriends
-            .where((f) => f.name.toLowerCase().contains(_searchQuery.toLowerCase()))
-            .toList();
+              .where(
+                (f) =>
+                    f.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+              )
+              .toList();
 
     return SafeArea(
       child: Padding(
@@ -650,9 +797,9 @@ class _InviteFriendsSheetState extends State<_InviteFriendsSheet> {
           children: <Widget>[
             Text(
               'Invite Friends',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -667,9 +814,7 @@ class _InviteFriendsSheetState extends State<_InviteFriendsSheet> {
             if (filtered.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text('No inviteable friends found.'),
-                ),
+                child: Center(child: Text('No inviteable friends found.')),
               )
             else
               SizedBox(

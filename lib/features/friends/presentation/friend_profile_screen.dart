@@ -1,8 +1,10 @@
+import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,6 +51,19 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     final privacy = friend.privacySettings;
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => MovieNightWizardScreen(
+                preSelectedFriendIds: <String>[friend.id],
+              ),
+            ),
+          );
+        },
+        icon: const Icon(Icons.local_movies_outlined),
+        label: Text('Movie Night with ${friend.name}'),
+      ),
       body: SafeArea(
         child: DefaultTabController(
           length: 3,
@@ -230,7 +245,7 @@ class _ReviewList extends StatelessWidget {
             leading: const Icon(Icons.star_rounded, color: Color(0xFFFBBF24)),
             title: Text(review.movie.title),
             subtitle: Text(
-              '${review.rating}/5 • ${_dateLabel(review.date)}\n${review.reviewPreview}',
+              '${review.rating}/5 • ${movieNightDateLabel(review.date)}\n${review.reviewPreview}',
             ),
             isThreeLine: true,
           ),
@@ -362,8 +377,4 @@ class _StatPill extends StatelessWidget {
       ),
     );
   }
-}
-
-String _dateLabel(DateTime date) {
-  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }

@@ -584,6 +584,26 @@ async function joinMovieNight(uid, eventId) {
   return getMovieNight(uid, eventId);
 }
 
+async function leaveMovieNight(uid, eventId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (user:AppUser {uid: $uid})-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
+    WHERE coalesce(part.isHost, false) = false
+    DELETE part
+    WITH event, user
+    OPTIONAL MATCH (user)-[vote:VOTED_IN]->(:Movie)
+    WHERE vote.eventId = $eventId
+    DELETE vote
+    SET event.updatedAt = datetime()
+    RETURN event.id AS eventId
+    LIMIT 1
+    `,
+    { uid, eventId }
+  );
+
+  return result.records.length > 0;
+}
+
 async function listMovieNights(uid) {
   const result = await neo4jService.run(
     `
@@ -639,7 +659,18 @@ async function getMovieNight(uid, eventId) {
     loadVotes(eventId),
   ]);
 
-  return { ...event, participants, shortlist, votes };
+  return { ...event, participants, shortlist, votes, votedUserIds: completedVoterIds(participants, shortlist, votes) };
+}
+
+function completedVoterIds(participants, shortlist, votes) {
+  const joinedIds = participants
+    .filter((participant) => participant.status === 'joined')
+    .map((participant) => participant.userId);
+  if (joinedIds.length === 0 || shortlist.length === 0) return [];
+  return joinedIds.filter((userId) => shortlist.every((candidate) => {
+    const movieId = `tmdb-${candidate.movie.tmdbId}`;
+    return votes.some((vote) => vote.userId === userId && vote.movieId === movieId);
+  }));
 }
 
 async function loadParticipants(eventId) {
@@ -1313,6 +1344,7 @@ module.exports = {
   createMovieNight,
   inviteFriends,
   joinMovieNight,
+  leaveMovieNight,
   listMovieNights,
   getMovieNight,
   updateMovieNight,

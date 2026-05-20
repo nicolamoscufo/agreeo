@@ -297,6 +297,7 @@ class MovieNightEvent {
     required this.votes,
     required this.createdAt,
     required this.updatedAt,
+    this.votedUserIds = const <String>[],
   });
 
   final String id;
@@ -312,6 +313,7 @@ class MovieNightEvent {
   final List<MovieNightVote> votes;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> votedUserIds;
 
   String get contentTypeLabel => 'Movie';
 
@@ -360,6 +362,7 @@ class MovieNightEvent {
     bool clearWinnerMovieId = false,
     List<MovieNightVote>? votes,
     DateTime? updatedAt,
+    List<String>? votedUserIds,
   }) {
     return MovieNightEvent(
       id: id,
@@ -377,6 +380,7 @@ class MovieNightEvent {
       votes: votes ?? this.votes,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      votedUserIds: votedUserIds ?? this.votedUserIds,
     );
   }
 }

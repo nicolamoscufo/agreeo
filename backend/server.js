@@ -149,6 +149,7 @@ app.get('/movie-nights/:id', verifyMiddleware, socialController.movieNight);
 app.patch('/movie-nights/:id', verifyMiddleware, socialController.updateMovieNight);
 app.post('/movie-nights/:id/invite', verifyMiddleware, socialController.inviteFriends);
 app.post('/movie-nights/:id/join', verifyMiddleware, socialController.joinMovieNight);
+app.delete('/movie-nights/:id/participants/me', verifyMiddleware, socialController.leaveMovieNight);
 app.post('/movie-nights/:id/invite-link', verifyMiddleware, socialController.createInviteLink);
 app.post('/movie-nights/:id/shortlist', verifyMiddleware, socialController.generateShortlist);
 app.post('/movie-nights/:id/votes', verifyMiddleware, socialController.submitVote);

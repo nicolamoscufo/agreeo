@@ -48,11 +48,7 @@ class NotificationsPage extends ConsumerWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF08111F),
-                Color(0xFF0B1120),
-                Color(0xFF111827),
-              ],
+              colors: [Color(0xFF08111F), Color(0xFF0B1120), Color(0xFF111827)],
             ),
           ),
           child: NestedScrollView(
@@ -89,7 +85,7 @@ class NotificationsPage extends ConsumerWidget {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),
@@ -98,7 +94,9 @@ class NotificationsPage extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text('Movie Nights'),
-                            if (movieNightNotifications.any((n) => !n.read)) ...[
+                            if (movieNightNotifications.any(
+                              (n) => !n.read,
+                            )) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 8,
@@ -108,7 +106,7 @@ class NotificationsPage extends ConsumerWidget {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),
@@ -168,9 +166,7 @@ class NotificationsPage extends ConsumerWidget {
             .resolveMovieNightInvite(eventId);
         if (event != null && context.mounted) {
           Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => _routeForMovieNight(event),
-            ),
+            MaterialPageRoute<void>(builder: (_) => _routeForMovieNight(event)),
           );
         }
       }
@@ -210,13 +206,13 @@ class _NotificationsTabList extends StatelessWidget {
             Icon(
               Icons.notifications_none,
               size: 64,
-              color: Colors.grey.withOpacity(0.4),
+              color: Colors.grey.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             Text(
               emptyMessage,
               style: TextStyle(
-                color: Colors.grey.withOpacity(0.6),
+                color: Colors.grey.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -262,31 +258,29 @@ class _NotificationsTabList extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: isUnread
-                ? const Color(0xFF1E293B).withOpacity(0.4)
-                : const Color(0xFF1E293B).withOpacity(0.15),
+                ? const Color(0xFF1E293B).withValues(alpha: 0.4)
+                : const Color(0xFF1E293B).withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isUnread
-                  ? const Color(0xFF38BDF8).withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.1),
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
+                  : Colors.grey.withValues(alpha: 0.1),
               width: 1,
             ),
           ),
           child: ListTile(
             onTap: () => onTap(notif),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
+                color: iconColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                iconData,
-                color: iconColor,
-                size: 24,
-              ),
+              child: Icon(iconData, color: iconColor, size: 24),
             ),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -295,7 +289,9 @@ class _NotificationsTabList extends StatelessWidget {
                   child: Text(
                     notif.title,
                     style: TextStyle(
-                      fontWeight: isUnread ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isUnread
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: Colors.white,
                       fontSize: 15,
                     ),
@@ -327,10 +323,7 @@ class _NotificationsTabList extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     formatTimestamp(notif.createdAt),
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
                   ),
                 ],
               ),

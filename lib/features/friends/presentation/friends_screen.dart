@@ -7,6 +7,8 @@ import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.d
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/utils/movie_night_utils.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -133,13 +135,21 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
             _FriendsListSection(
               friends: socialState.friends,
               onFriendTap: _openFriend,
-              onRemoveFriend: (friend) {
+              onRemoveFriend: (friend) async {
+                final confirmed = await _confirmRemoveFriend(friend);
+                if (!confirmed || !context.mounted) {
+                  return;
+                }
                 controller.removeFriend(friend.id);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('${friend.name} removed.')),
                 );
               },
-              onBlockFriend: (friend) {
+              onBlockFriend: (friend) async {
+                final confirmed = await _confirmBlockFriend(friend);
+                if (!confirmed || !context.mounted) {
+                  return;
+                }
                 controller.blockFriend(friend.id);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('${friend.name} blocked.')),
@@ -220,6 +230,56 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     );
   }
 
+  Future<bool> _confirmRemoveFriend(Friend friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('Remove ${friend.name}?'),
+          content: const Text(
+            'You will no longer see each other\'s profiles or invite each other directly.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
+  Future<bool> _confirmBlockFriend(Friend friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('Block ${friend.name}?'),
+          content: const Text(
+            'They will be removed from friends and blocked from interacting with you.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Block'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
   void _openJoinMovieNightDialog() {
     final linkController = TextEditingController();
     showDialog<void>(
@@ -279,13 +339,17 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     final event = await controller.resolveMovieNightInvite(eventId);
     if (!mounted) return;
     if (event != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Joined "${event.name}"!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Joined "${event.name}"!')));
       _openEvent(event);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not join Movie Night. Check the link and try again.')),
+        const SnackBar(
+          content: Text(
+            'Could not join Movie Night. Check the link and try again.',
+          ),
+        ),
       );
     }
   }
@@ -663,90 +727,236 @@ class _SearchResults extends StatelessWidget {
   }
 }
 
-class _MovieNightCard extends StatelessWidget {
+class _MovieNightCard extends StatefulWidget {
   const _MovieNightCard({required this.event, required this.onTap});
 
   final MovieNightEvent event;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final winner = event.winnerCandidate?.movie.title;
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.56),
-      borderRadius: BorderRadius.circular(26),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(26),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      event.name,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  InfoBadge(label: _statusLabel(event.status)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Host • ${event.participants.length} participants • ${_dateLabel(event.dateTime)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  Chip(label: Text(event.contentTypeLabel)),
-                  if (event.constraints.includedGenres.isNotEmpty)
-                    Chip(
-                      label: Text(event.constraints.includedGenres.join(', ')),
-                    ),
-                  if (event.constraints.maxDurationMinutes != null)
-                    Chip(
-                      label: Text(
-                        'Up to ${event.constraints.maxDurationMinutes}m',
-                      ),
-                    ),
-                  if (winner != null) Chip(label: Text('Winner: $winner')),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+  State<_MovieNightCard> createState() => _MovieNightCardState();
+}
+
+class _MovieNightCardState extends State<_MovieNightCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      lowerBound: 0,
+      upperBound: 1,
     );
+    if (widget.event.status == MovieNightStatus.voting) {
+      _pulseController.repeat(reverse: true);
+    }
   }
 
-  String _statusLabel(MovieNightStatus status) {
-    switch (status) {
-      case MovieNightStatus.draft:
-        return 'Draft';
-      case MovieNightStatus.waiting:
-        return 'Waiting for friends';
-      case MovieNightStatus.voting:
-        return 'Voting';
-      case MovieNightStatus.completed:
-        return 'Completed';
+  @override
+  void didUpdateWidget(covariant _MovieNightCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.event.status == MovieNightStatus.voting &&
+        !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (widget.event.status != MovieNightStatus.voting &&
+        _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.value = 0;
     }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final event = widget.event;
+    final winner = event.winnerCandidate?.movie;
+    final completedVoterCount = movieNightCompletedVoterIds(event).length;
+    final joinedCount = event.joinedParticipants.length;
+    final votingProgress = joinedCount == 0
+        ? 0.0
+        : completedVoterCount / joinedCount;
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final pulse = event.status == MovieNightStatus.voting
+            ? _pulseController.value
+            : 0.0;
+        return Transform.scale(
+          scale: 1 + pulse * 0.012,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: <BoxShadow>[
+                if (event.status == MovieNightStatus.voting)
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(
+                      alpha: 0.12 + pulse * 0.12,
+                    ),
+                    blurRadius: 16 + pulse * 12,
+                    spreadRadius: 1 + pulse * 2,
+                  ),
+              ],
+            ),
+            child: Material(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.56,
+              ),
+              borderRadius: BorderRadius.circular(26),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(26),
+                onTap: widget.onTap,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          if (winner != null) ...<Widget>[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: SizedBox(
+                                width: 62,
+                                height: 92,
+                                child: CachedNetworkImage(
+                                  imageUrl: winner.posterUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                        color: const Color(0xFF1F2937),
+                                        child: const Icon(
+                                          Icons.movie_creation_outlined,
+                                        ),
+                                      ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Row(
+                                  children: <Widget>[
+                                    Expanded(
+                                      child: Text(
+                                        event.name,
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                      ),
+                                    ),
+                                    InfoBadge(
+                                      label: movieNightStatusLabel(
+                                        event.status,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Host • ${event.participants.length} participants • ${movieNightDateLabel(event.dateTime)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                _ParticipantAvatarStack(
+                                  participants: event.participants,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (event.status == MovieNightStatus.voting) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Text(
+                          '$completedVoterCount/$joinedCount have voted',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(
+                          value: votingProgress,
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          Chip(label: Text(event.contentTypeLabel)),
+                          if (event.constraints.includedGenres.isNotEmpty)
+                            Chip(
+                              label: Text(
+                                event.constraints.includedGenres.join(', '),
+                              ),
+                            ),
+                          if (event.constraints.maxDurationMinutes != null)
+                            Chip(
+                              label: Text(
+                                'Up to ${event.constraints.maxDurationMinutes}m',
+                              ),
+                            ),
+                          if (winner != null)
+                            Chip(label: Text('Winner: ${winner.title}')),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
-String _dateLabel(DateTime? dateTime) {
-  if (dateTime == null) {
-    return 'Date optional';
+class _ParticipantAvatarStack extends StatelessWidget {
+  const _ParticipantAvatarStack({required this.participants});
+
+  final List<MovieNightParticipant> participants;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = participants.take(4).toList(growable: false);
+    final overflow = participants.length - visible.length;
+    return SizedBox(
+      height: 34,
+      child: Stack(
+        children: <Widget>[
+          for (var index = 0; index < visible.length; index++)
+            Positioned(
+              left: index * 24,
+              child: UserAvatar(initials: visible[index].initials, size: 34),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: visible.length * 24,
+              child: CircleAvatar(radius: 17, child: Text('+$overflow')),
+            ),
+        ],
+      ),
+    );
   }
-  return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
 }

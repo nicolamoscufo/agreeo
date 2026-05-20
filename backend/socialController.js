@@ -380,6 +380,26 @@ exports.joinMovieNight = async (req, res) => {
   }
 };
 
+exports.leaveMovieNight = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const previousEvent = await socialRepository.getMovieNight(uid, req.params.id);
+    const left = await socialRepository.leaveMovieNight(uid, req.params.id);
+    if (!left) return res.status(404).json({ error: 'Movie night leave target not found' });
+
+    const otherUids = previousEvent
+      ? previousEvent.participants.filter(p => p.userId !== uid).map(p => p.userId)
+      : [];
+    socketService.emitToUsers(otherUids, 'movie_night_updated', { eventId: req.params.id });
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error, 'Failed to leave movie night');
+  }
+};
+
 exports.createInviteLink = async (req, res) => {
   const uid = requireUid(req, res);
   if (!uid) return;

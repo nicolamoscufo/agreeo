@@ -147,11 +147,33 @@ class FriendsMovieNightController
         friendMovieStates: const <String, Map<String, UserMovieState>>{},
         movieNights: snapshot.movieNights,
       );
-    } catch (e, stackTrace) {
-      debugPrint('Error hydrating backend social layer: $e');
-      debugPrint(stackTrace.toString());
+    } catch (e) {
+      debugPrint('Backend social layer unavailable; using local fallback: $e');
       _usingBackend = false;
+      _hydrateLocalFallback();
     }
+  }
+
+  void _hydrateLocalFallback() {
+    final localFriends = _localFriendSeed();
+    final incomingRequests = state.incomingRequests.isEmpty
+        ? _localIncomingRequestSeed()
+        : state.incomingRequests;
+    final discoverableUsers = state.discoverableUsers.isEmpty
+        ? localFriends
+        : state.discoverableUsers;
+    state = state.copyWith(
+      friends: state.friends.isEmpty ? localFriends : state.friends,
+      incomingRequests: incomingRequests,
+      discoverableUsers: discoverableUsers,
+      searchResults: state.searchResults.isEmpty
+          ? discoverableUsers
+          : state.searchResults,
+      incomingRequestIdsByUserId: <String, String>{
+        ...state.incomingRequestIdsByUserId,
+        ..._incomingRequestIds(incomingRequests),
+      },
+    );
   }
 
   void searchFriends(String query, {bool syncBackend = true}) {
@@ -458,7 +480,7 @@ class FriendsMovieNightController
       );
     }
 
-    final shortlist = const <ShortlistCandidate>[];
+    final shortlist = _fallbackShortlist();
     final event = MovieNightEvent(
       id: eventId,
       name: name.trim().isEmpty ? 'Movie Night' : name.trim(),
@@ -479,6 +501,70 @@ class FriendsMovieNightController
       movieNights: <MovieNightEvent>[event, ...state.movieNights],
     );
     return event;
+  }
+
+  List<ShortlistCandidate> _fallbackShortlist() {
+    const mockBreakdown = ScoreBreakdown(
+      watchlistSaves: 1,
+      likes: 2,
+      dislikes: 0,
+      watched: 0,
+      positiveRatings: 1,
+      includedGenreMatches: 2,
+      groupBonus: 0.05,
+      groupPenalty: 0.0,
+      total: 0.95,
+    );
+    return <ShortlistCandidate>[
+      ShortlistCandidate(
+        movie: Movie(
+          id: '550',
+          tmdbId: 550,
+          title: 'Fight Club',
+          originalTitle: 'Fight Club',
+          overview:
+              'An insomniac office worker and a soapmaker form an underground fight club.',
+          posterUrl:
+              'https://image.tmdb.org/t/p/w500/pB8BM7pv12mEaaA8v17fSSJbxr9.jpg',
+          backdropUrl: '',
+          releaseYear: 1999,
+          runtime: 139,
+          genres: const ['Drama', 'Thriller'],
+          director: 'David Fincher',
+          cast: const ['Brad Pitt', 'Edward Norton'],
+          rating: 8.4,
+          mediaType: CatalogMediaType.movie,
+          trailerUrl: '',
+        ),
+        compatibilityScore: 0.95,
+        explanationTags: const ['Highly compatible'],
+        scoreBreakdown: mockBreakdown,
+      ),
+      ShortlistCandidate(
+        movie: Movie(
+          id: '27205',
+          tmdbId: 27205,
+          title: 'Inception',
+          originalTitle: 'Inception',
+          overview:
+              'A thief who steals corporate secrets through dream-sharing technology.',
+          posterUrl:
+              'https://image.tmdb.org/t/p/w500/oYu2QhxWgVnsD2yc76eia2tIYpq.jpg',
+          backdropUrl: '',
+          releaseYear: 2010,
+          runtime: 148,
+          genres: const ['Action', 'Sci-Fi'],
+          director: 'Christopher Nolan',
+          cast: const ['Leonardo DiCaprio'],
+          rating: 8.3,
+          mediaType: CatalogMediaType.movie,
+          trailerUrl: '',
+        ),
+        compatibilityScore: 0.88,
+        explanationTags: const ['Highly compatible'],
+        scoreBreakdown: mockBreakdown,
+      ),
+    ];
   }
 
   Future<MovieNightEvent?> updateEventConstraints({
@@ -630,6 +716,29 @@ class FriendsMovieNightController
     return updated;
   }
 
+  Future<bool> leaveMovieNight(String eventId) async {
+    final previous = state;
+    state = state.copyWith(
+      movieNights: state.movieNights
+          .where((event) => event.id != eventId)
+          .toList(growable: false),
+    );
+    if (_usingBackend) {
+      try {
+        final left = await _backendSocialService.leaveMovieNight(eventId);
+        if (!left) {
+          state = previous;
+        }
+        return left;
+      } catch (error) {
+        debugPrint('Error leaving backend Movie Night: $error');
+        state = previous;
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<MovieNightEvent?> startVoting(String eventId) async {
     // Idempotency guard: avoid duplicate transitions for the same event
     if (state.inflightEventIds.contains(eventId)) {
@@ -680,8 +789,10 @@ class FriendsMovieNightController
               tmdbId: 550,
               title: 'Fight Club',
               originalTitle: 'Fight Club',
-              overview: 'An insomniac office worker and a soapmaker form an underground fight club.',
-              posterUrl: 'https://image.tmdb.org/t/p/w500/pB8BM7pv12mEaaA8v17fSSJbxr9.jpg',
+              overview:
+                  'An insomniac office worker and a soapmaker form an underground fight club.',
+              posterUrl:
+                  'https://image.tmdb.org/t/p/w500/pB8BM7pv12mEaaA8v17fSSJbxr9.jpg',
               backdropUrl: '',
               releaseYear: 1999,
               runtime: 139,
@@ -702,8 +813,10 @@ class FriendsMovieNightController
               tmdbId: 27205,
               title: 'Inception',
               originalTitle: 'Inception',
-              overview: 'A thief who steals corporate secrets through the use of dream-sharing technology.',
-              posterUrl: 'https://image.tmdb.org/t/p/w500/oYu2QhxWgVnsD2yc76eia2tIYpq.jpg',
+              overview:
+                  'A thief who steals corporate secrets through the use of dream-sharing technology.',
+              posterUrl:
+                  'https://image.tmdb.org/t/p/w500/oYu2QhxWgVnsD2yc76eia2tIYpq.jpg',
               backdropUrl: '',
               releaseYear: 2010,
               runtime: 148,
@@ -833,7 +946,9 @@ class FriendsMovieNightController
       final event = state.eventById(eventId);
       if (event == null) return null;
 
-      final updatedParticipants = List<MovieNightParticipant>.from(event.participants);
+      final updatedParticipants = List<MovieNightParticipant>.from(
+        event.participants,
+      );
       for (final friendId in friendIds) {
         if (!updatedParticipants.any((p) => p.userId == friendId)) {
           final friendIndex = state.friends.indexWhere((f) => f.id == friendId);
@@ -1013,6 +1128,55 @@ final friendsMovieNightControllerProvider =
         ref.watch(backendSocialServiceProvider),
       );
     });
+
+List<Friend> _localFriendSeed() {
+  final privacy = PrivacySettings.open();
+  return <Friend>[
+    Friend(
+      id: 'friend-giulia',
+      name: 'Giulia Moretti',
+      avatarUrl: '',
+      watchedCount: 42,
+      reviewsCount: 8,
+      privacySettings: privacy,
+    ),
+    Friend(
+      id: 'friend-nina',
+      name: 'Nina Ahmed',
+      avatarUrl: '',
+      watchedCount: 37,
+      reviewsCount: 6,
+      privacySettings: privacy,
+    ),
+    Friend(
+      id: 'friend-leo',
+      name: 'Leo Martin',
+      avatarUrl: '',
+      watchedCount: 29,
+      reviewsCount: 4,
+      privacySettings: privacy,
+    ),
+  ];
+}
+
+List<FriendRequest> _localIncomingRequestSeed() {
+  return <FriendRequest>[
+    FriendRequest(
+      id: 'request-sofia',
+      fromUser: Friend(
+        id: 'friend-sofia',
+        name: 'Sofia Russo',
+        avatarUrl: '',
+        watchedCount: 18,
+        reviewsCount: 3,
+        privacySettings: PrivacySettings.open(),
+      ),
+      toUserId: 'local-host',
+      status: FriendRequestStatus.pending,
+      createdAt: DateTime(2026),
+    ),
+  ];
+}
 
 List<Friend> _rankedFriendSearchResults(
   List<Friend> friends,

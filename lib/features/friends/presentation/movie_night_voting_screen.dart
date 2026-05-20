@@ -2,6 +2,7 @@ import 'package:agreeo/features/friends/presentation/movie_night_result_screen.d
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,15 +17,37 @@ class MovieNightVotingScreen extends ConsumerStatefulWidget {
       _MovieNightVotingScreenState();
 }
 
-class _MovieNightVotingScreenState
-    extends ConsumerState<MovieNightVotingScreen> {
+class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   final List<_VoteHistoryEntry> _voteHistory = <_VoteHistoryEntry>[];
   bool _navigatedToResult = false;
+  late final AnimationController _swipeController;
+  Animation<Offset>? _swipeAnimation;
+  Offset _dragOffset = Offset.zero;
+  bool _isSubmittingSwipe = false;
+  int _cardVersion = 0;
 
   @override
   void initState() {
     super.initState();
+    _swipeController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 260),
+        )..addListener(() {
+          final animation = _swipeAnimation;
+          if (animation == null || !mounted) {
+            return;
+          }
+          setState(() => _dragOffset = animation.value);
+        });
+  }
+
+  @override
+  void dispose() {
+    _swipeController.dispose();
+    super.dispose();
   }
 
   List<ShortlistCandidate> _unvotedCandidates(
@@ -37,7 +60,7 @@ class _MovieNightVotingScreenState
     }).toList();
   }
 
-  Future<void> _submitVote(
+  Future<bool> _submitVote(
     MovieNightEvent event,
     ShortlistCandidate candidate,
     MovieNightVoteValue voteValue,
@@ -52,21 +75,25 @@ class _MovieNightVotingScreenState
       vote: voteValue,
     );
 
-    if (!mounted) return;
+    if (!mounted) return false;
 
     if (updated == null) {
       _voteHistory.removeLast();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not submit this vote.')),
       );
-      return;
+      setState(() => _dragOffset = Offset.zero);
+      return false;
     }
 
     if (updated.status != MovieNightStatus.completed) {
       setState(() {
         _currentIndex = 0;
+        _dragOffset = Offset.zero;
+        _cardVersion++;
       });
     }
+    return true;
   }
 
   Future<void> _undoLastVote(MovieNightEvent event) async {
@@ -93,6 +120,47 @@ class _MovieNightVotingScreenState
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Could not undo vote.')));
+    }
+  }
+
+  Future<void> _animateDragTo(Offset target) async {
+    _swipeController.stop();
+    _swipeAnimation = Tween<Offset>(begin: _dragOffset, end: target).animate(
+      CurvedAnimation(parent: _swipeController, curve: Curves.easeOutCubic),
+    );
+    await _swipeController.forward(from: 0);
+  }
+
+  Future<void> _handlePanEnd(
+    DragEndDetails details,
+    MovieNightEvent event,
+    ShortlistCandidate candidate,
+  ) async {
+    if (_isSubmittingSwipe) {
+      return;
+    }
+    final width = MediaQuery.sizeOf(context).width;
+    final velocityX = details.velocity.pixelsPerSecond.dx;
+    final shouldVote =
+        _dragOffset.dx.abs() > width * 0.28 || velocityX.abs() > 650;
+    if (!shouldVote) {
+      await _animateDragTo(Offset.zero);
+      return;
+    }
+
+    final voteLike = velocityX.abs() > _dragOffset.dx.abs()
+        ? velocityX > 0
+        : _dragOffset.dx > 0;
+    final vote = voteLike
+        ? MovieNightVoteValue.like
+        : MovieNightVoteValue.dislike;
+    final target = Offset((voteLike ? 1 : -1) * (width + 260), _dragOffset.dy);
+
+    setState(() => _isSubmittingSwipe = true);
+    await _animateDragTo(target);
+    await _submitVote(event, candidate, vote);
+    if (mounted) {
+      setState(() => _isSubmittingSwipe = false);
     }
   }
 
@@ -124,6 +192,11 @@ class _MovieNightVotingScreenState
     final unvoted = _unvotedCandidates(event, controller);
     final votedCount = event.shortlist.length - unvoted.length;
     final totalCandidates = event.shortlist.length;
+    final completedVoterIds = movieNightCompletedVoterIds(event).toSet();
+    final joinedParticipants = event.joinedParticipants;
+    final votedParticipantCount = joinedParticipants
+        .where((participant) => completedVoterIds.contains(participant.userId))
+        .length;
 
     if (unvoted.isEmpty) {
       return Scaffold(
@@ -165,10 +238,11 @@ class _MovieNightVotingScreenState
                       const SizedBox(height: 24),
                       Text(
                         'All votes in!',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -179,11 +253,20 @@ class _MovieNightVotingScreenState
                           fontSize: 16,
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      _ParticipantVoteProgressCard(
+                        participants: joinedParticipants,
+                        votedUserIds: completedVoterIds,
+                        votedCount: votedParticipantCount,
+                      ),
                       const SizedBox(height: 32),
                       if (_voteHistory.isNotEmpty)
                         OutlinedButton.icon(
                           onPressed: () => _undoLastVote(event),
-                          icon: const Icon(Icons.undo_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.undo_rounded,
+                            color: Colors.white,
+                          ),
                           label: const Text(
                             'Undo last vote',
                             style: TextStyle(color: Colors.white),
@@ -209,6 +292,10 @@ class _MovieNightVotingScreenState
     final nextCandidate = unvoted.length > 1
         ? unvoted[(_currentIndex + 1).clamp(0, unvoted.length - 1)]
         : null;
+    final dragProgress =
+        (_dragOffset.dx.abs() / (MediaQuery.sizeOf(context).width * 0.45))
+            .clamp(0.0, 1.0)
+            .toDouble();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -218,73 +305,123 @@ class _MovieNightVotingScreenState
           // Background card (next movie visible behind)
           if (nextCandidate != null && nextCandidate != currentCandidate)
             Positioned.fill(
-              child: _VotingImmersiveCard(
-                candidate: nextCandidate,
-                isBackground: true,
+              child: AnimatedScale(
+                scale: 0.94 + (dragProgress * 0.04),
+                duration: const Duration(milliseconds: 120),
+                curve: Curves.easeOutCubic,
+                child: _VotingImmersiveCard(
+                  candidate: nextCandidate,
+                  isBackground: true,
+                ),
               ),
             ),
 
           // Current card (swipeable)
           Positioned.fill(
-            child: Dismissible(
-              key: ValueKey<String>(currentCandidate.movie.id),
-              direction: DismissDirection.horizontal,
-              resizeDuration: null,
-              movementDuration: const Duration(milliseconds: 240),
-              background: const _SwipeVoteBackground(
-                alignment: Alignment.centerLeft,
-                icon: Icons.favorite_rounded,
-                label: 'Like',
-                color: Color(0xFF16A34A),
-              ),
-              secondaryBackground: const _SwipeVoteBackground(
-                alignment: Alignment.centerRight,
-                icon: Icons.close_rounded,
-                label: 'Dislike',
-                color: Color(0xFFDC2626),
-              ),
-              onDismissed: (direction) {
-                final vote = direction == DismissDirection.startToEnd
-                    ? MovieNightVoteValue.like
-                    : MovieNightVoteValue.dislike;
-                _submitVote(event, currentCandidate, vote);
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.08),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
               },
-              child: _VotingImmersiveCard(
-                candidate: currentCandidate,
-                isBackground: false,
-                progress: '${votedCount + 1}/$totalCandidates',
-                onInfoTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AgreeoMovieDetailsScreen(
-                        movieId: currentCandidate.movie.id,
+              child: GestureDetector(
+                key: ValueKey<String>(
+                  '${currentCandidate.movie.id}-$_cardVersion',
+                ),
+                onPanUpdate: _isSubmittingSwipe
+                    ? null
+                    : (details) {
+                        setState(() {
+                          _dragOffset += details.delta;
+                        });
+                      },
+                onPanEnd: (details) =>
+                    _handlePanEnd(details, event, currentCandidate),
+                onPanCancel: () => _animateDragTo(Offset.zero),
+                child: AnimatedBuilder(
+                  animation: _swipeController,
+                  builder: (context, child) {
+                    final width = MediaQuery.sizeOf(context).width;
+                    final rotation =
+                        (_dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() *
+                        0.18;
+                    final overlayProgress =
+                        (_dragOffset.dx.abs() / (width * 0.42))
+                            .clamp(0.0, 1.0)
+                            .toDouble();
+                    return Transform.translate(
+                      offset: _dragOffset,
+                      child: Transform.rotate(
+                        angle: rotation,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: <Widget>[
+                            _VotingImmersiveCard(
+                              candidate: currentCandidate,
+                              isBackground: false,
+                              progress: '${votedCount + 1}/$totalCandidates',
+                              onInfoTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => AgreeoMovieDetailsScreen(
+                                      movieId: currentCandidate.movie.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                              actions: _VotingCardActions(
+                                canUndo: _voteHistory.isNotEmpty,
+                                onUndo: () => _undoLastVote(event),
+                                onDislike: () {
+                                  _submitVote(
+                                    event,
+                                    currentCandidate,
+                                    MovieNightVoteValue.dislike,
+                                  );
+                                },
+                                onAlreadySeen: () {
+                                  _submitVote(
+                                    event,
+                                    currentCandidate,
+                                    MovieNightVoteValue.alreadySeen,
+                                  );
+                                },
+                                onLike: () {
+                                  _submitVote(
+                                    event,
+                                    currentCandidate,
+                                    MovieNightVoteValue.like,
+                                  );
+                                },
+                                onNeutral: () {
+                                  _submitVote(
+                                    event,
+                                    currentCandidate,
+                                    MovieNightVoteValue.neutral,
+                                  );
+                                },
+                              ),
+                            ),
+                            if (overlayProgress > 0)
+                              _SwipeStampOverlay(
+                                progress: overlayProgress,
+                                isLike: _dragOffset.dx >= 0,
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-                actions: _VotingCardActions(
-                  canUndo: _voteHistory.isNotEmpty,
-                  onUndo: () => _undoLastVote(event),
-                  onDislike: () => _submitVote(
-                    event,
-                    currentCandidate,
-                    MovieNightVoteValue.dislike,
-                  ),
-                  onAlreadySeen: () => _submitVote(
-                    event,
-                    currentCandidate,
-                    MovieNightVoteValue.alreadySeen,
-                  ),
-                  onLike: () => _submitVote(
-                    event,
-                    currentCandidate,
-                    MovieNightVoteValue.like,
-                  ),
-                  onNeutral: () => _submitVote(
-                    event,
-                    currentCandidate,
-                    MovieNightVoteValue.neutral,
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -317,6 +454,134 @@ class _MovieNightVotingScreenState
   }
 }
 
+class _ParticipantVoteProgressCard extends StatelessWidget {
+  const _ParticipantVoteProgressCard({
+    required this.participants,
+    required this.votedUserIds,
+    required this.votedCount,
+  });
+
+  final List<MovieNightParticipant> participants;
+  final Set<String> votedUserIds;
+  final int votedCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = participants.length;
+    final progress = total == 0 ? 0.0 : votedCount / total;
+    return Card(
+      color: Colors.white.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '$votedCount/$total participants voted',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(999),
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF22C55E),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...participants.map((participant) {
+              final voted = votedUserIds.contains(participant.userId);
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  voted
+                      ? Icons.check_circle_rounded
+                      : Icons.hourglass_top_rounded,
+                  color: voted
+                      ? const Color(0xFF22C55E)
+                      : const Color(0xFFF59E0B),
+                ),
+                title: Text(
+                  participant.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  voted ? 'Voted' : 'Waiting...',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.68)),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwipeStampOverlay extends StatelessWidget {
+  const _SwipeStampOverlay({required this.progress, required this.isLike});
+
+  final double progress;
+  final bool isLike;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isLike ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    final alignment = isLike ? Alignment.topLeft : Alignment.topRight;
+    final angle = isLike ? -0.18 : 0.18;
+    final label = isLike ? 'LIKE \u2665' : 'NOPE \u2715';
+    return IgnorePointer(
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(38, 78, 38, 0),
+          child: Align(
+            alignment: alignment,
+            child: Opacity(
+              opacity: progress,
+              child: Transform.rotate(
+                angle: angle,
+                child: Transform.scale(
+                  scale: 0.86 + progress * 0.24,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: color, width: 4),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VoteHistoryEntry {
   const _VoteHistoryEntry({required this.candidate, required this.vote});
   final ShortlistCandidate candidate;
@@ -341,7 +606,11 @@ class _VotingImmersiveCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final movie = candidate.movie;
-    String imageUrl = movie.posterUrl.isNotEmpty ? movie.posterUrl : movie.backdropUrl;
+    final actions = this.actions;
+    final actionWidgets = actions == null ? null : <Widget>[actions];
+    String imageUrl = movie.posterUrl.isNotEmpty
+        ? movie.posterUrl
+        : movie.backdropUrl;
     if (imageUrl.isNotEmpty) {
       if (!imageUrl.startsWith('http')) {
         imageUrl = 'https://image.tmdb.org/t/p/w780$imageUrl';
@@ -534,7 +803,7 @@ class _VotingImmersiveCard extends StatelessWidget {
                               ),
                             ],
                             const SizedBox(height: 24),
-                            if (actions != null) actions!,
+                            ...?actionWidgets,
                           ],
                         ),
                       ),
@@ -545,44 +814,6 @@ class _VotingImmersiveCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SwipeVoteBackground extends StatelessWidget {
-  const _SwipeVoteBackground({
-    required this.alignment,
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final Alignment alignment;
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: color.withValues(alpha: 0.8),
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      alignment: alignment,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, color: Colors.white, size: 48),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 24,
-            ),
-          ),
-        ],
       ),
     );
   }

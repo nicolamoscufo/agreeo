@@ -248,6 +248,16 @@ class BackendSocialService {
     return _decodeMovieNightEvent(_castMap(body['event']));
   }
 
+  Future<bool> leaveMovieNight(String eventId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'DELETE',
+        '/movie-nights/$eventId/participants/me',
+      )).body,
+    );
+    return body['ok'] == true;
+  }
+
   Future<MovieNightEvent> submitVote({
     required String eventId,
     required String movieId,
@@ -446,6 +456,7 @@ class BackendSocialService {
       votes: _decodeVotes(json['votes']),
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
+      votedUserIds: _stringList(json['votedUserIds']),
     );
   }
 
@@ -562,7 +573,9 @@ class BackendSocialService {
 
     var backdropUrl = _string(json['backdropUrl']);
     final backdropPath = _nullableString(json['backdropPath']);
-    if (backdropUrl.isEmpty && backdropPath != null && backdropPath.isNotEmpty) {
+    if (backdropUrl.isEmpty &&
+        backdropPath != null &&
+        backdropPath.isNotEmpty) {
       backdropUrl = 'https://image.tmdb.org/t/p/w1280$backdropPath';
     } else if (backdropUrl.isNotEmpty && !backdropUrl.startsWith('http')) {
       backdropUrl = 'https://image.tmdb.org/t/p/w1280$backdropUrl';
@@ -673,7 +686,10 @@ class BackendSocialService {
       if (list is List) {
         return list
             .whereType<Map>()
-            .map((item) => InAppNotification.fromJson(item.cast<String, dynamic>()))
+            .map(
+              (item) =>
+                  InAppNotification.fromJson(item.cast<String, dynamic>()),
+            )
             .toList();
       }
     } catch (e) {
@@ -684,7 +700,10 @@ class BackendSocialService {
 
   Future<bool> markNotificationAsRead(String notificationId) async {
     try {
-      final response = await _authorizedRequest('POST', '/notifications/$notificationId/read');
+      final response = await _authorizedRequest(
+        'POST',
+        '/notifications/$notificationId/read',
+      );
       final body = _decodeMap(response.body);
       return body['ok'] == true;
     } catch (e) {

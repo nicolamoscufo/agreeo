@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
@@ -12,40 +12,46 @@ class RealTimeService {
   RealTimeService(this._ref);
 
   final Ref _ref;
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String? _currentUserId;
 
   void connect(String userId) {
     if (_socket != null && _currentUserId == userId) {
       return;
     }
-    
+
     if (_socket != null) {
       disconnect();
     }
 
     _currentUserId = userId;
+    _ref.read(realTimeConnectionProvider.notifier).state = false;
     final baseUrl = BackendConfig.fromEnv().baseUrl;
-    
+
     debugPrint('[RealTimeService] Connecting to Socket.io at $baseUrl');
-    
-    _socket = IO.io(baseUrl, IO.OptionBuilder()
-      .setTransports(['websocket'])
-      .disableAutoConnect()
-      .build()
+
+    _socket = io.io(
+      baseUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .build(),
     );
 
     _socket!.onConnect((_) {
       debugPrint('[RealTimeService] Connected! Authenticating user: $userId');
+      _ref.read(realTimeConnectionProvider.notifier).state = true;
       _socket!.emit('authenticate', {'userId': userId});
     });
 
     _socket!.onDisconnect((_) {
       debugPrint('[RealTimeService] Disconnected');
+      _ref.read(realTimeConnectionProvider.notifier).state = false;
     });
 
     _socket!.onConnectError((data) {
       debugPrint('[RealTimeService] Connection error: $data');
+      _ref.read(realTimeConnectionProvider.notifier).state = false;
     });
 
     // Listen to friend request events
@@ -101,6 +107,7 @@ class RealTimeService {
       _socket = null;
     }
     _currentUserId = null;
+    _ref.read(realTimeConnectionProvider.notifier).state = false;
   }
 
   void _handleFriendRequestReceived(dynamic data) {
@@ -110,7 +117,7 @@ class RealTimeService {
         fromName = data['fromUser']['name'] ?? 'Someone';
       }
     } catch (_) {}
-    
+
     NotificationService.instance.showGenericNotification(
       id: 2001,
       title: 'New Friend Request',
@@ -126,7 +133,7 @@ class RealTimeService {
         friendName = data['friendName'] ?? 'Someone';
       }
     } catch (_) {}
-    
+
     NotificationService.instance.showGenericNotification(
       id: 2002,
       title: 'Friend Request Accepted',
@@ -166,7 +173,9 @@ class RealTimeService {
     try {
       if (data is Map && data['event'] is Map) {
         final eventMap = Map<String, dynamic>.from(data['event'] as Map);
-        decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
+        decodedEvent = _ref
+            .read(backendSocialServiceProvider)
+            .decodeMovieNightEvent(eventMap);
         eventName = decodedEvent.name;
         eventId = decodedEvent.id;
       }
@@ -178,9 +187,13 @@ class RealTimeService {
       body: 'Voting has started for "$eventName"!',
     );
     if (decodedEvent != null) {
-      _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+      _ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .handleSocketMovieNightUpdated(decodedEvent);
     } else if (eventId != null) {
-      _ref.read(friendsMovieNightControllerProvider.notifier).refreshMovieNight(eventId);
+      _ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .refreshMovieNight(eventId);
     } else {
       _refreshAll();
     }
@@ -196,7 +209,9 @@ class RealTimeService {
         winnerTitle = data['winnerTitle'] ?? '';
         if (data['event'] is Map) {
           final eventMap = Map<String, dynamic>.from(data['event'] as Map);
-          decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
+          decodedEvent = _ref
+              .read(backendSocialServiceProvider)
+              .decodeMovieNightEvent(eventMap);
           eventName = decodedEvent.name;
           eventId = decodedEvent.id;
         }
@@ -209,9 +224,13 @@ class RealTimeService {
       body: 'Decision reached for "$eventName"! Winner: $winnerTitle.',
     );
     if (decodedEvent != null) {
-      _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+      _ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .handleSocketMovieNightUpdated(decodedEvent);
     } else if (eventId != null) {
-      _ref.read(friendsMovieNightControllerProvider.notifier).refreshMovieNight(eventId);
+      _ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .refreshMovieNight(eventId);
     } else {
       _refreshAll();
     }
@@ -221,8 +240,12 @@ class RealTimeService {
     try {
       if (data is Map && data['event'] is Map) {
         final eventMap = Map<String, dynamic>.from(data['event'] as Map);
-        final decodedEvent = _ref.read(backendSocialServiceProvider).decodeMovieNightEvent(eventMap);
-        _ref.read(friendsMovieNightControllerProvider.notifier).handleSocketMovieNightUpdated(decodedEvent);
+        final decodedEvent = _ref
+            .read(backendSocialServiceProvider)
+            .decodeMovieNightEvent(eventMap);
+        _ref
+            .read(friendsMovieNightControllerProvider.notifier)
+            .handleSocketMovieNightUpdated(decodedEvent);
         return;
       }
     } catch (e) {
@@ -238,11 +261,13 @@ class RealTimeService {
         final stateName = data['stateName']?.toString();
         final value = data['value'] == true;
         if (tmdbId != null && stateName != null) {
-          _ref.read(agreeoAppControllerProvider.notifier).handleSocketMovieStateChanged(
-            tmdbId: tmdbId,
-            stateName: stateName,
-            value: value,
-          );
+          _ref
+              .read(agreeoAppControllerProvider.notifier)
+              .handleSocketMovieStateChanged(
+                tmdbId: tmdbId,
+                stateName: stateName,
+                value: value,
+              );
         }
       }
     } catch (e) {
@@ -257,7 +282,9 @@ class RealTimeService {
 
   void _refreshSocial() {
     try {
-      _ref.read(friendsMovieNightControllerProvider.notifier).refreshSocialLayer();
+      _ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .refreshSocialLayer();
     } catch (e) {
       debugPrint('[RealTimeService] Error refreshing social provider: $e');
     }
@@ -267,7 +294,9 @@ class RealTimeService {
     try {
       _ref.read(notificationsProvider.notifier).refreshNotifications();
     } catch (e) {
-      debugPrint('[RealTimeService] Error refreshing notifications provider: $e');
+      debugPrint(
+        '[RealTimeService] Error refreshing notifications provider: $e',
+      );
     }
   }
 }
@@ -275,3 +304,5 @@ class RealTimeService {
 final realTimeServiceProvider = Provider<RealTimeService>((ref) {
   return RealTimeService(ref);
 });
+
+final realTimeConnectionProvider = StateProvider<bool>((ref) => false);

@@ -3,12 +3,17 @@ import 'package:agreeo/features/friends/state/friends_movie_night_controller.dar
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MovieNightWizardScreen extends ConsumerStatefulWidget {
-  const MovieNightWizardScreen({super.key});
+  const MovieNightWizardScreen({
+    super.key,
+    this.preSelectedFriendIds = const <String>[],
+  });
+
+  final List<String> preSelectedFriendIds;
 
   @override
   ConsumerState<MovieNightWizardScreen> createState() =>
@@ -17,11 +22,8 @@ class MovieNightWizardScreen extends ConsumerStatefulWidget {
 
 class _MovieNightWizardScreenState
     extends ConsumerState<MovieNightWizardScreen> {
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Friday Movie Night',
-  );
+  late final TextEditingController _nameController;
   final TextEditingController _friendSearchController = TextEditingController();
-  final PageController _pageController = PageController();
   int _step = 0;
   DateTime? _dateTime;
   final Set<String> _includedGenres = <String>{};
@@ -29,14 +31,20 @@ class _MovieNightWizardScreenState
   int _maxDurationMinutes = 150;
   double? _minimumRating;
   String? _language;
-  final Set<String> _selectedFriendIds = <String>{};
+  late final Set<String> _selectedFriendIds;
   String _friendSearch = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: _defaultMovieNightName());
+    _selectedFriendIds = widget.preSelectedFriendIds.toSet();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _friendSearchController.dispose();
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -114,43 +122,92 @@ class _MovieNightWizardScreenState
     ];
     final page = pages[_step];
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(title: const Text('Create Movie Night')),
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                children: <Widget>[
-                  _WizardHero(page: page, step: _step),
-                  const SizedBox(height: 18),
-                  _StepDots(step: _step),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height * 0.58,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: pages.length,
-                      itemBuilder: (context, index) {
-                        return _WizardCard(page: pages[index]);
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        await _confirmExit();
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: AppBar(
+          title: const Text('Create Movie Night'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: _confirmExit,
+          ),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: <Widget>[
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  children: <Widget>[
+                    _WizardHero(page: page, step: _step),
+                    const SizedBox(height: 18),
+                    _StepDots(step: _step),
+                    const SizedBox(height: 18),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.04, 0),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        );
                       },
+                      child: _WizardCard(key: ValueKey<int>(_step), page: page),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            _WizardActions(
-              step: _step,
-              onBack: _step == 0 ? null : () => _goToStep(_step - 1),
-              onContinue: _continue,
-            ),
-          ],
+              _WizardActions(
+                step: _step,
+                onBack: _step == 0 ? null : () => _goToStep(_step - 1),
+                onContinue: _continue,
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmExit() async {
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Leave Movie Night setup?'),
+          content: const Text(
+            'You will lose the Movie Night settings you selected.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Leave'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldLeave == true && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _pickDateTime() async {
@@ -263,11 +320,19 @@ class _MovieNightWizardScreenState
   void _goToStep(int step) {
     final nextStep = step.clamp(0, 2);
     setState(() => _step = nextStep);
-    _pageController.animateToPage(
-      nextStep,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
+  }
+
+  String _defaultMovieNightName() {
+    const weekdays = <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    return '${weekdays[DateTime.now().weekday - 1]} Movie Night';
   }
 
   void _showError(String message) {
@@ -460,7 +525,7 @@ class _StepDots extends StatelessWidget {
 }
 
 class _WizardCard extends StatelessWidget {
-  const _WizardCard({required this.page});
+  const _WizardCard({super.key, required this.page});
 
   final _WizardPageData page;
 
@@ -526,9 +591,7 @@ class _WizardActions extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onContinue,
               icon: Icon(
-                isLast
-                    ? Icons.done_rounded
-                    : Icons.arrow_forward_rounded,
+                isLast ? Icons.done_rounded : Icons.arrow_forward_rounded,
               ),
               label: Text(isLast ? 'Create Movie Night' : 'Continue'),
             ),
@@ -568,7 +631,9 @@ class _BasicsStep extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.event_rounded),
           title: Text(
-            dateTime == null ? 'Optional date/time' : _dateLabel(dateTime!),
+            dateTime == null
+                ? 'Optional date/time'
+                : movieNightDateLabel(dateTime, includeTime: true),
           ),
           subtitle: const Text(
             'Set this only if the group already has a time.',
@@ -762,12 +827,4 @@ class _InviteStep extends StatelessWidget {
       ],
     );
   }
-}
-
-String _dateLabel(DateTime dateTime) {
-  final date =
-      '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
-  final time =
-      '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  return '$date $time';
 }

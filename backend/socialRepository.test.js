@@ -115,12 +115,12 @@ test('acceptFriendRequest creates one undirected friendship relationship', async
 
   neo4jService.run = async (query, params) => {
     calls.push({ query, params });
-    return { records: [record({ friendId: 'friend-1' })] };
+    return { records: [record({ friendId: 'friend-1', accepterName: 'User', senderName: 'Friend' })] };
   };
 
   const accepted = await socialRepository.acceptFriendRequest('user-1', 'request-1');
 
-  assert.equal(accepted, true);
+  assert.deepEqual(accepted, { friendId: 'friend-1', accepterName: 'User', senderName: 'Friend' });
   assert.equal(calls.length, 1);
   assert.match(calls[0].query, /MERGE \(me\)-\[a:FRIEND\]-\(from\)/);
   assert.doesNotMatch(calls[0].query, /MERGE \(from\)-\[b:FRIEND\]->\(me\)/);
