@@ -215,7 +215,7 @@ async function searchFriends(uid, query) {
     WITH me, candidate, toLower(coalesce(candidate.displayName, candidate.email, '')) AS rawSearchText
     WITH me, candidate, replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(rawSearchText, 'à', 'a'), 'è', 'e'), 'é', 'e'), 'ì', 'i'), 'ò', 'o'), 'ù', 'u'), '.', ' '), '-', ' '), '_', ' '), "'", ' ') AS searchText
     WHERE candidate.uid <> me.uid
-      AND (size($tokens) = 0 OR all(token IN $tokens WHERE searchText CONTAINS token))
+      AND (size($tokens) = 0 OR all(token IN $tokens WHERE any(word IN split(searchText, ' ') WHERE word STARTS WITH token)))
     OPTIONAL MATCH (me)-[friendRel:FRIEND]-(candidate)
     OPTIONAL MATCH (me)-[pending:SENT_FRIEND_REQUEST {status: 'pending'}]->(candidate)
     OPTIONAL MATCH (candidate)-[:ALREADY_SEEN]->(watched:Movie)

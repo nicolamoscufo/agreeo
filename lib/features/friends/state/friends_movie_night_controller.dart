@@ -122,7 +122,7 @@ class FriendsMovieNightController
     }
   }
 
-  void searchFriends(String query) {
+  void searchFriends(String query, {bool syncBackend = true}) {
     final tokens = _searchTokens(query);
     _latestSearchKey = tokens.join(' ');
     final regex = _friendSearchRegex(tokens);
@@ -130,7 +130,7 @@ class FriendsMovieNightController
         ? state.discoverableUsers
         : _rankedFriendSearchResults(state.discoverableUsers, tokens, regex);
     state = state.copyWith(searchResults: results);
-    if (_usingBackend) {
+    if (_usingBackend && syncBackend) {
       Future<void>.microtask(() => _searchFriendsBackend(query));
     }
   }
@@ -871,7 +871,7 @@ int _friendSearchScore(String name, String id, List<String> tokens) {
 
 RegExp _friendSearchRegex(List<String> tokens) {
   final lookaheads = tokens
-      .map((token) => '(?=.*${RegExp.escape(token)})')
+      .map((token) => '(?=.*(?:^| )${RegExp.escape(token)})')
       .join();
   return RegExp('^$lookaheads.*\$', caseSensitive: false);
 }

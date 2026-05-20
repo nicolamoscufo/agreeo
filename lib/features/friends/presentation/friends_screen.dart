@@ -32,6 +32,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
   // Gestione intelligente della ricerca (evita spam al backend)
   void _onSearchChanged(String query) {
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .searchFriends(query, syncBackend: false);
     setState(
       () {},
     ); // Aggiorna la UI per mostrare i risultati solo se c'è testo
@@ -52,6 +55,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
     final theme = Theme.of(context);
+    final searchQuery = _searchController.text.trim();
 
     // Stile salvavita per evitare il crash "BoxConstraints(w=Infinity)"
     final safeButtonStyle = FilledButton.styleFrom(
@@ -76,42 +80,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                 style: safeButtonStyle, // Applicato per evitare il crash
               ),
             ),
-            const SizedBox(height: 22),
-            _FriendsListSection(
-              friends: socialState.friends,
-              onFriendTap: _openFriend,
-              onFindFriendsTap: () {
-                _searchFocusNode.requestFocus(); // Apre la tastiera
-                // Effettua un piccolo scroll verso il basso per mostrare la barra
-                Scrollable.ensureVisible(
-                  _searchFocusNode.context!,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              },
-            ),
-            const SizedBox(height: 26),
-            _RequestsSection(
-              requests: socialState.incomingRequests,
-              onAccept: controller.acceptFriendRequest,
-              onDecline: controller.declineFriendRequest,
-            ),
-            const SizedBox(height: 26),
-            const SectionHeader(
-              title: 'Search friends',
-              subtitle: 'Invite people who help the group decide faster.',
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
             AgreeoSearchBar(
               controller: _searchController,
               focusNode: _searchFocusNode,
-              hintText: 'Search by name',
+              hintText: 'Search friends by name',
               onChanged: _onSearchChanged,
             ),
-            const SizedBox(height: 14),
-
-            // I risultati appaiono solo se l'utente ha digitato qualcosa
-            if (_searchController.text.trim().isNotEmpty)
+            if (searchQuery.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 14),
               _SearchResults(
                 results: socialState.searchResults,
                 socialState: socialState,
@@ -124,7 +101,44 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   );
                 },
               ),
-
+            ],
+            const SizedBox(height: 24),
+            _RequestsSection(
+              requests: socialState.incomingRequests,
+              onAccept: (requestId) {
+                controller.acceptFriendRequest(requestId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Friend request accepted.')),
+                );
+              },
+              onDecline: (requestId) {
+                controller.declineFriendRequest(requestId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Friend request declined.')),
+                );
+              },
+            ),
+            const SizedBox(height: 26),
+            const SectionHeader(
+              title: 'Your friends',
+              subtitle: 'People available for future Movie Nights.',
+            ),
+            const SizedBox(height: 14),
+            _FriendsListSection(
+              friends: socialState.friends,
+              onFriendTap: _openFriend,
+              onFindFriendsTap: () {
+                _searchFocusNode.requestFocus(); // Apre la tastiera
+                final searchContext = _searchFocusNode.context;
+                if (searchContext != null) {
+                  Scrollable.ensureVisible(
+                    searchContext,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+            ),
             const SizedBox(height: 26),
             SectionHeader(
               title: 'Movie Nights',
@@ -309,47 +323,156 @@ class _RequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (requests.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const SectionHeader(
-          title: 'Friend requests',
-          subtitle: 'Accept people you want in future Movie Nights.',
-        ),
-        const SizedBox(height: 14),
-        ...requests.map(
-          (request) => Card(
-            child: ListTile(
-              leading: UserAvatar(initials: request.fromUser.initials),
-              title: Text(request.fromUser.name),
-              subtitle: Text(
-                '${request.fromUser.watchedCount} watched • ${request.fromUser.reviewsCount} reviews',
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.mark_email_unread_outlined,
+                  color: colorScheme.primary,
+                ),
               ),
-              trailing: Wrap(
-                spacing: 8,
-                children: <Widget>[
-                  TextButton(
-                    onPressed: () => onDecline(request.id),
-                    child: const Text('Decline'),
-                  ),
-                  FilledButton(
-                    onPressed: () => onAccept(request.id),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      maximumSize: const Size(120, 40), // Impedisce crash
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Friend requests',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                    child: const Text('Accept'),
-                  ),
-                ],
+                    Text(
+                      requests.isEmpty
+                          ? 'No pending requests right now.'
+                          : '${requests.length} pending request${requests.length == 1 ? '' : 's'} to review.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InfoBadge(label: '${requests.length}'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (requests.isEmpty)
+            Text(
+              'Incoming requests will appear here with Accept and Decline actions.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            )
+          else
+            ...requests.map(
+              (request) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _FriendRequestCard(
+                  request: request,
+                  onAccept: () => onAccept(request.id),
+                  onDecline: () => onDecline(request.id),
+                ),
               ),
             ),
-          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendRequestCard extends StatelessWidget {
+  const _FriendRequestCard({
+    required this.request,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  final FriendRequest request;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(22),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                UserAvatar(initials: request.fromUser.initials, size: 48),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        request.fromUser.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${request.fromUser.watchedCount} watched • ${request.fromUser.reviewsCount} reviews',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onDecline,
+                    child: const Text('Decline'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onAccept,
+                    child: const Text('Accept'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

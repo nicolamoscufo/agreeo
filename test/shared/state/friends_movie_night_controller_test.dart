@@ -103,6 +103,45 @@ void main() {
             .name,
         'Leo Martin',
       );
+
+      controller.searchFriends('a');
+      final aResults = container
+          .read(friendsMovieNightControllerProvider)
+          .searchResults
+          .map((friend) => friend.name)
+          .toList(growable: false);
+      expect(aResults, <String>['Nina Ahmed']);
     },
   );
+
+  test('accepting friend request moves requester into friends', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(
+          _OfflineBackendSocialService(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final request = container
+        .read(friendsMovieNightControllerProvider)
+        .incomingRequests
+        .single;
+    controller.acceptFriendRequest(request.id);
+
+    final state = container.read(friendsMovieNightControllerProvider);
+    expect(state.incomingRequests, isEmpty);
+    expect(
+      state.friends.any((friend) => friend.id == request.fromUser.id),
+      true,
+    );
+  });
 }
