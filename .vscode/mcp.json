@@ -4,10 +4,10 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "c:\\Users\\Anton\\.vscode\\extensions\\vexp.vexp-vscode-2.0.17-win32-x64\\dist\\mcp-server.cjs"
+        "c:\\Users\\Nicola\\.vscode\\extensions\\vexp.vexp-vscode-2.0.17-win32-x64\\dist\\mcp-server.cjs"
       ],
       "env": {
-        "VEXP_WORKSPACE": "c:\\Users\\Anton\\agreeo"
+        "VEXP_WORKSPACE": "c:\\Users\\Nicola\\Desktop\\Simple App\\agreeo"
       }
     }
   }

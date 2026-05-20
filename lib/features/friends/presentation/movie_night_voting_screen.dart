@@ -21,6 +21,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     with MovieNightAutoRefresh<MovieNightVotingScreen> {
   int _currentIndex = 0;
   final List<_VoteHistoryEntry> _voteHistory = <_VoteHistoryEntry>[];
+  bool _navigatedToResult = false;
 
   @override
   void initState() {
@@ -61,7 +62,8 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       return;
     }
 
-    if (updated.status == MovieNightStatus.completed) {
+    if (updated.status == MovieNightStatus.completed && !_navigatedToResult) {
+      _navigatedToResult = true;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => MovieNightResultScreen(eventId: event.id),
@@ -111,7 +113,8 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       );
     }
 
-    if (event.status == MovieNightStatus.completed) {
+    if (event.status == MovieNightStatus.completed && !_navigatedToResult) {
+      _navigatedToResult = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           Navigator.of(context).pushReplacement(

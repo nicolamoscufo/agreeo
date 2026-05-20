@@ -534,7 +534,6 @@ async function createMovieNight(uid, data) {
   if (invitedFriendIds.length > 0) {
     await inviteFriends(uid, eventId, invitedFriendIds);
   }
-  await generateShortlist(uid, eventId);
   return getMovieNight(uid, eventId);
 }
 
@@ -578,7 +577,6 @@ async function joinMovieNight(uid, eventId) {
   );
 
   if (result.records.length === 0) return null;
-  await generateShortlist(uid, eventId);
   return getMovieNight(uid, eventId);
 }
 
@@ -751,6 +749,8 @@ async function updateMovieNight(uid, eventId, data) {
   if (result.records.length === 0) return null;
   if (constraintsProvided) {
     await clearShortlistAndVotes(eventId);
+  }
+  if (status === 'voting') {
     await generateShortlist(uid, eventId);
   }
   return getMovieNight(uid, eventId);

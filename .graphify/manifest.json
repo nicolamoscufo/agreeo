@@ -1,0 +1,798 @@
+{
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\build.gradle.kts": {
+    "mtime": 1775930251679.9229,
+    "hash": "5d5d98e20b2ba66852b92489e9fdd1f0"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\kotlin\\com\\example\\agreeo\\MainActivity.kt": {
+    "mtime": 1775930251683.4915,
+    "hash": "0452fad330a56eaa94e02646599b6024"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\build.gradle.kts": {
+    "mtime": 1775930251683.4915,
+    "hash": "803fe22651fbe96ed401eb0b66a492d1"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\settings.gradle.kts": {
+    "mtime": 1775930251704.7324,
+    "hash": "f276a44edd917afd836899357fdae60e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\authController.js": {
+    "mtime": 1778428777402.2773,
+    "hash": "f6c92fe8f21b5d78a5bae12f63154d1b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\jwtUtils.js": {
+    "mtime": 1778423305449.4294,
+    "hash": "af19bdcbf8cb22470ab510a799de7345"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\movieController.js": {
+    "mtime": 1779205973769.733,
+    "hash": "e4f70be0a551ab89055c7c953fce13ad"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\movieController.test.js": {
+    "mtime": 1778775760705.7551,
+    "hash": "899a3f7b53ccfd5f40bcf32c4881b2e5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\movieRepository.js": {
+    "mtime": 1779205973770.2532,
+    "hash": "b7b84d2bd916f7703f6d364e78832d89"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\movieRepository.test.js": {
+    "mtime": 1779209229686.4573,
+    "hash": "d0860670e7196cd6fa4d5b16f545ed02"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\neo4jService.js": {
+    "mtime": 1779208771932.1406,
+    "hash": "c253a3f10e68f2b69156d38e96c1cbd6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\patchForYou.js": {
+    "mtime": 1779198706976.0884,
+    "hash": "2f491c83933be1844fe32e08994f4b51"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\register_and_test.js": {
+    "mtime": 1779198706976.5999,
+    "hash": "41850497e7ef1be66aa2a17e47bd8f58"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\register_and_test2.js": {
+    "mtime": 1779198706977.1106,
+    "hash": "78d1ceb91fdf31eb7fcf35c47c6fe9d8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\seedInitialUsers.js": {
+    "mtime": 1778435055834.6409,
+    "hash": "9d98f3fd3aec2a50df34fb0847c13eb5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\server.js": {
+    "mtime": 1779284877124.0176,
+    "hash": "4e10d744813dd0349c3f10305597f027"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\socialController.js": {
+    "mtime": 1779284871130.4775,
+    "hash": "ef8c43c32a5391ed7262e4710384a3b0"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\socialRepository.js": {
+    "mtime": 1779284859121.5386,
+    "hash": "b604b88cfd7f14e30784ed96a6ee4e37"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\socialRepository.test.js": {
+    "mtime": 1779285185135.4607,
+    "hash": "f944494df699e620e35af55513094d0b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testDaily.js": {
+    "mtime": 1779275834629.8489,
+    "hash": "a3f038cdc40e985991986c63905d06c5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testDailySuggestions.js": {
+    "mtime": 1779198706977.1106,
+    "hash": "48d69e0cfb596c9df6304fa84fc6e2fc"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testDailySuggestionsRoute.js": {
+    "mtime": 1779198706978.115,
+    "hash": "720ae4f6e5c97c5368b7a9d352a36b8a"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testFriends.js": {
+    "mtime": 1779275834629.8489,
+    "hash": "5f66fbaa610ca69f4eb49113bbd17951"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testFriends2.js": {
+    "mtime": 1779275834631.3706,
+    "hash": "4a8d82803a5b1f532304e37b504749c0"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testLike.js": {
+    "mtime": 1779275834631.3706,
+    "hash": "e9e242ec979052a2214f973cdb1192bb"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testLoadDaily.js": {
+    "mtime": 1779198706978.6182,
+    "hash": "ab550187ae175f1579fb8c5cab6d8732"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testLoadDaily2.js": {
+    "mtime": 1779198706978.6182,
+    "hash": "9ebeb71bbd5a05ba81cf76cf02a374c3"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testLoadDaily3.js": {
+    "mtime": 1779198706978.6182,
+    "hash": "548be5c19d29c17fb9593e3e053a8839"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\testSuggestions.js": {
+    "mtime": 1779198706979.6228,
+    "hash": "9d617444d74c8c8d9ec2b6d48745d15c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\tmdbClient.js": {
+    "mtime": 1778777201228.2812,
+    "hash": "e84aff5990ba38ba238c23822b6aa51c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\AppDelegate.swift": {
+    "mtime": 1775662518641.413,
+    "hash": "9e1de9c329a3fe4931876063de95132b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Runner-Bridging-Header.h": {
+    "mtime": 1775662518645.9973,
+    "hash": "7ad7b5cea096132de13ba526b2b9efbe"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\SceneDelegate.swift": {
+    "mtime": 1775662518645.9973,
+    "hash": "0c3e86af131f6a9e547c80b5ed058914"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\RunnerTests\\RunnerTests.swift": {
+    "mtime": 1775930251765.3826,
+    "hash": "24e5d095048eb86c30423f4e04b6e57b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\app.dart": {
+    "mtime": 1779285077625.6316,
+    "hash": "9c2a930e5d5ea8c2a270d9c1568afb2e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\config\\backend_config.dart": {
+    "mtime": 1778429093642.5151,
+    "hash": "154d2593e4ef1fc950eef25559db759f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\config\\neo4j_config.dart": {
+    "mtime": 1778429093787.3235,
+    "hash": "2f68dd98f46e312a4da06e52c5277b95"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\auth\\presentation\\auth_welcome_screen.dart": {
+    "mtime": 1779208039132.718,
+    "hash": "3cc5f5c777635b7eb12e2475409651b9"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\bootstrap\\presentation\\agreeo_bootstrap_gate.dart": {
+    "mtime": 1778259220877.0732,
+    "hash": "cbcd05b2ad024856ca7a91aa995bf8a8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\debug\\presentation\\recommendation_debug_screen.dart": {
+    "mtime": 1779205973770.7686,
+    "hash": "286ccf6185aa7680419d62ac6be58f90"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\friend_profile_screen.dart": {
+    "mtime": 1779209064048.2695,
+    "hash": "1375b09568b2b493bbc475d273475a66"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\friends_placeholder_screen.dart": {
+    "mtime": 1778258285908.997,
+    "hash": "cbb358d52ed15e1fb9fd188521beb2ef"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\friends_screen.dart": {
+    "mtime": 1779284955864.4924,
+    "hash": "1b9f4ef4e237cb999c56382b04983051"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\movie_night_auto_refresh.dart": {
+    "mtime": 1779284970165.5627,
+    "hash": "29d89f80b0b9bcd791f7523433f1b0bf"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\movie_night_result_screen.dart": {
+    "mtime": 1779285033517.8132,
+    "hash": "78922872eb784244c9e46086b2eba37c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\movie_night_voting_screen.dart": {
+    "mtime": 1779285013523.6345,
+    "hash": "936651b07fea3f7a6b22bc2ea371df3b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\movie_night_waiting_room_screen.dart": {
+    "mtime": 1779284990542.8481,
+    "hash": "1e9fb6572dbe2b6c546a76f91e0aebb5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\presentation\\movie_night_wizard_screen.dart": {
+    "mtime": 1779284297518.5557,
+    "hash": "5ff9edf9d6c5dd003c850c7f6d65fc1d"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\friends\\state\\friends_movie_night_controller.dart": {
+    "mtime": 1779284933504.248,
+    "hash": "511cf78194510ab7bb4507f06bbd0452"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\home\\presentation\\home_screen.dart": {
+    "mtime": 1779208000868.225,
+    "hash": "e203181ebeb053981c5d02624bf4c9b4"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\library\\presentation\\library_screen.dart": {
+    "mtime": 1779198706981.1514,
+    "hash": "fe0385aef987a2335a427d053ba38e17"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\movie_details\\presentation\\movie_details_screen.dart": {
+    "mtime": 1779198706982.1558,
+    "hash": "bc75d97c11a104b11c41ee1b213e8b30"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\onboarding\\presentation\\onboarding_flow_screen.dart": {
+    "mtime": 1779208085672.667,
+    "hash": "701cfc2d21396adc11526e9f710d51cf"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\profile\\presentation\\profile_screen.dart": {
+    "mtime": 1778780210717.4768,
+    "hash": "86bbbc5a1f6a317d6770cc6caea42064"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\shell\\presentation\\agreeo_home_shell.dart": {
+    "mtime": 1779285154121.9524,
+    "hash": "4d7faf1ae626036c49370ce78b784965"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\features\\swipe\\presentation\\swipe_screen.dart": {
+    "mtime": 1779275834633.416,
+    "hash": "a573134dc2281d0ada716fe08fd62aa9"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\main.dart": {
+    "mtime": 1778423305437.5957,
+    "hash": "5ae1a432ede37378e35711d84d832217"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\models\\app_models.dart": {
+    "mtime": 1778253279299.1492,
+    "hash": "c7374ab1e96850055ff35ca2d3c0a363"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\models\\neo4j\\neo4j_models.dart": {
+    "mtime": 1778433364934.4875,
+    "hash": "9a40bfe33d1b209069c1e3d7eb655f32"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\providers\\app_controller.dart": {
+    "mtime": 1778775760714.0308,
+    "hash": "68a77277ca31cc1b42d4f22b6bbc0a8a"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\providers\\app_providers.dart": {
+    "mtime": 1775935076272.1938,
+    "hash": "e408489576f0511604b0f066166e5793"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\providers\\theme_mode_provider.dart": {
+    "mtime": 1775935076280.984,
+    "hash": "e9bdd7297dbef287b11976b1108e35a8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\auth_service.dart": {
+    "mtime": 1778775760714.5352,
+    "hash": "43f7d184ca0cb4ac1cdbd2f177aaa8c8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\backend_movie_service.dart": {
+    "mtime": 1779199048129.2742,
+    "hash": "0306b464b007d8350905ff54eec5744e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\backend_service.dart": {
+    "mtime": 1779198706984.1685,
+    "hash": "57ab7fca8df69b3081b3773c0ea18a4a"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\backend_social_service.dart": {
+    "mtime": 1779284891134.406,
+    "hash": "ab52bbe59e58c986cdfa0718436cf574"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\neo4j_service.dart": {
+    "mtime": 1778422443194.946,
+    "hash": "ab07dfb6cc824fcd2ab30d4f1125d885"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\notification_service.dart": {
+    "mtime": 1778259801973.0654,
+    "hash": "6e505877771249e927d1ae25825b4091"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\services\\tmdb_service.dart": {
+    "mtime": 1778253279299.1492,
+    "hash": "61d2efc1cc3a0e6e56dbb7352a69ad6f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\components\\agreeo_bottom_navigation.dart": {
+    "mtime": 1779275834634.4207,
+    "hash": "34a720b2673d98e5c551afb7c45cd998"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\components\\filter_bottom_sheet.dart": {
+    "mtime": 1779198706985.1726,
+    "hash": "a70667a4e6e31919e8c17922119c311f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\components\\movie_widgets.dart": {
+    "mtime": 1779208039742.875,
+    "hash": "cb1029dcb45ec3c6f7d5538fa96cced7"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\components\\primitives.dart": {
+    "mtime": 1779275834634.4207,
+    "hash": "4cdde6227ae50377bad1e62141182761"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\components\\review_editor.dart": {
+    "mtime": 1778258165514.2827,
+    "hash": "c6ee332ffc17184eb729cc9ee96f9e00"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\mock_data\\mock_movies.dart": {
+    "mtime": 1778262316798.9028,
+    "hash": "56250c93264d9bfbddb0570deb0f1830"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\models\\agreeo_models.dart": {
+    "mtime": 1779198706986.681,
+    "hash": "aa7c3f20ff13cde78e0c046c1c08d5c0"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\models\\social_models.dart": {
+    "mtime": 1779208000932.5413,
+    "hash": "97f2b5a07c73e431bb51782ca6c4fbce"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\backend_catalog_movie_service.dart": {
+    "mtime": 1779199597634.4841,
+    "hash": "a07568d89d4eaefe6777fffc5680784c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\mock_auth_service.dart": {
+    "mtime": 1778775760717.5771,
+    "hash": "37be3a263cd8f7d5b4640b06bbf65b54"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\mock_movie_service.dart": {
+    "mtime": 1778785616124.0188,
+    "hash": "7965dda2655ab0d8ee848ab1bc8efb29"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\movie_service.dart": {
+    "mtime": 1778785585837.548,
+    "hash": "e87a3f63980ea52f92e54adebbf58221"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\shortlist_service.dart": {
+    "mtime": 1779208000934.067,
+    "hash": "60bf66d134d72dc54f4d29fa15636270"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\services\\user_movie_state_service.dart": {
+    "mtime": 1778779829576.865,
+    "hash": "ea3fe0c06f85fab5b51640804c0e269f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\state\\agreeo_app_controller.dart": {
+    "mtime": 1779275834635.9817,
+    "hash": "24595effd1080cd1e4af1a0f890eccad"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\state\\home_refresh_provider.dart": {
+    "mtime": 1779198706988.6934,
+    "hash": "770c51db51d99d2e76bd43852a596a10"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\state\\movie_night_invite_provider.dart": {
+    "mtime": 1779285057646.6785,
+    "hash": "0063ef76f0c6db7316856b6ba8ea8093"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\state\\nav_index_provider.dart": {
+    "mtime": 1779198706988.6934,
+    "hash": "05a0e69db01b76f2cbfa92af5dcabb72"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\theme\\agreeo_theme.dart": {
+    "mtime": 1779284583511.1309,
+    "hash": "c456a77bb77dff8f841e00720508067b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\shared\\utils\\movie_night_invite_links.dart": {
+    "mtime": 1779285047606.8398,
+    "hash": "9be025da598a1b64cfb64322a617e0ec"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\utils\\recommendation_engine.dart": {
+    "mtime": 1779199198040.6921,
+    "hash": "1a2ba54195ad6e2ba4c83280bc11eee3"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\utils\\sample_catalog.dart": {
+    "mtime": 1778253232302.794,
+    "hash": "0cdfecab1536498821378e775fb42a30"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\widgets\\consensus_banner.dart": {
+    "mtime": 1778259771172.275,
+    "hash": "b86348724ca69c172a62164439125bf2"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\widgets\\empty_state.dart": {
+    "mtime": 1778259771172.275,
+    "hash": "bf7ed2d2c4bfaaa4f87fbc56ae624fef"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\widgets\\gradient_scaffold.dart": {
+    "mtime": 1778259771178.1584,
+    "hash": "bd1173f7fe6a7d972315babb9532b813"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\widgets\\movie_card.dart": {
+    "mtime": 1779198706988.6934,
+    "hash": "f4b6602a924a4f81f626462f825ffd55"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\lib\\widgets\\section_header.dart": {
+    "mtime": 1778259870663.1318,
+    "hash": "9ddbe91a464f254410baaba5ecd9618b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\flutter\\generated_plugin_registrant.cc": {
+    "mtime": 1779284830626.2402,
+    "hash": "638422954f06f3ff805e3bb23521f938"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\flutter\\generated_plugin_registrant.h": {
+    "mtime": 1775930252238.4836,
+    "hash": "d295462c9da9f7fef22dc86c34492318"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\runner\\main.cc": {
+    "mtime": 1775662518649.0444,
+    "hash": "539395bcd63dba20afed0838d136189f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\runner\\my_application.cc": {
+    "mtime": 1775930251774.608,
+    "hash": "6e455c5adf5af4af205bcb8783baf479"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\runner\\my_application.h": {
+    "mtime": 1775662518649.0444,
+    "hash": "ffa1a7c0a2ad45a2c14a921596516ff8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Flutter\\GeneratedPluginRegistrant.swift": {
+    "mtime": 1779284830641.8313,
+    "hash": "a8ac25a875248b2e0b46b2d22ea484fd"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\AppDelegate.swift": {
+    "mtime": 1775662518652.184,
+    "hash": "4b52e0b89ebfef9baf45b04548c463d6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\MainFlutterWindow.swift": {
+    "mtime": 1775662518655.2268,
+    "hash": "93c22dae2d93f3dc1402e121901f582b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\RunnerTests\\RunnerTests.swift": {
+    "mtime": 1775930251814.355,
+    "hash": "8059f5d27a19c556eeafb49b3f9b7bdd"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\services\\backend_service_test.dart": {
+    "mtime": 1778253232307.5083,
+    "hash": "5f49186bf4ce4d06e9443e967d7834ee"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\services\\shortlist_service_test.dart": {
+    "mtime": 1779208000934.067,
+    "hash": "872c315c88dba9ffd027091fa60056ca"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\services\\tmdb_service_test.dart": {
+    "mtime": 1778253232305.9788,
+    "hash": "6fb99053c234609ec352126b3263a9f6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\services\\user_movie_state_service_test.dart": {
+    "mtime": 1778259147417.2283,
+    "hash": "cb98034c8d543219a6ddd21bf7909da6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\shared\\state\\agreeo_app_controller_test.dart": {
+    "mtime": 1778785775271.3645,
+    "hash": "5a8a95403b2748ce8c11497149d2a8a7"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\shared\\state\\friends_movie_night_controller_test.dart": {
+    "mtime": 1779285197516.927,
+    "hash": "54e855150d23cf58dc647d12732b3126"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\shared\\utils\\movie_night_invite_links_test.dart": {
+    "mtime": 1779285134879.0479,
+    "hash": "4a8a0bb6e6300f853092c5fd76ab17ab"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\utils\\recommendation_engine_test.dart": {
+    "mtime": 1778253232305.9788,
+    "hash": "2bf37f4bd1d902056c13bc7798848692"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\test\\widget_test.dart": {
+    "mtime": 1778775760721.107,
+    "hash": "eff740a975be2acff2658343c2bab161"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tools\\mcp\\flutter_analyze_server.py": {
+    "mtime": 1776072965896.6213,
+    "hash": "b70480621bbc85f43d6e08fe28e9806b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tools\\mcp\\flutter_runtime_server.py": {
+    "mtime": 1776078977230.239,
+    "hash": "c385c72c44c80e524a2d5519edc2fcba"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tools\\mcp\\web_browser_server.py": {
+    "mtime": 1776093176933.996,
+    "hash": "d53fc097e854794930b75e3fd6ed57b9"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tools\\mcp\\web_browser_server_async.py": {
+    "mtime": 1776115398300.072,
+    "hash": "a1955ffe1d20e2d37aebf80774e5fe3c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tools\\mcp\\workspace_git_server.py": {
+    "mtime": 1776073537518.6243,
+    "hash": "7656f433b9ca8add9593866aa320b554"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\flutter\\generated_plugin_registrant.cc": {
+    "mtime": 1779284830631.546,
+    "hash": "8f827c92146e46fc11f4e794a498348b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\flutter\\generated_plugin_registrant.h": {
+    "mtime": 1775930252241.5264,
+    "hash": "0ea33875f9f8e118f9c2ded03e2e2835"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\flutter_window.cpp": {
+    "mtime": 1775662518659.8108,
+    "hash": "2f463f9b7da67a2d692a012f9ea85e0c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\flutter_window.h": {
+    "mtime": 1775662518659.8108,
+    "hash": "7defcc89d4a26d56e801241d624d48fb"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\main.cpp": {
+    "mtime": 1775930251835.7197,
+    "hash": "72bab0cb5e33cfd7c0c516414736bb94"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\resource.h": {
+    "mtime": 1775662518659.8108,
+    "hash": "1ade5dd15e613479a15e8832ed276f2b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\utils.cpp": {
+    "mtime": 1775662518661.3296,
+    "hash": "432461b09d862a2f8dadf380ff0e34e5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\utils.h": {
+    "mtime": 1775662518661.3296,
+    "hash": "fd81e143f5614eb6fd75efe539002853"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\win32_window.cpp": {
+    "mtime": 1775662518661.3296,
+    "hash": "571eb8234dbc2661be03aa5f2a4d2fca"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\win32_window.h": {
+    "mtime": 1775662518661.3296,
+    "hash": "7569387d58711ab975940f4df3b4bcda"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.clinerules\\coding-helper.md": {
+    "mtime": 1776092392448.651,
+    "hash": "883316e4bc68dde80c6f07825f5a7bb6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.clinerules\\flutter-analyzer.md": {
+    "mtime": 1776072965896.6213,
+    "hash": "fb456ddc10ef6355249a07ee2d16364d"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.clinerules\\flutter-inspector.md": {
+    "mtime": 1776079055856.796,
+    "hash": "9abe095396db0f1daee01e1389be0fed"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.clinerules\\flutter-runtime.md": {
+    "mtime": 1776079055856.796,
+    "hash": "52f6cf4e534c0dd1b98566bd4bcdc7e6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.clinerules\\web-browser.md": {
+    "mtime": 1776092392448.651,
+    "hash": "a8d03867f0176ee67beec3eba815ba3c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.github\\copilot-instructions.md": {
+    "mtime": 1779210568496.9634,
+    "hash": "c7ed77631c7ba3314a6e2e7de9477ed8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\.vscode\\UI_FONT.md": {
+    "mtime": 1778073472995.5293,
+    "hash": "6c22459bd5701fc5bfc439824c6d764b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\AGENTS.md": {
+    "mtime": 1779210568499.0464,
+    "hash": "4a2627db95610dfa394af48c961c26a6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\AVVIO.md": {
+    "mtime": 1778775760687.4338,
+    "hash": "b5d8bfbe5030deab8410c1e4ae4a6863"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\NEO4J_INTEGRATION_REPORT.md": {
+    "mtime": 1778428777401.7737,
+    "hash": "15033cadb01464f259aa916c7d318a8a"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\NEO4J_TMDB_MOVIELENS_ARCHITECTURE.md": {
+    "mtime": 1778432470987.4739,
+    "hash": "5c96e8206da63e41170cf8f4174815b9"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\README.md": {
+    "mtime": 1778530581031.7117,
+    "hash": "c03f2ab16ac97faa73991e03c01f4eb8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\REMAINING_WORK.md": {
+    "mtime": 1779209338614.6184,
+    "hash": "13e58810453b851d65d0e3f403392b2b"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\Remaining Work.md": {
+    "mtime": 1778785794215.6096,
+    "hash": "e7022906be3c64d0c8d8c660c4feaf2e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\agreeo_neo4j_project_context.md": {
+    "mtime": 1778428777402.2773,
+    "hash": "8de0cf65b25d9fd6ce3145c8130f9a6f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\analysis_options.yaml": {
+    "mtime": 1775930251678.3586,
+    "hash": "9e65f4b9beebb674c0dc252f70a5c177"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\data\\ml-latest-small\\README.txt": {
+    "mtime": 1778775760689.9934,
+    "hash": "264d26c67a567de0f45d6eeb46bd6cde"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\backend\\struttura_backend.txt": {
+    "mtime": 1778422757964.1526,
+    "hash": "e51f96b3a6d434d9a261efd9b85e0289"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\devtools_options.yaml": {
+    "mtime": 1778428777403.7861,
+    "hash": "1b16e156b9f8b9f43ca52a78a6f72e80"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\docker-compose.yml": {
+    "mtime": 1779275834631.3706,
+    "hash": "60c49d6a3e93b52f66647889cb541bf9"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\docs\\NEO4J_TMDB_MOVIELENS_ARCHITECTURE.md": {
+    "mtime": 1778435055841.7126,
+    "hash": "22cb7e534c23c0838833e17b45979b18"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\docs\\RICOSTRUZIONE_AMBIENTE.md": {
+    "mtime": 1778775760708.2673,
+    "hash": "be7feef0dc03c4514ba96220ecd7e774"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\friends.md": {
+    "mtime": 1779201286683.1797,
+    "hash": "6e96704f8a6654e3fc401b68094ec654"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\README.md": {
+    "mtime": 1775662518644.4695,
+    "hash": "f7ee1b402881509d197f34963e569927"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\CMakeLists.txt": {
+    "mtime": 1775930251768.4607,
+    "hash": "fed46fa295fd6085a4ebeb049a589bb4"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\flutter\\CMakeLists.txt": {
+    "mtime": 1775662518648.0376,
+    "hash": "2195470ce31675d31db5a37590d011f6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\linux\\runner\\CMakeLists.txt": {
+    "mtime": 1775662518648.0376,
+    "hash": "30cc1614b16214b66c014af09ba699eb"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\pubspec.yaml": {
+    "mtime": 1779284829155.2205,
+    "hash": "fb69c3262c684f2b8dbaf5a0b1a4ca2a"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\struttura_directory.txt": {
+    "mtime": 1778421327623.4182,
+    "hash": "e0f66e801f62c52c4a0c74f88a0c8a64"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\tree.txt": {
+    "mtime": 1778421289616.4243,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\index.html": {
+    "mtime": 1775930251825.0227,
+    "hash": "2ac971fa094138247c5710885f7456ca"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\CMakeLists.txt": {
+    "mtime": 1775930251829.609,
+    "hash": "208132dca72eccb88ee8c81f56776a37"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\flutter\\CMakeLists.txt": {
+    "mtime": 1775662518658.2725,
+    "hash": "bbf66fed5180bd9ae8198b8d7c4a0001"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\windows\\runner\\CMakeLists.txt": {
+    "mtime": 1775662518658.2725,
+    "hash": "028602ab9754bffe716659ada7590d29"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\DM2526 Instructions on projects (1).pdf": {
+    "mtime": 1778428777400.7666,
+    "hash": "8c730389c4bd2face3eacddd421dde47"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png": {
+    "mtime": 1775662518633.8325,
+    "hash": "13e9c72ec37fac220397aa819fa1ef2d"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png": {
+    "mtime": 1775662518633.8325,
+    "hash": "6270344430679711b81476e29878caa7"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png": {
+    "mtime": 1775662518633.8325,
+    "hash": "a0a8db5985280b3679d99a820ae2db79"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png": {
+    "mtime": 1775662518635.35,
+    "hash": "afe1b655b9f32da22f9a4301bb8e6ba8"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png": {
+    "mtime": 1775662518635.35,
+    "hash": "57838d52c318faff743130c3fcfae0c6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-1024x1024@1x.png": {
+    "mtime": 1775670873782.4531,
+    "hash": "c785f8932297af4acd5f5ccb7630f01c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@1x.png": {
+    "mtime": 1775670873794.132,
+    "hash": "a2f8558fb1d42514111fbbb19fb67314"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@2x.png": {
+    "mtime": 1775670873774.0876,
+    "hash": "2247a840b6ee72b8a069208af170e5b1"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@3x.png": {
+    "mtime": 1775670873812.6887,
+    "hash": "1b3b1538136316263c7092951e923e9d"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@1x.png": {
+    "mtime": 1775670873878.7808,
+    "hash": "be8887071dd7ec39cb754d236aa9584f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@2x.png": {
+    "mtime": 1775670873738.3625,
+    "hash": "043119ef4faa026ff82bd03f241e5338"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@3x.png": {
+    "mtime": 1775670873800.0767,
+    "hash": "2b1452c4c1bda6177b4fbbb832df217f"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@1x.png": {
+    "mtime": 1775670873754.4062,
+    "hash": "2247a840b6ee72b8a069208af170e5b1"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@2x.png": {
+    "mtime": 1775670873840.9382,
+    "hash": "8245359312aea1b0d2412f79a07b0ca5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@3x.png": {
+    "mtime": 1775670873758.0566,
+    "hash": "5b3c0902200ce596e9848f22e1f0fe0e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@2x.png": {
+    "mtime": 1775670873775.7852,
+    "hash": "5b3c0902200ce596e9848f22e1f0fe0e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@3x.png": {
+    "mtime": 1775670873728.113,
+    "hash": "e419d22a37bc40ba185aca1acb6d4ac6"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@1x.png": {
+    "mtime": 1775670873769.4824,
+    "hash": "36c0d7a7132bdde18898ffdfcfcdc4d2"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@2x.png": {
+    "mtime": 1775670873888.4624,
+    "hash": "643842917530acf4c5159ae851b0baf2"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-83.5x83.5@2x.png": {
+    "mtime": 1775670873823.7112,
+    "hash": "665cb5e3c5729da6d639d26eff47a503"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage.png": {
+    "mtime": 1775670873724.9995,
+    "hash": "978c1bee49d7ad5fc1a4d81099b13e18"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@2x.png": {
+    "mtime": 1775670873705.021,
+    "hash": "978c1bee49d7ad5fc1a4d81099b13e18"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@3x.png": {
+    "mtime": 1775670873699.9915,
+    "hash": "978c1bee49d7ad5fc1a4d81099b13e18"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_1024.png": {
+    "mtime": 1775670873680.3433,
+    "hash": "c9becc9105f8cabce934d20c7bfb6aac"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_128.png": {
+    "mtime": 1775670873628.0237,
+    "hash": "3ded30823804caaa5ccc944067c54a36"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_16.png": {
+    "mtime": 1775670873653.0552,
+    "hash": "8bf511604bc6ed0a6aeb380c5113fdcf"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_256.png": {
+    "mtime": 1775670873686.9204,
+    "hash": "dfe2c93d1536ae02f085cc63faa3430e"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_32.png": {
+    "mtime": 1775670873657.5645,
+    "hash": "8e0ae58e362a6636bdfccbc04da2c58c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_512.png": {
+    "mtime": 1775670873639.5967,
+    "hash": "0ad44039155424738917502c69667699"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\macos\\Runner\\Assets.xcassets\\AppIcon.appiconset\\app_icon_64.png": {
+    "mtime": 1775670873614.944,
+    "hash": "04e7b6ef05346c70b663ca1d97de3ad5"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\favicon.png": {
+    "mtime": 1775662518656.7498,
+    "hash": "5dcef449791fa27946b3d35ad8803796"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\icons\\Icon-192.png": {
+    "mtime": 1775662518656.7498,
+    "hash": "ac9a721a12bbc803b44f645561ecb1e1"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\icons\\Icon-512.png": {
+    "mtime": 1775662518656.7498,
+    "hash": "96e752610906ba2a93c65f8abe1645f1"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\icons\\Icon-maskable-192.png": {
+    "mtime": 1775670874561.666,
+    "hash": "c457ef57daa1d16f64b27b786ec2ea3c"
+  },
+  "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo\\web\\icons\\Icon-maskable-512.png": {
+    "mtime": 1775670874555.9646,
+    "hash": "301a7604d45b3e739efc881eb04896ea"
+  }
+}

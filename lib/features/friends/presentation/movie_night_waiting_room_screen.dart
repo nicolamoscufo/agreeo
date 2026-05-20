@@ -2,7 +2,6 @@ import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.da
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
-import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/models/social_models.dart';
@@ -24,6 +23,8 @@ class MovieNightWaitingRoomScreen extends ConsumerStatefulWidget {
 class _MovieNightWaitingRoomScreenState
     extends ConsumerState<MovieNightWaitingRoomScreen>
     with MovieNightAutoRefresh<MovieNightWaitingRoomScreen> {
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +44,8 @@ class _MovieNightWaitingRoomScreenState
       );
     }
 
-    if (event.status == MovieNightStatus.voting) {
+    if (event.status == MovieNightStatus.voting && !_navigated) {
+      _navigated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           Navigator.of(context).pushReplacement(
@@ -53,7 +55,8 @@ class _MovieNightWaitingRoomScreenState
           );
         }
       });
-    } else if (event.status == MovieNightStatus.completed) {
+    } else if (event.status == MovieNightStatus.completed && !_navigated) {
+      _navigated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
           Navigator.of(context).pushReplacement(
@@ -191,60 +194,29 @@ class _MovieNightWaitingRoomScreenState
                     icon: const Icon(Icons.tune_rounded),
                     label: const Text('Edit constraints'),
                   ),
-                  FilledButton.tonalIcon(
+                  FilledButton.icon(
                     onPressed: () async {
-                      final updated = await controller.refreshShortlist(
+                      final updated = await controller.startVoting(
                         event.id,
                       );
-                      if (!context.mounted) return;
+                      if (!context.mounted) {
+                        return;
+                      }
                       if (updated == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Could not refresh shortlist.'),
+                            content: Text('Could not start voting.'),
                           ),
                         );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Shortlist updated: ${updated.shortlist.length} movies.',
-                            ),
-                          ),
-                        );
+                        return;
                       }
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              MovieNightVotingScreen(eventId: event.id),
+                        ),
+                      );
                     },
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: Text(
-                      event.shortlist.isEmpty
-                          ? 'Generate shortlist'
-                          : 'Regenerate shortlist (${event.shortlist.length})',
-                    ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: event.shortlist.isEmpty
-                        ? null
-                        : () async {
-                            final updated = await controller.startVoting(
-                              event.id,
-                            );
-                            if (!context.mounted) {
-                              return;
-                            }
-                            if (updated == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Could not start voting.'),
-                                ),
-                              );
-                              return;
-                            }
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    MovieNightVotingScreen(eventId: event.id),
-                              ),
-                            );
-                          },
                     icon: const Icon(Icons.how_to_vote_rounded),
                     label: const Text('Start voting'),
                   ),
@@ -277,52 +249,6 @@ class _MovieNightWaitingRoomScreenState
                 ),
               ],
             ],
-            const SizedBox(height: 24),
-            const SectionHeader(
-              title: 'Shortlist preview',
-              subtitle:
-                  'Generated from constraints, participants, catalog, and movie states.',
-            ),
-            const SizedBox(height: 12),
-            if (event.shortlist.isEmpty)
-              EmptyState(
-                icon: Icons.movie_filter_outlined,
-                title: 'No movies matched this group',
-                message:
-                    'Tap "Generate shortlist" above to discover movies from TMDB, or try adjusting constraints.',
-                action: isHost
-                    ? FilledButton.tonal(
-                        onPressed: () async {
-                          final updated = await controller.refreshShortlist(event.id);
-                          if (!context.mounted) return;
-                          if (updated == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Could not generate shortlist.')),
-                            );
-                          }
-                        },
-                        child: const Text('Generate shortlist now'),
-                      )
-                    : null,
-              )
-            else
-              ...event.shortlist.map(
-                (candidate) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ShortlistPreviewCard(
-                    candidate: candidate,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => AgreeoMovieDetailsScreen(
-                            movieId: candidate.movie.id,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -454,28 +380,6 @@ class _JoinMovieNightCard extends StatelessWidget {
   }
 }
 
-class _ShortlistPreviewCard extends StatelessWidget {
-  const _ShortlistPreviewCard({required this.candidate, required this.onTap});
-
-  final ShortlistCandidate candidate;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final movie = candidate.movie;
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        leading: const Icon(Icons.movie_creation_outlined),
-        title: Text(movie.title),
-        subtitle: Text(
-          '${movie.releaseYear} • ${movie.runtimeLabel}\n${candidate.explanationTags.join(' • ')}',
-        ),
-        isThreeLine: true,
-      ),
-    );
-  }
-}
 
 class _EditConstraintsSheet extends StatefulWidget {
   const _EditConstraintsSheet({required this.initialConstraints});

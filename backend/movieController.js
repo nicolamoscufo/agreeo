@@ -904,25 +904,6 @@ async function notifyMovieStateChange(uid, tmdbId, stateName, value) {
       stateName,
       value
     });
-
-    const result = await neo4jService.run(
-      `
-      MATCH (u:AppUser {uid: $uid})-[membership:MEMBER_OF]->(event:MovieNight)
-      WHERE event.status IN ['waiting', 'voting']
-      RETURN event.id AS eventId
-      `,
-      { uid }
-    );
-
-    const eventIds = result.records.map(record => record.get('eventId'));
-    for (const eventId of eventIds) {
-      console.info(`[notifyMovieStateChange] Regenerating shortlist for event ${eventId} due to user ${uid} preference change`);
-      const updatedEvent = await socialRepository.generateShortlist(uid, eventId);
-      if (updatedEvent) {
-        const allParticipantIds = updatedEvent.participants.map(p => p.userId);
-        socketService.emitToUsers(allParticipantIds, 'movie_night_updated', { event: updatedEvent });
-      }
-    }
   } catch (error) {
     console.error('[notifyMovieStateChange] Error propagating state update:', error);
   }

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "branchName": "main",
+  "worktreePath": "C:\\Users\\Nicola\\Desktop\\Simple App\\agreeo",
+  "upstream": "origin/main",
+  "mergeBase": "7dbd57988ddd59c1a505b2b27aba4dd19ccb5f30",
+  "firstSeenHead": "7dbd57988ddd59c1a505b2b27aba4dd19ccb5f30",
+  "lastSeenHead": "7dbd57988ddd59c1a505b2b27aba4dd19ccb5f30",
+  "lastAnalyzedHead": "7dbd57988ddd59c1a505b2b27aba4dd19ccb5f30",
+  "stale": false,
+  "staleReason": null,
+  "staleSince": null,
+  "lifecycleEvent": null,
+  "createdAt": "2026-05-20T14:08:41.350Z",
+  "updatedAt": "2026-05-20T14:08:41.350Z"
+}
