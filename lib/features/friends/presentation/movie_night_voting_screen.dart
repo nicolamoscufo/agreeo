@@ -62,14 +62,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       return;
     }
 
-    if (updated.status == MovieNightStatus.completed && !_navigatedToResult) {
-      _navigatedToResult = true;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => MovieNightResultScreen(eventId: event.id),
-        ),
-      );
-    } else {
+    if (updated.status != MovieNightStatus.completed) {
       setState(() {
         _currentIndex = 0;
       });

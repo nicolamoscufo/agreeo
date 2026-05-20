@@ -68,8 +68,8 @@ class _MovieNightWizardScreenState
       ),
       _WizardPageData(
         eyebrow: 'Step 2 of 3',
-        title: 'Tune the shortlist',
-        subtitle: 'Shape recommendations before everyone starts voting.',
+        title: 'Tune recommendations',
+        subtitle: 'Shape movie suggestions before starting to vote.',
         icon: Icons.tune_rounded,
         accent: const Color(0xFF06B6D4),
         child: _ConstraintsStep(
@@ -205,7 +205,7 @@ class _MovieNightWizardScreenState
       return;
     }
     if (_selectedFriendIds.isEmpty) {
-      _showError('Invite at least one friend before generating the shortlist.');
+      _showError('Invite at least one friend before creating the Movie Night.');
       return;
     }
 
@@ -527,10 +527,10 @@ class _WizardActions extends StatelessWidget {
               onPressed: onContinue,
               icon: Icon(
                 isLast
-                    ? Icons.auto_awesome_rounded
+                    ? Icons.done_rounded
                     : Icons.arrow_forward_rounded,
               ),
-              label: Text(isLast ? 'Generate Shortlist' : 'Continue'),
+              label: Text(isLast ? 'Create Movie Night' : 'Continue'),
             ),
           ),
         ],

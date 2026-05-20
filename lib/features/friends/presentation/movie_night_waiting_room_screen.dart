@@ -91,7 +91,7 @@ class _MovieNightWaitingRoomScreenState
             SectionHeader(
               title: event.name,
               subtitle:
-                  'Confirm the group, constraints, and shortlist before voting.',
+                  'Confirm the group and constraints before voting.',
               trailing: InfoBadge(label: _statusLabel(event.status)),
             ),
             const SizedBox(height: 18),
@@ -136,7 +136,7 @@ class _MovieNightWaitingRoomScreenState
               const SectionHeader(
                 title: 'Host controls',
                 subtitle:
-                    'Adjust constraints, share invite link, refresh the shortlist, or start voting.',
+                    'Adjust constraints, share invite link, or start voting.',
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -208,14 +208,7 @@ class _MovieNightWaitingRoomScreenState
                             content: Text('Could not start voting.'),
                           ),
                         );
-                        return;
                       }
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              MovieNightVotingScreen(eventId: event.id),
-                        ),
-                      );
                     },
                     icon: const Icon(Icons.how_to_vote_rounded),
                     label: const Text('Start voting'),
@@ -372,7 +365,7 @@ class _JoinMovieNightCard extends StatelessWidget {
         leading: const Icon(Icons.group_add_rounded),
         title: const Text('Join this Movie Night'),
         subtitle: const Text(
-          'Join before voting starts so your preferences shape the shortlist.',
+          'Join before voting starts so your preferences shape the recommendations.',
         ),
         trailing: FilledButton(onPressed: onJoin, child: const Text('Join')),
       ),
