@@ -33,6 +33,20 @@ function cleanString(value) {
   return value == null ? '' : String(value).trim();
 }
 
+function normalizeSearchText(value) {
+  return cleanString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function searchTokens(value) {
+  const normalized = normalizeSearchText(value);
+  return normalized ? normalized.split(/\s+/).filter(Boolean) : [];
+}
+
 function cleanStringList(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -193,18 +207,20 @@ async function getFriends(uid) {
 }
 
 async function searchFriends(uid, query) {
-  const normalized = cleanString(query).toLowerCase();
+  const tokens = searchTokens(query);
   const result = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})
     MATCH (candidate:AppUser)
+    WITH me, candidate, toLower(coalesce(candidate.displayName, candidate.email, '')) AS rawSearchText
+    WITH me, candidate, replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(rawSearchText, 'à', 'a'), 'è', 'e'), 'é', 'e'), 'ì', 'i'), 'ò', 'o'), 'ù', 'u'), '.', ' '), '-', ' '), '_', ' '), "'", ' ') AS searchText
     WHERE candidate.uid <> me.uid
-      AND ($query = '' OR toLower(coalesce(candidate.displayName, candidate.email, '')) CONTAINS $query)
+      AND (size($tokens) = 0 OR all(token IN $tokens WHERE searchText CONTAINS token))
     OPTIONAL MATCH (me)-[friendRel:FRIEND]-(candidate)
     OPTIONAL MATCH (me)-[pending:SENT_FRIEND_REQUEST {status: 'pending'}]->(candidate)
     OPTIONAL MATCH (candidate)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (candidate)-[:RATED_APP]->(reviewed:Movie)
-    WITH candidate, count(DISTINCT friendRel) AS friendCount, count(DISTINCT pending) AS pendingCount, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
+    WITH candidate, searchText, count(DISTINCT friendRel) AS friendCount, count(DISTINCT pending) AS pendingCount, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
     RETURN {
       id: candidate.uid,
       name: coalesce(candidate.displayName, candidate.email, 'Agreeo user'),
@@ -219,10 +235,18 @@ async function searchFriends(uid, query) {
         canShowWatchlist: coalesce(candidate.canShowWatchlist, false)
       }
     } AS friend
-    ORDER BY toLower(coalesce(candidate.displayName, candidate.email, '')) ASC
+    ORDER BY
+      CASE
+        WHEN size($tokens) = 0 THEN 0
+        WHEN searchText = $normalized THEN 0
+        WHEN searchText STARTS WITH $normalized THEN 1
+        WHEN any(word IN split(searchText, ' ') WHERE word STARTS WITH $firstToken) THEN 2
+        ELSE 3
+      END ASC,
+      toLower(coalesce(candidate.displayName, candidate.email, '')) ASC
     LIMIT 25
     `,
-    { uid, query: normalized }
+    { uid, normalized: tokens.join(' '), firstToken: tokens[0] || '', tokens }
   );
 
   return result.records.map((record) => normalizeFriend(record.get('friend')));

@@ -54,4 +54,55 @@ void main() {
       );
     },
   );
+
+  test(
+    'local friend search handles accents, punctuation, and token order',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final container = ProviderContainer(
+        overrides: <Override>[
+          backendSocialServiceProvider.overrideWithValue(
+            _OfflineBackendSocialService(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        friendsMovieNightControllerProvider.notifier,
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      controller.searchFriends('mor  giu');
+      expect(
+        container
+            .read(friendsMovieNightControllerProvider)
+            .searchResults
+            .single
+            .name,
+        'Giulia Moretti',
+      );
+
+      controller.searchFriends('nina!! ah');
+      expect(
+        container
+            .read(friendsMovieNightControllerProvider)
+            .searchResults
+            .single
+            .name,
+        'Nina Ahmed',
+      );
+
+      controller.searchFriends('léo mar');
+      expect(
+        container
+            .read(friendsMovieNightControllerProvider)
+            .searchResults
+            .single
+            .name,
+        'Leo Martin',
+      );
+    },
+  );
 }

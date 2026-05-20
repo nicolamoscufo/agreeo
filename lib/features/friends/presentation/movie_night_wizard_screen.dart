@@ -21,6 +21,7 @@ class _MovieNightWizardScreenState
     text: 'Friday Movie Night',
   );
   final TextEditingController _friendSearchController = TextEditingController();
+  final PageController _pageController = PageController();
   int _step = 0;
   DateTime? _dateTime;
   final Set<String> _includedGenres = <String>{};
@@ -35,6 +36,7 @@ class _MovieNightWizardScreenState
   void dispose() {
     _nameController.dispose();
     _friendSearchController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -49,102 +51,112 @@ class _MovieNightWizardScreenState
         )
         .toList(growable: false);
 
+    final pages = <_WizardPageData>[
+      _WizardPageData(
+        eyebrow: 'Step 1 of 3',
+        title: 'Set the vibe',
+        subtitle:
+            'Give the night a name, then lock the time only if it exists.',
+        icon: Icons.nightlight_round,
+        accent: const Color(0xFF8B5CF6),
+        child: _BasicsStep(
+          nameController: _nameController,
+          dateTime: _dateTime,
+          onPickDateTime: _pickDateTime,
+          onClearDateTime: () => setState(() => _dateTime = null),
+        ),
+      ),
+      _WizardPageData(
+        eyebrow: 'Step 2 of 3',
+        title: 'Tune the shortlist',
+        subtitle: 'Shape recommendations before everyone starts voting.',
+        icon: Icons.tune_rounded,
+        accent: const Color(0xFF06B6D4),
+        child: _ConstraintsStep(
+          includedGenres: _includedGenres,
+          excludedGenres: _excludedGenres,
+          maxDurationMinutes: _maxDurationMinutes,
+          minimumRating: _minimumRating,
+          language: _language,
+          onIncludedToggle: _toggleIncludedGenre,
+          onExcludedToggle: _toggleExcludedGenre,
+          onDurationChanged: (value) => setState(() {
+            _maxDurationMinutes = value.round();
+          }),
+          onMinimumRatingChanged: (value) => setState(() {
+            _minimumRating = value;
+          }),
+          onLanguageChanged: (value) => setState(() {
+            _language = value;
+          }),
+        ),
+      ),
+      _WizardPageData(
+        eyebrow: 'Step 3 of 3',
+        title: 'Bring the crew',
+        subtitle: 'Invite friends now, or copy the link for later.',
+        icon: Icons.groups_rounded,
+        accent: const Color(0xFFF97316),
+        child: _InviteStep(
+          friends: filteredFriends,
+          selectedFriendIds: _selectedFriendIds,
+          searchController: _friendSearchController,
+          previewLink: 'agreeo://invite/new-night',
+          onSearchChanged: (value) => setState(() {
+            _friendSearch = value.trim();
+          }),
+          onToggleFriend: (friendId) => setState(() {
+            if (!_selectedFriendIds.add(friendId)) {
+              _selectedFriendIds.remove(friendId);
+            }
+          }),
+          onCopyLink: () async {
+            await Clipboard.setData(
+              const ClipboardData(text: 'agreeo://invite/new-night'),
+            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invite link copied.')),
+              );
+            }
+          },
+        ),
+      ),
+    ];
+    final page = pages[_step];
+
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(title: const Text('Create Movie Night')),
       body: SafeArea(
-        child: Stepper(
-          currentStep: _step,
-          onStepTapped: (step) => setState(() => _step = step),
-          onStepContinue: () {
-            _continue(filteredFriends);
-          },
-          onStepCancel: _step == 0
-              ? null
-              : () => setState(() => _step = (_step - 1).clamp(0, 2)),
-          controlsBuilder: (context, details) {
-            final isLast = _step == 2;
-            return Padding(
-              padding: const EdgeInsets.only(top: 18),
-              child: Row(
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 children: <Widget>[
-                  FilledButton(
-                    onPressed: details.onStepContinue,
-                    child: Text(isLast ? 'Generate Shortlist' : 'Continue'),
-                  ),
-                  if (_step > 0) ...<Widget>[
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: details.onStepCancel,
-                      child: const Text('Back'),
+                  _WizardHero(page: page, step: _step),
+                  const SizedBox(height: 18),
+                  _StepDots(step: _step),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.58,
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: pages.length,
+                      itemBuilder: (context, index) {
+                        return _WizardCard(page: pages[index]);
+                      },
                     ),
-                  ],
+                  ),
                 ],
               ),
-            );
-          },
-          steps: <Step>[
-            Step(
-              title: const Text('Event basics'),
-              subtitle: const Text('Name and optional date'),
-              isActive: _step >= 0,
-              content: _BasicsStep(
-                nameController: _nameController,
-                dateTime: _dateTime,
-                onPickDateTime: _pickDateTime,
-                onClearDateTime: () => setState(() => _dateTime = null),
-              ),
             ),
-            Step(
-              title: const Text('Constraints'),
-              subtitle: const Text('Genres, duration, rating, language'),
-              isActive: _step >= 1,
-              content: _ConstraintsStep(
-                includedGenres: _includedGenres,
-                excludedGenres: _excludedGenres,
-                maxDurationMinutes: _maxDurationMinutes,
-                minimumRating: _minimumRating,
-                language: _language,
-                onIncludedToggle: _toggleIncludedGenre,
-                onExcludedToggle: _toggleExcludedGenre,
-                onDurationChanged: (value) => setState(() {
-                  _maxDurationMinutes = value.round();
-                }),
-                onMinimumRatingChanged: (value) => setState(() {
-                  _minimumRating = value;
-                }),
-                onLanguageChanged: (value) => setState(() {
-                  _language = value;
-                }),
-              ),
-            ),
-            Step(
-              title: const Text('Invite friends'),
-              subtitle: const Text('Select friends and copy invite link'),
-              isActive: _step >= 2,
-              content: _InviteStep(
-                friends: filteredFriends,
-                selectedFriendIds: _selectedFriendIds,
-                searchController: _friendSearchController,
-                previewLink: 'agreeo://invite/new-night',
-                onSearchChanged: (value) => setState(() {
-                  _friendSearch = value.trim();
-                }),
-                onToggleFriend: (friendId) => setState(() {
-                  if (!_selectedFriendIds.add(friendId)) {
-                    _selectedFriendIds.remove(friendId);
-                  }
-                }),
-                onCopyLink: () async {
-                  await Clipboard.setData(
-                    const ClipboardData(text: 'agreeo://invite/new-night'),
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Invite link copied.')),
-                    );
-                  }
-                },
-              ),
+            _WizardActions(
+              step: _step,
+              onBack: _step == 0 ? null : () => _goToStep(_step - 1),
+              onContinue: _continue,
             ),
           ],
         ),
@@ -182,13 +194,13 @@ class _MovieNightWizardScreenState
     });
   }
 
-  Future<void> _continue(List<Friend> filteredFriends) async {
+  Future<void> _continue() async {
     if (_step == 0) {
       if (_nameController.text.trim().isEmpty) {
         _showError('Event name is required.');
         return;
       }
-      setState(() => _step = 1);
+      _goToStep(1);
       return;
     }
     if (_step == 1) {
@@ -200,7 +212,7 @@ class _MovieNightWizardScreenState
         _showError('Maximum duration must be valid.');
         return;
       }
-      setState(() => _step = 2);
+      _goToStep(2);
       return;
     }
     if (_selectedFriendIds.isEmpty) {
@@ -251,10 +263,282 @@ class _MovieNightWizardScreenState
     });
   }
 
+  void _goToStep(int step) {
+    final nextStep = step.clamp(0, 2);
+    setState(() => _step = nextStep);
+    _pageController.animateToPage(
+      nextStep,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _WizardPageData {
+  const _WizardPageData({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+    required this.child,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
+  final Widget child;
+}
+
+class _WizardHero extends StatelessWidget {
+  const _WizardHero({required this.page, required this.step});
+
+  final _WizardPageData page;
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        gradient: LinearGradient(
+          colors: <Color>[
+            page.accent.withValues(alpha: 0.9),
+            colorScheme.primary,
+            colorScheme.secondary,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: page.accent.withValues(alpha: 0.28),
+            blurRadius: 30,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: <Widget>[
+          Positioned(
+            right: -18,
+            top: -18,
+            child: Icon(
+              page.icon,
+              size: 132,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              InfoBadge(label: page.eyebrow),
+              const SizedBox(height: 18),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      page.title,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Icon(page.icon, color: Colors.white, size: 30),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                page.subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 20),
+              LinearProgressIndicator(
+                value: (step + 1) / 3,
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(999),
+                backgroundColor: Colors.white.withValues(alpha: 0.18),
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepDots extends StatelessWidget {
+  const _StepDots({required this.step});
+
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    const labels = <String>['Basics', 'Taste', 'Friends'];
+
+    return Row(
+      children: List<Widget>.generate(labels.length, (index) {
+        final selected = index == step;
+        final done = index < step;
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            margin: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: selected
+                  ? colorScheme.primary.withValues(alpha: 0.14)
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
+              border: Border.all(
+                color: selected
+                    ? colorScheme.primary.withValues(alpha: 0.28)
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(
+                  done ? Icons.check_circle_rounded : Icons.circle_rounded,
+                  size: 14,
+                  color: selected || done
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    labels[index],
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected || done
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _WizardCard extends StatelessWidget {
+  const _WizardCard({required this.page});
+
+  final _WizardPageData page;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: page.accent.withValues(alpha: 0.18)),
+      ),
+      child: SingleChildScrollView(child: page.child),
+    );
+  }
+}
+
+class _WizardActions extends StatelessWidget {
+  const _WizardActions({
+    required this.step,
+    required this.onBack,
+    required this.onContinue,
+  });
+
+  final int step;
+  final VoidCallback? onBack;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isLast = step == 2;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          if (onBack != null) ...<Widget>[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              onPressed: onContinue,
+              icon: Icon(
+                isLast
+                    ? Icons.auto_awesome_rounded
+                    : Icons.arrow_forward_rounded,
+              ),
+              label: Text(isLast ? 'Generate Shortlist' : 'Continue'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

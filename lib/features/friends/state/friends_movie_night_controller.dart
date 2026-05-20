@@ -97,6 +97,7 @@ class FriendsMovieNightController
   final BackendSocialService _backendSocialService;
   final Uuid _uuid = const Uuid();
   bool _usingBackend = false;
+  String _latestSearchKey = '';
 
   Future<void> _hydrateSocialLayer() async {
     _seedLocalSocialLayer();
@@ -122,12 +123,12 @@ class FriendsMovieNightController
   }
 
   void searchFriends(String query) {
-    final normalized = query.trim().toLowerCase();
-    final results = normalized.isEmpty
+    final tokens = _searchTokens(query);
+    _latestSearchKey = tokens.join(' ');
+    final regex = _friendSearchRegex(tokens);
+    final results = tokens.isEmpty
         ? state.discoverableUsers
-        : state.discoverableUsers
-              .where((friend) => friend.name.toLowerCase().contains(normalized))
-              .toList(growable: false);
+        : _rankedFriendSearchResults(state.discoverableUsers, tokens, regex);
     state = state.copyWith(searchResults: results);
     if (_usingBackend) {
       Future<void>.microtask(() => _searchFriendsBackend(query));
@@ -191,8 +192,12 @@ class FriendsMovieNightController
   }
 
   Future<void> _searchFriendsBackend(String query) async {
+    final searchKey = _searchTokens(query).join(' ');
     try {
       final search = await _backendSocialService.searchFriends(query);
+      if (searchKey != _latestSearchKey) {
+        return;
+      }
       state = state.copyWith(
         discoverableUsers: query.trim().isEmpty
             ? search.results
@@ -816,6 +821,99 @@ final friendsMovieNightControllerProvider =
         ref.watch(backendSocialServiceProvider),
       );
     });
+
+List<Friend> _rankedFriendSearchResults(
+  List<Friend> friends,
+  List<String> tokens,
+  RegExp regex,
+) {
+  final scored = <({Friend friend, int index, int score})>[];
+  for (var index = 0; index < friends.length; index++) {
+    final friend = friends[index];
+    final name = _normalizeSearchText(friend.name);
+    final id = _normalizeSearchText(friend.id);
+    final haystack = '$name $id';
+    if (!regex.hasMatch(haystack)) {
+      continue;
+    }
+    scored.add((
+      friend: friend,
+      index: index,
+      score: _friendSearchScore(name, id, tokens),
+    ));
+  }
+  scored.sort((a, b) {
+    final scoreCompare = b.score.compareTo(a.score);
+    if (scoreCompare != 0) {
+      return scoreCompare;
+    }
+    return a.index.compareTo(b.index);
+  });
+  return scored.map((entry) => entry.friend).toList(growable: false);
+}
+
+int _friendSearchScore(String name, String id, List<String> tokens) {
+  var score = 0;
+  final words = name.split(' ');
+  for (final token in tokens) {
+    if (name == token || id == token) {
+      score += 80;
+    } else if (name.startsWith(token)) {
+      score += 48;
+    } else if (words.any((word) => word.startsWith(token))) {
+      score += 32;
+    } else if (name.contains(token) || id.contains(token)) {
+      score += 12;
+    }
+  }
+  return score;
+}
+
+RegExp _friendSearchRegex(List<String> tokens) {
+  final lookaheads = tokens
+      .map((token) => '(?=.*${RegExp.escape(token)})')
+      .join();
+  return RegExp('^$lookaheads.*\$', caseSensitive: false);
+}
+
+List<String> _searchTokens(String query) {
+  final normalized = _normalizeSearchText(query);
+  if (normalized.isEmpty) {
+    return const <String>[];
+  }
+  return normalized
+      .split(' ')
+      .where((token) => token.isNotEmpty)
+      .toList(growable: false);
+}
+
+String _normalizeSearchText(String value) {
+  final lower = value.toLowerCase();
+  final folded = lower
+      .replaceAll(RegExp('[àáâãäåāăą]'), 'a')
+      .replaceAll(RegExp('[çćĉċč]'), 'c')
+      .replaceAll(RegExp('[ďđ]'), 'd')
+      .replaceAll(RegExp('[èéêëēĕėęě]'), 'e')
+      .replaceAll(RegExp('[ĝğġģ]'), 'g')
+      .replaceAll(RegExp('[ĥħ]'), 'h')
+      .replaceAll(RegExp('[ìíîïĩīĭįı]'), 'i')
+      .replaceAll(RegExp('[ĵ]'), 'j')
+      .replaceAll(RegExp('[ķ]'), 'k')
+      .replaceAll(RegExp('[ĺļľŀł]'), 'l')
+      .replaceAll(RegExp('[ñńņňŉŋ]'), 'n')
+      .replaceAll(RegExp('[òóôõöøōŏő]'), 'o')
+      .replaceAll(RegExp('[ŕŗř]'), 'r')
+      .replaceAll(RegExp('[śŝşš]'), 's')
+      .replaceAll(RegExp('[ţťŧ]'), 't')
+      .replaceAll(RegExp('[ùúûüũūŭůűų]'), 'u')
+      .replaceAll(RegExp('[ŵ]'), 'w')
+      .replaceAll(RegExp('[ýÿŷ]'), 'y')
+      .replaceAll(RegExp('[źżž]'), 'z')
+      .replaceAll('æ', 'ae')
+      .replaceAll('œ', 'oe')
+      .replaceAll('ß', 'ss');
+  return folded.replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+}
 
 T? _firstOrNull<T>(Iterable<T> items) {
   for (final item in items) {
