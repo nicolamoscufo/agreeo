@@ -5,3 +5,24 @@
 # Xcode-related
 **/dgph
 **/xcuserdata/
+
+# Graphify / vexp: ignore generated indexes, caches and local graphs
+vexp/
+.vexp/
+vexp-*
+vexp_*
+*.vexp
+vexp_cache/
+vexp_index/
+
+graphify/
+graphify-*
+graphify_cache/
+.graphify/
+.graphify_cache/
+graphify.db
+graphify-*.json
+graphify-output/
+graphify-outputs/
+graphify_tmp/
+graphify-temp/
