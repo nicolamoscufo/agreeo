@@ -92,6 +92,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               _SearchResults(
                 results: socialState.searchResults,
                 socialState: socialState,
+                onAccept: (requestId) {
+                  controller.acceptFriendRequest(requestId);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Friend request accepted.')),
+                  );
+                },
                 onAdd: (friend) {
                   controller.sendFriendRequest(friend.id);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +133,18 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
             _FriendsListSection(
               friends: socialState.friends,
               onFriendTap: _openFriend,
+              onRemoveFriend: (friend) {
+                controller.removeFriend(friend.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${friend.name} removed.')),
+                );
+              },
+              onBlockFriend: (friend) {
+                controller.blockFriend(friend.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${friend.name} blocked.')),
+                );
+              },
               onFindFriendsTap: () {
                 _searchFocusNode.requestFocus(); // Apre la tastiera
                 final searchContext = _searchFocusNode.context;
@@ -206,11 +224,15 @@ class _FriendsListSection extends StatelessWidget {
   const _FriendsListSection({
     required this.friends,
     required this.onFriendTap,
+    required this.onRemoveFriend,
+    required this.onBlockFriend,
     required this.onFindFriendsTap,
   });
 
   final List<Friend> friends;
   final ValueChanged<Friend> onFriendTap;
+  final ValueChanged<Friend> onRemoveFriend;
+  final ValueChanged<Friend> onBlockFriend;
   final VoidCallback onFindFriendsTap;
 
   @override
@@ -241,6 +263,8 @@ class _FriendsListSection extends StatelessWidget {
             child: _FriendCard(
               friend: friend,
               onTap: () => onFriendTap(friend),
+              onRemove: () => onRemoveFriend(friend),
+              onBlock: () => onBlockFriend(friend),
             ),
           ),
         ),
@@ -250,10 +274,17 @@ class _FriendsListSection extends StatelessWidget {
 }
 
 class _FriendCard extends StatelessWidget {
-  const _FriendCard({required this.friend, required this.onTap});
+  const _FriendCard({
+    required this.friend,
+    required this.onTap,
+    required this.onRemove,
+    required this.onBlock,
+  });
 
   final Friend friend;
   final VoidCallback onTap;
+  final VoidCallback onRemove;
+  final VoidCallback onBlock;
 
   @override
   Widget build(BuildContext context) {
@@ -291,14 +322,21 @@ class _FriendCard extends StatelessWidget {
                 ),
               ),
               PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'remove') {
+                    onRemove();
+                  } else if (value == 'block') {
+                    onBlock();
+                  }
+                },
                 itemBuilder: (context) => const <PopupMenuEntry<String>>[
                   PopupMenuItem<String>(
                     value: 'remove',
-                    child: Text('Remove friend later'),
+                    child: Text('Remove friend'),
                   ),
                   PopupMenuItem<String>(
                     value: 'block',
-                    child: Text('Block later'),
+                    child: Text('Block friend'),
                   ),
                 ],
               ),
@@ -481,11 +519,13 @@ class _SearchResults extends StatelessWidget {
   const _SearchResults({
     required this.results,
     required this.socialState,
+    required this.onAccept,
     required this.onAdd,
   });
 
   final List<Friend> results;
   final FriendsMovieNightState socialState;
+  final ValueChanged<String> onAccept;
   final ValueChanged<Friend> onAdd;
 
   @override
@@ -502,6 +542,9 @@ class _SearchResults extends StatelessWidget {
           .map((friend) {
             final isFriend = socialState.isFriend(friend.id);
             final pending = socialState.isPending(friend.id);
+            final incomingRequestId = socialState.incomingRequestIdFor(
+              friend.id,
+            );
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Card(
@@ -510,7 +553,12 @@ class _SearchResults extends StatelessWidget {
                   title: Text(friend.name),
                   subtitle: const Text('Mutual movie taste preview soon'),
                   trailing: FilledButton.tonal(
-                    onPressed: isFriend || pending ? null : () => onAdd(friend),
+                    onPressed:
+                        isFriend || (pending && incomingRequestId == null)
+                        ? null
+                        : incomingRequestId != null
+                        ? () => onAccept(incomingRequestId)
+                        : () => onAdd(friend),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 40),
                       maximumSize: const Size(120, 40), // Impedisce crash
@@ -518,6 +566,8 @@ class _SearchResults extends StatelessWidget {
                     child: Text(
                       isFriend
                           ? 'Friends'
+                          : incomingRequestId != null
+                          ? 'Accept'
                           : pending
                           ? 'Pending'
                           : 'Add Friend',

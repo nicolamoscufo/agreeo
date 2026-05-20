@@ -149,6 +149,7 @@ async function getFriends(uid) {
   const friendsResult = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})-[:FRIEND]-(friend:AppUser)
+    WHERE NOT (me)-[:BLOCKED]->(friend) AND NOT (friend)-[:BLOCKED]->(me)
     WITH DISTINCT friend
     OPTIONAL MATCH (friend)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (friend)-[:RATED_APP]->(reviewed:Movie)
@@ -215,12 +216,15 @@ async function searchFriends(uid, query) {
     WITH me, candidate, toLower(coalesce(candidate.displayName, candidate.email, '')) AS rawSearchText
     WITH me, candidate, replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(rawSearchText, 'à', 'a'), 'è', 'e'), 'é', 'e'), 'ì', 'i'), 'ò', 'o'), 'ù', 'u'), '.', ' '), '-', ' '), '_', ' '), "'", ' ') AS searchText
     WHERE candidate.uid <> me.uid
+      AND NOT (me)-[:BLOCKED]->(candidate)
+      AND NOT (candidate)-[:BLOCKED]->(me)
       AND (size($tokens) = 0 OR all(token IN $tokens WHERE any(word IN split(searchText, ' ') WHERE word STARTS WITH token)))
     OPTIONAL MATCH (me)-[friendRel:FRIEND]-(candidate)
     OPTIONAL MATCH (me)-[pending:SENT_FRIEND_REQUEST {status: 'pending'}]->(candidate)
+    OPTIONAL MATCH (candidate)-[incoming:SENT_FRIEND_REQUEST {status: 'pending'}]->(me)
     OPTIONAL MATCH (candidate)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (candidate)-[:RATED_APP]->(reviewed:Movie)
-    WITH candidate, searchText, count(DISTINCT friendRel) AS friendCount, count(DISTINCT pending) AS pendingCount, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
+    WITH candidate, searchText, count(DISTINCT friendRel) AS friendCount, count(DISTINCT pending) AS pendingCount, count(DISTINCT incoming) AS incomingCount, head(collect(DISTINCT incoming.requestId)) AS incomingRequestId, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
     RETURN {
       id: candidate.uid,
       name: coalesce(candidate.displayName, candidate.email, 'Agreeo user'),
@@ -229,6 +233,8 @@ async function searchFriends(uid, query) {
       reviewsCount: reviewsCount,
       isFriend: friendCount > 0,
       pending: pendingCount > 0,
+      incomingPending: incomingCount > 0,
+      incomingRequestId: incomingRequestId,
       privacySettings: {
         canShowWatched: coalesce(candidate.canShowWatched, true),
         canShowReviews: coalesce(candidate.canShowReviews, true),
@@ -253,12 +259,41 @@ async function searchFriends(uid, query) {
 }
 
 async function sendFriendRequest(uid, targetUserId) {
+  const reciprocalResult = await neo4jService.run(
+    `
+    MATCH (from:AppUser {uid: $uid})
+    MATCH (to:AppUser {uid: $targetUserId})
+    WHERE from.uid <> to.uid
+      AND NOT (from)-[:FRIEND]-(to)
+      AND NOT (from)-[:BLOCKED]->(to)
+      AND NOT (to)-[:BLOCKED]->(from)
+    MATCH (to)-[r:SENT_FRIEND_REQUEST {status: 'pending'}]->(from)
+    SET r.status = 'accepted', r.updatedAt = datetime()
+    MERGE (from)-[a:FRIEND]-(to)
+    ON CREATE SET a.createdAt = datetime()
+    RETURN r.requestId AS requestId
+    LIMIT 1
+    `,
+    { uid, targetUserId }
+  );
+
+  if (reciprocalResult.records.length > 0) {
+    return {
+      accepted: true,
+      requestId: reciprocalResult.records[0].get('requestId'),
+      social: await getFriends(uid),
+    };
+  }
+
   const requestId = randomId('fr');
   const result = await neo4jService.run(
     `
     MATCH (from:AppUser {uid: $uid})
     MATCH (to:AppUser {uid: $targetUserId})
-    WHERE from.uid <> to.uid AND NOT (from)-[:FRIEND]-(to)
+    WHERE from.uid <> to.uid
+      AND NOT (from)-[:FRIEND]-(to)
+      AND NOT (from)-[:BLOCKED]->(to)
+      AND NOT (to)-[:BLOCKED]->(from)
     MERGE (from)-[r:SENT_FRIEND_REQUEST]->(to)
     ON CREATE SET r.requestId = $requestId, r.createdAt = datetime()
     SET r.status = 'pending', r.updatedAt = datetime()
@@ -285,7 +320,9 @@ async function sendFriendRequest(uid, targetUserId) {
     { uid, targetUserId, requestId }
   );
 
-  return result.records.length === 0 ? null : native(result.records[0].get('request'));
+  return result.records.length === 0
+    ? null
+    : { accepted: false, request: native(result.records[0].get('request')) };
 }
 
 async function acceptFriendRequest(uid, requestId) {
@@ -319,10 +356,54 @@ async function declineFriendRequest(uid, requestId) {
   return result.records.length > 0;
 }
 
+async function removeFriend(uid, friendId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+    MATCH (friend:AppUser {uid: $friendId})
+    MATCH (me)-[rel:FRIEND]-(friend)
+    DELETE rel
+    RETURN friend.uid AS friendId
+    LIMIT 1
+    `,
+    { uid, friendId }
+  );
+
+  return result.records.length > 0;
+}
+
+async function blockFriend(uid, friendId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+    MATCH (target:AppUser {uid: $friendId})
+    WHERE me.uid <> target.uid
+    OPTIONAL MATCH (me)-[friendRel:FRIEND]-(target)
+    DELETE friendRel
+    WITH me, target
+    OPTIONAL MATCH (me)-[outgoing:SENT_FRIEND_REQUEST {status: 'pending'}]->(target)
+    SET outgoing.status = 'declined', outgoing.updatedAt = datetime()
+    WITH me, target
+    OPTIONAL MATCH (target)-[incoming:SENT_FRIEND_REQUEST {status: 'pending'}]->(me)
+    SET incoming.status = 'declined', incoming.updatedAt = datetime()
+    WITH me, target
+    MERGE (me)-[blocked:BLOCKED]->(target)
+    ON CREATE SET blocked.createdAt = datetime()
+    SET blocked.updatedAt = datetime()
+    RETURN target.uid AS friendId
+    LIMIT 1
+    `,
+    { uid, friendId }
+  );
+
+  return result.records.length > 0;
+}
+
 async function getFriendProfile(uid, friendId) {
   const friendResult = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})-[:FRIEND]-(friend:AppUser {uid: $friendId})
+    WHERE NOT (me)-[:BLOCKED]->(friend) AND NOT (friend)-[:BLOCKED]->(me)
     OPTIONAL MATCH (friend)-[:ALREADY_SEEN]->(watchedCountMovie:Movie)
     OPTIONAL MATCH (friend)-[:RATED_APP]->(reviewedCountMovie:Movie)
     WITH friend, count(DISTINCT watchedCountMovie) AS watchedCount, count(DISTINCT reviewedCountMovie) AS reviewsCount
@@ -466,6 +547,29 @@ async function inviteFriends(uid, eventId, friendIds) {
     { uid, eventId, friendIds: invitedFriendIds }
   );
 
+  return getMovieNight(uid, eventId);
+}
+
+async function joinMovieNight(uid, eventId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (user:AppUser {uid: $uid})
+    MATCH (event:MovieNight {id: $eventId})
+    WHERE coalesce(event.status, 'waiting') IN ['draft', 'waiting']
+    MERGE (user)-[part:PARTICIPATES_IN]->(event)
+    ON CREATE SET part.createdAt = datetime(), part.isHost = false
+    SET part.status = 'joined',
+        part.isHost = coalesce(part.isHost, false),
+        part.updatedAt = datetime(),
+        event.updatedAt = datetime()
+    RETURN event.id AS eventId
+    LIMIT 1
+    `,
+    { uid, eventId }
+  );
+
+  if (result.records.length === 0) return null;
+  await generateShortlist(uid, eventId);
   return getMovieNight(uid, eventId);
 }
 
@@ -966,9 +1070,12 @@ module.exports = {
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
+  removeFriend,
+  blockFriend,
   getFriendProfile,
   createMovieNight,
   inviteFriends,
+  joinMovieNight,
   listMovieNights,
   getMovieNight,
   updateMovieNight,

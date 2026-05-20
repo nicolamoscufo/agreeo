@@ -136,6 +136,8 @@ app.get('/friends/search', verifyMiddleware, socialController.searchFriends);
 app.post('/friends/requests', verifyMiddleware, socialController.sendFriendRequest);
 app.post('/friends/requests/:id/accept', verifyMiddleware, socialController.acceptFriendRequest);
 app.post('/friends/requests/:id/decline', verifyMiddleware, socialController.declineFriendRequest);
+app.delete('/friends/:id', verifyMiddleware, socialController.removeFriend);
+app.post('/friends/:id/block', verifyMiddleware, socialController.blockFriend);
 app.get('/friends/:id/profile', verifyMiddleware, socialController.friendProfile);
 
 app.get('/movie-nights', verifyMiddleware, socialController.listMovieNights);
@@ -143,6 +145,7 @@ app.post('/movie-nights', verifyMiddleware, socialController.createMovieNight);
 app.get('/movie-nights/:id', verifyMiddleware, socialController.movieNight);
 app.patch('/movie-nights/:id', verifyMiddleware, socialController.updateMovieNight);
 app.post('/movie-nights/:id/invite', verifyMiddleware, socialController.inviteFriends);
+app.post('/movie-nights/:id/join', verifyMiddleware, socialController.joinMovieNight);
 app.post('/movie-nights/:id/invite-link', verifyMiddleware, socialController.createInviteLink);
 app.post('/movie-nights/:id/shortlist', verifyMiddleware, socialController.generateShortlist);
 app.post('/movie-nights/:id/votes', verifyMiddleware, socialController.submitVote);

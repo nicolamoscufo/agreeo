@@ -1,28 +1,68 @@
+import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
+import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/mock_data/mock_movies.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MovieNightWaitingRoomScreen extends ConsumerWidget {
+class MovieNightWaitingRoomScreen extends ConsumerStatefulWidget {
   const MovieNightWaitingRoomScreen({super.key, required this.eventId});
 
   final String eventId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MovieNightWaitingRoomScreen> createState() =>
+      _MovieNightWaitingRoomScreenState();
+}
+
+class _MovieNightWaitingRoomScreenState
+    extends ConsumerState<MovieNightWaitingRoomScreen>
+    with MovieNightAutoRefresh<MovieNightWaitingRoomScreen> {
+  @override
+  void initState() {
+    super.initState();
+    startMovieNightPolling(widget.eventId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
-    final event = socialState.eventById(eventId);
+    final appState = ref.watch(agreeoAppControllerProvider);
+    final event = socialState.eventById(widget.eventId);
     if (event == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Waiting Room')),
         body: const Center(child: Text('Movie Night not found')),
       );
+    }
+
+    if (event.status == MovieNightStatus.voting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => MovieNightVotingScreen(eventId: event.id),
+            ),
+          );
+        }
+      });
+    } else if (event.status == MovieNightStatus.completed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => MovieNightResultScreen(eventId: event.id),
+            ),
+          );
+        }
+      });
     }
 
     final pendingCount = event.participants
@@ -31,6 +71,13 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
               participant.status == MovieNightParticipantStatus.pending,
         )
         .length;
+    final currentUserId = appState.session?.id ?? 'local-host';
+    final currentParticipant = _participantFor(event, currentUserId);
+    final isHost =
+        currentParticipant?.isHost == true || event.hostUserId == currentUserId;
+    final canJoin =
+        event.status == MovieNightStatus.waiting &&
+        currentParticipant?.status == MovieNightParticipantStatus.pending;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Waiting Room')),
@@ -50,6 +97,26 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
             _InviteLinkCard(inviteLink: event.inviteLink),
             const SizedBox(height: 18),
             _ParticipantsCard(participants: event.participants),
+            if (canJoin) ...<Widget>[
+              const SizedBox(height: 12),
+              _JoinMovieNightCard(
+                onJoin: () async {
+                  final updated = await controller.joinMovieNight(event.id);
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        updated == null
+                            ? 'Could not join this Movie Night.'
+                            : 'You joined this Movie Night.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
             if (pendingCount > 0) ...<Widget>[
               const SizedBox(height: 12),
               Card(
@@ -64,65 +131,99 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 22),
-            const SectionHeader(
-              title: 'Host controls',
-              subtitle:
-                  'Adjust constraints, refresh the shortlist, or start voting.',
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                FilledButton.tonalIcon(
-                  onPressed: () async {
-                    final updated =
-                        await showModalBottomSheet<MovieNightConstraints>(
-                          context: context,
-                          isScrollControlled: true,
-                          showDragHandle: true,
-                          builder: (_) => _EditConstraintsSheet(
-                            initialConstraints: event.constraints,
-                          ),
-                        );
-                    if (updated == null) {
-                      return;
-                    }
-                    await controller.updateEventConstraints(
-                      eventId: event.id,
-                      constraints: updated,
-                    );
-                  },
-                  icon: const Icon(Icons.tune_rounded),
-                  label: const Text('Edit constraints'),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: () async {
-                    await controller.refreshShortlist(event.id);
-                  },
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Generate/refresh shortlist'),
-                ),
-                FilledButton.icon(
-                  onPressed: event.shortlist.isEmpty
-                      ? null
-                      : () async {
-                          await controller.startVoting(event.id);
-                          if (!context.mounted) {
-                            return;
-                          }
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  MovieNightVotingScreen(eventId: event.id),
+            if (isHost) ...<Widget>[
+              const SectionHeader(
+                title: 'Host controls',
+                subtitle:
+                    'Adjust constraints, refresh the shortlist, or start voting.',
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final updatedConstraints =
+                          await showModalBottomSheet<MovieNightConstraints>(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            builder: (_) => _EditConstraintsSheet(
+                              initialConstraints: event.constraints,
                             ),
                           );
-                        },
-                  icon: const Icon(Icons.how_to_vote_rounded),
-                  label: const Text('Start voting'),
-                ),
-              ],
-            ),
+                      if (updatedConstraints == null) {
+                        return;
+                      }
+                      final updatedEvent = await controller
+                          .updateEventConstraints(
+                            eventId: event.id,
+                            constraints: updatedConstraints,
+                          );
+                      if (updatedEvent == null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not update constraints.'),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('Edit constraints'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final updated = await controller.refreshShortlist(
+                        event.id,
+                      );
+                      if (updated == null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not refresh shortlist.'),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Generate/refresh shortlist'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: event.shortlist.isEmpty
+                        ? null
+                        : () async {
+                            final updated = await controller.startVoting(
+                              event.id,
+                            );
+                            if (!context.mounted) {
+                              return;
+                            }
+                            if (updated == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Could not start voting.'),
+                                ),
+                              );
+                              return;
+                            }
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    MovieNightVotingScreen(eventId: event.id),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.how_to_vote_rounded),
+                    label: const Text('Start voting'),
+                  ),
+                ],
+              ),
+            ] else ...<Widget>[
+              const SectionHeader(
+                title: 'Waiting for host',
+                subtitle: 'Only the host can edit constraints or start voting.',
+              ),
+            ],
             const SizedBox(height: 24),
             const SectionHeader(
               title: 'Shortlist preview',
@@ -136,26 +237,28 @@ class MovieNightWaitingRoomScreen extends ConsumerWidget {
                 title: 'No movies matched this group',
                 message:
                     'Try removing some excluded genres or increasing the maximum duration.',
-                action: FilledButton.tonal(
-                  onPressed: () async {
-                    final updated =
-                        await showModalBottomSheet<MovieNightConstraints>(
-                          context: context,
-                          isScrollControlled: true,
-                          showDragHandle: true,
-                          builder: (_) => _EditConstraintsSheet(
-                            initialConstraints: event.constraints,
-                          ),
-                        );
-                    if (updated != null) {
-                      await controller.updateEventConstraints(
-                        eventId: event.id,
-                        constraints: updated,
-                      );
-                    }
-                  },
-                  child: const Text('Edit constraints'),
-                ),
+                action: isHost
+                    ? FilledButton.tonal(
+                        onPressed: () async {
+                          final updated =
+                              await showModalBottomSheet<MovieNightConstraints>(
+                                context: context,
+                                isScrollControlled: true,
+                                showDragHandle: true,
+                                builder: (_) => _EditConstraintsSheet(
+                                  initialConstraints: event.constraints,
+                                ),
+                              );
+                          if (updated != null) {
+                            await controller.updateEventConstraints(
+                              eventId: event.id,
+                              constraints: updated,
+                            );
+                          }
+                        },
+                        child: const Text('Edit constraints'),
+                      )
+                    : null,
               )
             else
               ...event.shortlist.map(
@@ -305,6 +408,29 @@ class _ParticipantsCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _JoinMovieNightCard extends StatelessWidget {
+  const _JoinMovieNightCard({required this.onJoin});
+
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withValues(alpha: 0.55),
+      child: ListTile(
+        leading: const Icon(Icons.group_add_rounded),
+        title: const Text('Join this Movie Night'),
+        subtitle: const Text(
+          'Join before voting starts so your preferences shape the shortlist.',
+        ),
+        trailing: FilledButton(onPressed: onJoin, child: const Text('Join')),
       ),
     );
   }
@@ -493,6 +619,15 @@ String _statusLabel(MovieNightStatus status) {
     case MovieNightStatus.completed:
       return 'Completed';
   }
+}
+
+MovieNightParticipant? _participantFor(MovieNightEvent event, String userId) {
+  for (final participant in event.participants) {
+    if (participant.userId == userId) {
+      return participant;
+    }
+  }
+  return null;
 }
 
 String _dateLabel(DateTime dateTime) {

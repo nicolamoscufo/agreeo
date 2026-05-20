@@ -227,14 +227,22 @@ class _MovieNightWizardScreenState
       minimumRating: _minimumRating,
       language: _language,
     );
-    final event = await ref
-        .read(friendsMovieNightControllerProvider.notifier)
-        .createMovieNight(
-          name: _nameController.text,
-          dateTime: _dateTime,
-          constraints: constraints,
-          invitedFriendIds: _selectedFriendIds.toList(growable: false),
-        );
+    final MovieNightEvent event;
+    try {
+      event = await ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .createMovieNight(
+            name: _nameController.text,
+            dateTime: _dateTime,
+            constraints: constraints,
+            invitedFriendIds: _selectedFriendIds.toList(growable: false),
+          );
+    } catch (_) {
+      if (mounted) {
+        _showError('Could not create this Movie Night.');
+      }
+      return;
+    }
     if (!mounted) {
       return;
     }

@@ -1,3 +1,4 @@
+import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
@@ -7,15 +8,28 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MovieNightResultScreen extends ConsumerWidget {
+class MovieNightResultScreen extends ConsumerStatefulWidget {
   const MovieNightResultScreen({super.key, required this.eventId});
 
   final String eventId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MovieNightResultScreen> createState() =>
+      _MovieNightResultScreenState();
+}
+
+class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
+    with MovieNightAutoRefresh<MovieNightResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    startMovieNightPolling(widget.eventId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final event = socialState.eventById(eventId);
+    final event = socialState.eventById(widget.eventId);
     final winner = event?.winnerCandidate;
 
     if (event == null || winner == null) {

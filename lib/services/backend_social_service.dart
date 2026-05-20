@@ -19,10 +19,25 @@ class SocialBackendSnapshot {
 }
 
 class FriendSearchResponse {
-  const FriendSearchResponse({required this.results, required this.pendingIds});
+  const FriendSearchResponse({
+    required this.results,
+    required this.pendingIds,
+    required this.incomingRequestIdsByUserId,
+  });
 
   final List<Friend> results;
   final Set<String> pendingIds;
+  final Map<String, String> incomingRequestIdsByUserId;
+}
+
+class FriendRequestMutationResult {
+  const FriendRequestMutationResult({
+    required this.accepted,
+    required this.snapshot,
+  });
+
+  final bool accepted;
+  final SocialBackendSnapshot? snapshot;
 }
 
 class BackendSocialService {
@@ -61,6 +76,7 @@ class BackendSocialService {
     ).toString();
     final body = _decodeMap((await _authorizedRequest('GET', uri)).body);
     final pendingIds = <String>{};
+    final incomingRequestIdsByUserId = <String, String>{};
     final results = <Friend>[];
     final rawResults = body['results'];
     if (rawResults is List) {
@@ -71,16 +87,39 @@ class BackendSocialService {
         if (json['pending'] == true) {
           pendingIds.add(friend.id);
         }
+        if (json['incomingPending'] == true) {
+          final requestId = _string(json['incomingRequestId']);
+          if (requestId.isNotEmpty) {
+            incomingRequestIdsByUserId[friend.id] = requestId;
+          }
+        }
       }
     }
-    return FriendSearchResponse(results: results, pendingIds: pendingIds);
+    return FriendSearchResponse(
+      results: results,
+      pendingIds: pendingIds,
+      incomingRequestIdsByUserId: incomingRequestIdsByUserId,
+    );
   }
 
-  Future<void> sendFriendRequest(String userId) async {
-    await _authorizedRequest(
-      'POST',
-      '/friends/requests',
-      body: <String, dynamic>{'targetUserId': userId},
+  Future<FriendRequestMutationResult> sendFriendRequest(String userId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'POST',
+        '/friends/requests',
+        body: <String, dynamic>{'targetUserId': userId},
+      )).body,
+    );
+    final accepted = body['accepted'] == true;
+    return FriendRequestMutationResult(
+      accepted: accepted,
+      snapshot: accepted
+          ? SocialBackendSnapshot(
+              friends: _decodeFriends(body['friends']),
+              incomingRequests: _decodeFriendRequests(body['incomingRequests']),
+              movieNights: const <MovieNightEvent>[],
+            )
+          : null,
     );
   }
 
@@ -104,6 +143,28 @@ class BackendSocialService {
         'POST',
         '/friends/requests/$requestId/decline',
       )).body,
+    );
+    return SocialBackendSnapshot(
+      friends: _decodeFriends(body['friends']),
+      incomingRequests: _decodeFriendRequests(body['incomingRequests']),
+      movieNights: const <MovieNightEvent>[],
+    );
+  }
+
+  Future<SocialBackendSnapshot> removeFriend(String friendId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest('DELETE', '/friends/$friendId')).body,
+    );
+    return SocialBackendSnapshot(
+      friends: _decodeFriends(body['friends']),
+      incomingRequests: _decodeFriendRequests(body['incomingRequests']),
+      movieNights: const <MovieNightEvent>[],
+    );
+  }
+
+  Future<SocialBackendSnapshot> blockFriend(String friendId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest('POST', '/friends/$friendId/block')).body,
     );
     return SocialBackendSnapshot(
       friends: _decodeFriends(body['friends']),
@@ -140,6 +201,13 @@ class BackendSocialService {
     return _decodeMovieNightEvent(_castMap(body['event']));
   }
 
+  Future<MovieNightEvent> getMovieNight(String eventId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest('GET', '/movie-nights/$eventId')).body,
+    );
+    return _decodeMovieNightEvent(_castMap(body['event']));
+  }
+
   Future<MovieNightEvent> updateMovieNight({
     required String eventId,
     MovieNightConstraints? constraints,
@@ -168,6 +236,13 @@ class BackendSocialService {
         'POST',
         '/movie-nights/$eventId/shortlist',
       )).body,
+    );
+    return _decodeMovieNightEvent(_castMap(body['event']));
+  }
+
+  Future<MovieNightEvent> joinMovieNight(String eventId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest('POST', '/movie-nights/$eventId/join')).body,
     );
     return _decodeMovieNightEvent(_castMap(body['event']));
   }
@@ -220,6 +295,9 @@ class BackendSocialService {
           headers: headers,
           body: encodedBody,
         );
+        break;
+      case 'DELETE':
+        response = await _client.delete(uri, headers: headers);
         break;
       default:
         throw UnsupportedError('Unsupported method $method');

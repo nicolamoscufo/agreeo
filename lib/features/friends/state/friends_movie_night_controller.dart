@@ -15,6 +15,7 @@ class FriendsMovieNightState {
     required this.discoverableUsers,
     required this.searchResults,
     required this.outgoingPendingIds,
+    required this.incomingRequestIdsByUserId,
     required this.profiles,
     required this.friendMovieStates,
     required this.movieNights,
@@ -27,6 +28,7 @@ class FriendsMovieNightState {
       discoverableUsers: <Friend>[],
       searchResults: <Friend>[],
       outgoingPendingIds: <String>{},
+      incomingRequestIdsByUserId: <String, String>{},
       profiles: <String, FriendProfile>{},
       friendMovieStates: <String, Map<String, UserMovieState>>{},
       movieNights: <MovieNightEvent>[],
@@ -38,6 +40,7 @@ class FriendsMovieNightState {
   final List<Friend> discoverableUsers;
   final List<Friend> searchResults;
   final Set<String> outgoingPendingIds;
+  final Map<String, String> incomingRequestIdsByUserId;
   final Map<String, FriendProfile> profiles;
   final Map<String, Map<String, UserMovieState>> friendMovieStates;
   final List<MovieNightEvent> movieNights;
@@ -47,6 +50,10 @@ class FriendsMovieNightState {
   }
 
   bool isPending(String userId) => outgoingPendingIds.contains(userId);
+
+  String? incomingRequestIdFor(String userId) {
+    return incomingRequestIdsByUserId[userId];
+  }
 
   FriendProfile? profileFor(String userId) => profiles[userId];
 
@@ -65,6 +72,7 @@ class FriendsMovieNightState {
     List<Friend>? discoverableUsers,
     List<Friend>? searchResults,
     Set<String>? outgoingPendingIds,
+    Map<String, String>? incomingRequestIdsByUserId,
     Map<String, FriendProfile>? profiles,
     Map<String, Map<String, UserMovieState>>? friendMovieStates,
     List<MovieNightEvent>? movieNights,
@@ -75,6 +83,8 @@ class FriendsMovieNightState {
       discoverableUsers: discoverableUsers ?? this.discoverableUsers,
       searchResults: searchResults ?? this.searchResults,
       outgoingPendingIds: outgoingPendingIds ?? this.outgoingPendingIds,
+      incomingRequestIdsByUserId:
+          incomingRequestIdsByUserId ?? this.incomingRequestIdsByUserId,
       profiles: profiles ?? this.profiles,
       friendMovieStates: friendMovieStates ?? this.friendMovieStates,
       movieNights: movieNights ?? this.movieNights,
@@ -111,6 +121,10 @@ class FriendsMovieNightController
         discoverableUsers: search.results,
         searchResults: search.results,
         outgoingPendingIds: search.pendingIds,
+        incomingRequestIdsByUserId: <String, String>{
+          ..._incomingRequestIds(snapshot.incomingRequests),
+          ...search.incomingRequestIdsByUserId,
+        },
         profiles: const <String, FriendProfile>{},
         friendMovieStates: const <String, Map<String, UserMovieState>>{},
         movieNights: snapshot.movieNights,
@@ -136,6 +150,11 @@ class FriendsMovieNightController
   }
 
   void sendFriendRequest(String userId) {
+    final incomingRequestId = state.incomingRequestIdFor(userId);
+    if (incomingRequestId != null) {
+      acceptFriendRequest(incomingRequestId);
+      return;
+    }
     if (state.isFriend(userId) || state.isPending(userId)) {
       return;
     }
@@ -149,10 +168,16 @@ class FriendsMovieNightController
   }
 
   void acceptFriendRequest(String requestId) {
+    final previous = state;
     final request = _firstOrNull(
       state.incomingRequests.where((entry) => entry.id == requestId),
     );
     if (request == null) {
+      if (_usingBackend) {
+        Future<void>.microtask(
+          () => _acceptFriendRequestBackend(requestId, previous),
+        );
+      }
       return;
     }
 
@@ -168,26 +193,62 @@ class FriendsMovieNightController
     );
 
     state = state.copyWith(
-      friends: <Friend>[...state.friends, request.fromUser],
+      friends: state.isFriend(request.fromUser.id)
+          ? state.friends
+          : <Friend>[...state.friends, request.fromUser],
       incomingRequests: state.incomingRequests
           .where((entry) => entry.id != requestId)
           .toList(growable: false),
+      incomingRequestIdsByUserId: _withoutIncomingRequest(
+        state.incomingRequestIdsByUserId,
+        requestId: requestId,
+        userId: request.fromUser.id,
+      ),
       profiles: profiles,
       friendMovieStates: movieStates,
     );
     if (_usingBackend) {
-      Future<void>.microtask(() => _acceptFriendRequestBackend(requestId));
+      Future<void>.microtask(
+        () => _acceptFriendRequestBackend(requestId, previous),
+      );
     }
   }
 
   void declineFriendRequest(String requestId) {
+    final previous = state;
+    final request = _firstOrNull(
+      state.incomingRequests.where((entry) => entry.id == requestId),
+    );
     state = state.copyWith(
       incomingRequests: state.incomingRequests
           .where((entry) => entry.id != requestId)
           .toList(growable: false),
+      incomingRequestIdsByUserId: _withoutIncomingRequest(
+        state.incomingRequestIdsByUserId,
+        requestId: requestId,
+        userId: request?.fromUser.id,
+      ),
     );
     if (_usingBackend) {
-      Future<void>.microtask(() => _declineFriendRequestBackend(requestId));
+      Future<void>.microtask(
+        () => _declineFriendRequestBackend(requestId, previous),
+      );
+    }
+  }
+
+  void removeFriend(String friendId) {
+    final previous = state;
+    state = _stateWithoutUser(friendId);
+    if (_usingBackend) {
+      Future<void>.microtask(() => _removeFriendBackend(friendId, previous));
+    }
+  }
+
+  void blockFriend(String friendId) {
+    final previous = state;
+    state = _stateWithoutUser(friendId);
+    if (_usingBackend) {
+      Future<void>.microtask(() => _blockFriendBackend(friendId, previous));
     }
   }
 
@@ -207,6 +268,10 @@ class FriendsMovieNightController
           ...state.outgoingPendingIds,
           ...search.pendingIds,
         },
+        incomingRequestIdsByUserId: <String, String>{
+          ...state.incomingRequestIdsByUserId,
+          ...search.incomingRequestIdsByUserId,
+        },
       );
     } catch (_) {}
   }
@@ -216,13 +281,28 @@ class FriendsMovieNightController
     FriendsMovieNightState previous,
   ) async {
     try {
-      await _backendSocialService.sendFriendRequest(userId);
+      final result = await _backendSocialService.sendFriendRequest(userId);
+      final snapshot = result.snapshot;
+      if (result.accepted && snapshot != null) {
+        state = state.copyWith(
+          friends: snapshot.friends,
+          incomingRequests: snapshot.incomingRequests,
+          outgoingPendingIds: <String>{...state.outgoingPendingIds}
+            ..remove(userId),
+          incomingRequestIdsByUserId: _incomingRequestIds(
+            snapshot.incomingRequests,
+          ),
+        );
+      }
     } catch (_) {
       state = previous;
     }
   }
 
-  Future<void> _acceptFriendRequestBackend(String requestId) async {
+  Future<void> _acceptFriendRequestBackend(
+    String requestId,
+    FriendsMovieNightState previous,
+  ) async {
     try {
       final snapshot = await _backendSocialService.acceptFriendRequest(
         requestId,
@@ -230,11 +310,19 @@ class FriendsMovieNightController
       state = state.copyWith(
         friends: snapshot.friends,
         incomingRequests: snapshot.incomingRequests,
+        incomingRequestIdsByUserId: _incomingRequestIds(
+          snapshot.incomingRequests,
+        ),
       );
-    } catch (_) {}
+    } catch (_) {
+      state = previous;
+    }
   }
 
-  Future<void> _declineFriendRequestBackend(String requestId) async {
+  Future<void> _declineFriendRequestBackend(
+    String requestId,
+    FriendsMovieNightState previous,
+  ) async {
     try {
       final snapshot = await _backendSocialService.declineFriendRequest(
         requestId,
@@ -242,8 +330,38 @@ class FriendsMovieNightController
       state = state.copyWith(
         friends: snapshot.friends,
         incomingRequests: snapshot.incomingRequests,
+        incomingRequestIdsByUserId: _incomingRequestIds(
+          snapshot.incomingRequests,
+        ),
       );
-    } catch (_) {}
+    } catch (_) {
+      state = previous;
+    }
+  }
+
+  Future<void> _removeFriendBackend(
+    String friendId,
+    FriendsMovieNightState previous,
+  ) async {
+    try {
+      final snapshot = await _backendSocialService.removeFriend(friendId);
+      _applySocialSnapshot(snapshot);
+    } catch (_) {
+      state = previous;
+    }
+  }
+
+  Future<void> _blockFriendBackend(
+    String friendId,
+    FriendsMovieNightState previous,
+  ) async {
+    try {
+      final snapshot = await _backendSocialService.blockFriend(friendId);
+      _applySocialSnapshot(snapshot);
+      state = _stateWithoutUser(friendId);
+    } catch (_) {
+      state = previous;
+    }
   }
 
   Future<FriendProfile?> loadFriendProfile(String userId) async {
@@ -281,7 +399,10 @@ class FriendsMovieNightController
         );
         _upsertEvent(event);
         return event;
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Error creating backend Movie Night: $error');
+        rethrow;
+      }
     }
     return _createLocalMovieNight(
       name: name,
@@ -370,7 +491,10 @@ class FriendsMovieNightController
         );
         _upsertEvent(event);
         return event;
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Error updating backend Movie Night: $error');
+        return null;
+      }
     }
     final event = state.eventById(eventId);
     if (event == null) {
@@ -398,7 +522,10 @@ class FriendsMovieNightController
         final event = await _backendSocialService.refreshShortlist(eventId);
         _upsertEvent(event);
         return event;
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Error refreshing backend Movie Night shortlist: $error');
+        return null;
+      }
     }
     final event = state.eventById(eventId);
     if (event == null) {
@@ -417,6 +544,99 @@ class FriendsMovieNightController
     return updated;
   }
 
+  Future<MovieNightEvent?> refreshMovieNight(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.getMovieNight(eventId);
+        _upsertEvent(event);
+        return event;
+      } catch (_) {
+        return state.eventById(eventId);
+      }
+    }
+    return state.eventById(eventId);
+  }
+
+  Future<MovieNightEvent?> resolveMovieNightInvite(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.joinMovieNight(eventId);
+        _upsertEvent(event);
+        return event;
+      } catch (_) {
+        return refreshMovieNight(eventId);
+      }
+    }
+
+    final event = state.eventById(eventId);
+    if (event == null || event.status != MovieNightStatus.waiting) {
+      return event;
+    }
+    return joinMovieNight(eventId);
+  }
+
+  Future<MovieNightEvent?> joinMovieNight(String eventId) async {
+    if (_usingBackend) {
+      try {
+        final event = await _backendSocialService.joinMovieNight(eventId);
+        _upsertEvent(event);
+        return event;
+      } catch (error) {
+        debugPrint('Error joining backend Movie Night: $error');
+        return null;
+      }
+    }
+
+    final event = state.eventById(eventId);
+    if (event == null) {
+      return null;
+    }
+    final appState = _ref.read(agreeoAppControllerProvider);
+    final currentUserId = appState.session?.id ?? 'local-host';
+    final currentName = appState.session?.displayName ?? 'You';
+    var foundCurrentUser = false;
+    final participants = event.participants
+        .map((participant) {
+          if (participant.userId != currentUserId) {
+            return participant;
+          }
+          foundCurrentUser = true;
+          return MovieNightParticipant(
+            userId: participant.userId,
+            name: participant.name,
+            avatarUrl: participant.avatarUrl,
+            status: MovieNightParticipantStatus.joined,
+            isHost: participant.isHost,
+          );
+        })
+        .toList(growable: true);
+    if (!foundCurrentUser) {
+      participants.add(
+        MovieNightParticipant(
+          userId: currentUserId,
+          name: currentName,
+          avatarUrl: '',
+          status: MovieNightParticipantStatus.joined,
+          isHost: false,
+        ),
+      );
+    }
+
+    final updated = event.copyWith(
+      participants: participants,
+      shortlist: _generateShortlist(
+        participants: participants,
+        constraints: event.constraints,
+      ),
+      votes: const <MovieNightVote>[],
+      status: MovieNightStatus.waiting,
+      clearWinnerMovieId: true,
+      updatedAt: DateTime.now(),
+    );
+    _replaceEvent(updated);
+    return updated;
+  }
+
   Future<MovieNightEvent?> startVoting(String eventId) async {
     if (_usingBackend) {
       try {
@@ -426,7 +646,10 @@ class FriendsMovieNightController
         );
         _upsertEvent(event);
         return event;
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Error starting backend Movie Night voting: $error');
+        return null;
+      }
     }
     final event = state.eventById(eventId);
     if (event == null || event.shortlist.isEmpty) {
@@ -454,7 +677,10 @@ class FriendsMovieNightController
         );
         _upsertEvent(event);
         return event;
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('Error submitting backend Movie Night vote: $error');
+        return null;
+      }
     }
     final event = state.eventById(eventId);
     if (event == null) {
@@ -624,19 +850,21 @@ class FriendsMovieNightController
     profiles[requester.id] = _buildProfile(requester, catalog, 5);
     movieStates[requester.id] = _buildMovieStates(requester.id, catalog);
 
+    final incomingRequests = <FriendRequest>[
+      FriendRequest(
+        id: 'request-omar',
+        fromUser: requester,
+        toUserId:
+            _ref.read(agreeoAppControllerProvider).session?.id ?? 'local-host',
+        status: FriendRequestStatus.pending,
+        createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+      ),
+    ];
+
     state = state.copyWith(
       friends: friends,
-      incomingRequests: <FriendRequest>[
-        FriendRequest(
-          id: 'request-omar',
-          fromUser: requester,
-          toUserId:
-              _ref.read(agreeoAppControllerProvider).session?.id ??
-              'local-host',
-          status: FriendRequestStatus.pending,
-          createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-        ),
-      ],
+      incomingRequests: incomingRequests,
+      incomingRequestIdsByUserId: _incomingRequestIds(incomingRequests),
       discoverableUsers: discoverable,
       searchResults: discoverable,
       profiles: profiles,
@@ -663,6 +891,64 @@ class FriendsMovieNightController
     return <String, Map<String, UserMovieState>>{
       ...state.friendMovieStates,
       currentUserId: appState.movieStates,
+    };
+  }
+
+  void _applySocialSnapshot(SocialBackendSnapshot snapshot) {
+    state = state.copyWith(
+      friends: snapshot.friends,
+      incomingRequests: snapshot.incomingRequests,
+      incomingRequestIdsByUserId: _incomingRequestIds(
+        snapshot.incomingRequests,
+      ),
+    );
+  }
+
+  FriendsMovieNightState _stateWithoutUser(String userId) {
+    final profiles = Map<String, FriendProfile>.from(state.profiles)
+      ..remove(userId);
+    final movieStates = Map<String, Map<String, UserMovieState>>.from(
+      state.friendMovieStates,
+    )..remove(userId);
+    final incomingRequestIds = Map<String, String>.from(
+      state.incomingRequestIdsByUserId,
+    )..remove(userId);
+
+    return state.copyWith(
+      friends: state.friends
+          .where((friend) => friend.id != userId)
+          .toList(growable: false),
+      incomingRequests: state.incomingRequests
+          .where((request) => request.fromUser.id != userId)
+          .toList(growable: false),
+      discoverableUsers: state.discoverableUsers
+          .where((friend) => friend.id != userId)
+          .toList(growable: false),
+      searchResults: state.searchResults
+          .where((friend) => friend.id != userId)
+          .toList(growable: false),
+      outgoingPendingIds: <String>{...state.outgoingPendingIds}..remove(userId),
+      incomingRequestIdsByUserId: incomingRequestIds,
+      profiles: profiles,
+      friendMovieStates: movieStates,
+    );
+  }
+
+  Map<String, String> _incomingRequestIds(List<FriendRequest> requests) {
+    return <String, String>{
+      for (final request in requests) request.fromUser.id: request.id,
+    };
+  }
+
+  Map<String, String> _withoutIncomingRequest(
+    Map<String, String> requestIds, {
+    required String requestId,
+    String? userId,
+  }) {
+    return <String, String>{
+      for (final entry in requestIds.entries)
+        if (entry.value != requestId && entry.key != userId)
+          entry.key: entry.value,
     };
   }
 

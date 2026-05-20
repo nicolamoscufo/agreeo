@@ -4,8 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 ThemeData buildAgreeoTheme(Brightness brightness) {
   // Ignoriamo la brightness in ingresso e forziamo la dark mode
   // Il tema "Cinema Popcorn" è progettato specificamente per ambienti scuri.
-  const isDark = true;
-
   // Palette Cinema Popcorn Edition
   const cinematicRed = Color(0xFFE50914);
   const popcornWhite = Color(0xFFFFFFFF);

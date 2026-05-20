@@ -16,6 +16,53 @@ class _OfflineBackendSocialService extends BackendSocialService {
   }
 }
 
+class _AcceptFailingBackendSocialService extends BackendSocialService {
+  _AcceptFailingBackendSocialService()
+    : super(config: const BackendConfig(baseUrl: 'http://localhost:3000'));
+
+  Friend get _friend => Friend(
+    id: 'friend-remote',
+    name: 'Remote Friend',
+    avatarUrl: '',
+    watchedCount: 3,
+    reviewsCount: 1,
+    privacySettings: PrivacySettings.open(),
+  );
+
+  FriendRequest get _request => FriendRequest(
+    id: 'request-remote',
+    fromUser: _friend,
+    toUserId: 'local-host',
+    status: FriendRequestStatus.pending,
+    createdAt: DateTime(2026),
+  );
+
+  @override
+  Future<SocialBackendSnapshot> loadSnapshot() async {
+    return SocialBackendSnapshot(
+      friends: const <Friend>[],
+      incomingRequests: <FriendRequest>[_request],
+      movieNights: const <MovieNightEvent>[],
+    );
+  }
+
+  @override
+  Future<FriendSearchResponse> searchFriends(String query) async {
+    return FriendSearchResponse(
+      results: <Friend>[_friend],
+      pendingIds: const <String>{},
+      incomingRequestIdsByUserId: const <String, String>{
+        'friend-remote': 'request-remote',
+      },
+    );
+  }
+
+  @override
+  Future<SocialBackendSnapshot> acceptFriendRequest(String requestId) async {
+    throw StateError('accept failed');
+  }
+}
+
 void main() {
   test(
     'controller keeps local movie-night fallback when backend is offline',
@@ -143,5 +190,61 @@ void main() {
       state.friends.any((friend) => friend.id == request.fromUser.id),
       true,
     );
+  });
+
+  test('accept failure rolls back optimistic friend request state', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(
+          _AcceptFailingBackendSocialService(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.acceptFriendRequest('request-remote');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(friendsMovieNightControllerProvider);
+    expect(state.incomingRequests.single.id, 'request-remote');
+    expect(state.friends, isEmpty);
+    expect(state.incomingRequestIdFor('friend-remote'), 'request-remote');
+  });
+
+  test('remove friend clears local friend and search state', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(
+          _OfflineBackendSocialService(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final friendId = container
+        .read(friendsMovieNightControllerProvider)
+        .friends
+        .first
+        .id;
+    controller.removeFriend(friendId);
+
+    final state = container.read(friendsMovieNightControllerProvider);
+    expect(state.friends.any((friend) => friend.id == friendId), false);
+    expect(state.searchResults.any((friend) => friend.id == friendId), false);
   });
 }

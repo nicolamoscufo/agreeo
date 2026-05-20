@@ -1,3 +1,4 @@
+import 'package:agreeo/features/friends/presentation/movie_night_auto_refresh.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
@@ -8,16 +9,29 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MovieNightVotingScreen extends ConsumerWidget {
+class MovieNightVotingScreen extends ConsumerStatefulWidget {
   const MovieNightVotingScreen({super.key, required this.eventId});
 
   final String eventId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MovieNightVotingScreen> createState() =>
+      _MovieNightVotingScreenState();
+}
+
+class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
+    with MovieNightAutoRefresh<MovieNightVotingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    startMovieNightPolling(widget.eventId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
-    final event = socialState.eventById(eventId);
+    final event = socialState.eventById(widget.eventId);
     if (event == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Voting')),
@@ -97,6 +111,14 @@ class MovieNightVotingScreen extends ConsumerWidget {
                         movieId: candidate.movie.id,
                         vote: voteValue,
                       );
+                      if (updated == null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not submit this vote.'),
+                          ),
+                        );
+                        return;
+                      }
                       if (updated?.status == MovieNightStatus.completed &&
                           context.mounted) {
                         Navigator.of(context).pushReplacement(

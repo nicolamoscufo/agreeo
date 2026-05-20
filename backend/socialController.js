@@ -67,9 +67,12 @@ exports.sendFriendRequest = async (req, res) => {
   if (!targetUserId) return res.status(400).json({ error: 'targetUserId is required' });
 
   try {
-    const request = await socialRepository.sendFriendRequest(uid, targetUserId);
-    if (!request) return res.status(404).json({ error: 'Friend request target not found' });
-    return res.status(201).json({ request });
+    const result = await socialRepository.sendFriendRequest(uid, targetUserId);
+    if (!result) return res.status(404).json({ error: 'Friend request target not found' });
+    if (result.accepted) {
+      return res.json({ ok: true, accepted: true, ...result.social });
+    }
+    return res.status(201).json({ accepted: false, request: result.request });
   } catch (error) {
     return handleError(res, error, 'Failed to send friend request');
   }
@@ -100,6 +103,34 @@ exports.declineFriendRequest = async (req, res) => {
     return res.json({ ok: true, ...social });
   } catch (error) {
     return handleError(res, error, 'Failed to decline friend request');
+  }
+};
+
+exports.removeFriend = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const removed = await socialRepository.removeFriend(uid, req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Friend relationship not found' });
+    const social = await socialRepository.getFriends(uid);
+    return res.json({ ok: true, ...social });
+  } catch (error) {
+    return handleError(res, error, 'Failed to remove friend');
+  }
+};
+
+exports.blockFriend = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const blocked = await socialRepository.blockFriend(uid, req.params.id);
+    if (!blocked) return res.status(404).json({ error: 'Friend block target not found' });
+    const social = await socialRepository.getFriends(uid);
+    return res.json({ ok: true, ...social });
+  } catch (error) {
+    return handleError(res, error, 'Failed to block friend');
   }
 };
 
@@ -178,6 +209,19 @@ exports.inviteFriends = async (req, res) => {
     return res.json({ event });
   } catch (error) {
     return handleError(res, error, 'Failed to invite friends');
+  }
+};
+
+exports.joinMovieNight = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const event = await socialRepository.joinMovieNight(uid, req.params.id);
+    if (!event) return res.status(404).json({ error: 'Movie night join target not found' });
+    return res.json({ event });
+  } catch (error) {
+    return handleError(res, error, 'Failed to join movie night');
   }
 };
 
