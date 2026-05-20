@@ -90,7 +90,9 @@ class EmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -113,12 +115,14 @@ class AgreeoSearchBar extends StatelessWidget {
     super.key,
     required this.controller,
     required this.hintText,
+    this.focusNode,
     this.onChanged,
     this.trailing,
   });
 
   final TextEditingController controller;
   final String hintText;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
   final Widget? trailing;
 
@@ -129,6 +133,7 @@ class AgreeoSearchBar extends StatelessWidget {
         Expanded(
           child: TextField(
             controller: controller,
+            focusNode: focusNode,
             onChanged: onChanged,
             decoration: InputDecoration(
               hintText: hintText,
@@ -249,11 +254,7 @@ class InfoBadge extends StatelessWidget {
 }
 
 class UserAvatar extends StatelessWidget {
-  const UserAvatar({
-    super.key,
-    required this.initials,
-    this.size = 52,
-  });
+  const UserAvatar({super.key, required this.initials, this.size = 52});
 
   final String initials;
   final double size;
@@ -386,8 +387,7 @@ Future<void> showUndoSnackbar(
   required String message,
   required Future<void> Function() onUndo,
 }) async {
-  final messenger = ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar();
+  final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
 
   messenger.showSnackBar(
     SnackBar(

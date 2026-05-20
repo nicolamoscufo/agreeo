@@ -4,6 +4,7 @@ import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/services/shortlist_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/services/backend_social_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -113,7 +114,9 @@ class FriendsMovieNightController
         friendMovieStates: const <String, Map<String, UserMovieState>>{},
         movieNights: snapshot.movieNights,
       );
-    } catch (_) {
+    } catch (e, stackTrace) {
+      debugPrint('Error hydrating backend social layer: $e');
+      debugPrint(stackTrace.toString());
       _usingBackend = false;
     }
   }

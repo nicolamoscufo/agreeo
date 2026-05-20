@@ -41,6 +41,21 @@ services:
     networks:
       - agreeo_net
 
+  neo4j-init:
+    image: neo4j:latest
+    container_name: agreeo_neo4j_init
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./backend/scripts:/scripts
+    environment:
+      NEO4J_AUTH: neo4j/password123
+    entrypoint: >
+      bash -c "cypher-shell -a bolt://neo4j:7687 -u neo4j -p password123 -f /scripts/import_movielens.cypher && echo 'Dataset caricato con successo!'"
+    networks:
+      - agreeo_net
+
   frontend:
     build:
       context: .

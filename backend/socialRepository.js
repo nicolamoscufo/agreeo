@@ -138,12 +138,13 @@ async function getFriends(uid) {
     WITH DISTINCT friend
     OPTIONAL MATCH (friend)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (friend)-[:RATED_APP]->(reviewed:Movie)
+    WITH friend, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
     RETURN {
       id: friend.uid,
       name: coalesce(friend.displayName, friend.email, 'Agreeo user'),
       avatarUrl: coalesce(friend.avatarUrl, ''),
-      watchedCount: count(DISTINCT watched),
-      reviewsCount: count(DISTINCT reviewed),
+      watchedCount: watchedCount,
+      reviewsCount: reviewsCount,
       privacySettings: {
         canShowWatched: coalesce(friend.canShowWatched, true),
         canShowReviews: coalesce(friend.canShowReviews, true),
@@ -161,6 +162,7 @@ async function getFriends(uid) {
     MATCH (from:AppUser)-[r:SENT_FRIEND_REQUEST {status: 'pending'}]->(me)
     OPTIONAL MATCH (from)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (from)-[:RATED_APP]->(reviewed:Movie)
+    WITH r, me, from, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
     RETURN {
       id: r.requestId,
       status: coalesce(r.status, 'pending'),
@@ -170,8 +172,8 @@ async function getFriends(uid) {
         id: from.uid,
         name: coalesce(from.displayName, from.email, 'Agreeo user'),
         avatarUrl: coalesce(from.avatarUrl, ''),
-        watchedCount: count(DISTINCT watched),
-        reviewsCount: count(DISTINCT reviewed),
+        watchedCount: watchedCount,
+        reviewsCount: reviewsCount,
         privacySettings: {
           canShowWatched: coalesce(from.canShowWatched, true),
           canShowReviews: coalesce(from.canShowReviews, true),
@@ -202,14 +204,15 @@ async function searchFriends(uid, query) {
     OPTIONAL MATCH (me)-[pending:SENT_FRIEND_REQUEST {status: 'pending'}]->(candidate)
     OPTIONAL MATCH (candidate)-[:ALREADY_SEEN]->(watched:Movie)
     OPTIONAL MATCH (candidate)-[:RATED_APP]->(reviewed:Movie)
+    WITH candidate, count(DISTINCT friendRel) AS friendCount, count(DISTINCT pending) AS pendingCount, count(DISTINCT watched) AS watchedCount, count(DISTINCT reviewed) AS reviewsCount
     RETURN {
       id: candidate.uid,
       name: coalesce(candidate.displayName, candidate.email, 'Agreeo user'),
       avatarUrl: coalesce(candidate.avatarUrl, ''),
-      watchedCount: count(DISTINCT watched),
-      reviewsCount: count(DISTINCT reviewed),
-      isFriend: count(DISTINCT friendRel) > 0,
-      pending: count(DISTINCT pending) > 0,
+      watchedCount: watchedCount,
+      reviewsCount: reviewsCount,
+      isFriend: friendCount > 0,
+      pending: pendingCount > 0,
       privacySettings: {
         canShowWatched: coalesce(candidate.canShowWatched, true),
         canShowReviews: coalesce(candidate.canShowReviews, true),
@@ -298,12 +301,13 @@ async function getFriendProfile(uid, friendId) {
     MATCH (me:AppUser {uid: $uid})-[:FRIEND]-(friend:AppUser {uid: $friendId})
     OPTIONAL MATCH (friend)-[:ALREADY_SEEN]->(watchedCountMovie:Movie)
     OPTIONAL MATCH (friend)-[:RATED_APP]->(reviewedCountMovie:Movie)
+    WITH friend, count(DISTINCT watchedCountMovie) AS watchedCount, count(DISTINCT reviewedCountMovie) AS reviewsCount
     RETURN {
       id: friend.uid,
       name: coalesce(friend.displayName, friend.email, 'Agreeo user'),
       avatarUrl: coalesce(friend.avatarUrl, ''),
-      watchedCount: count(DISTINCT watchedCountMovie),
-      reviewsCount: count(DISTINCT reviewedCountMovie),
+      watchedCount: watchedCount,
+      reviewsCount: reviewsCount,
       privacySettings: {
         canShowWatched: coalesce(friend.canShowWatched, true),
         canShowReviews: coalesce(friend.canShowReviews, true),

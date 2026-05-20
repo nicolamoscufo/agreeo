@@ -354,47 +354,58 @@ class _ImmersiveMovieCard extends StatelessWidget {
                                 ),
                               ),
                       ),
-                      const Spacer(),
-                      Text(
-                        movie.title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          height: 1.05,
-                          letterSpacing: -0.6,
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              movie.title,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 34,
+                                fontWeight: FontWeight.w900,
+                                height: 1.05,
+                                letterSpacing: -0.6,
+                              ),
+                            ),
+                            if (metadata.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 10),
+                              Text(
+                                metadata,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                            if (movie.overview.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 14),
+                              Flexible(
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    movie.overview,
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.82,
+                                      ),
+                                      fontSize: 14,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            actions,
+                          ],
                         ),
                       ),
-                      if (metadata.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 10),
-                        Text(
-                          metadata,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      if (movie.overview.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 14),
-                        Text(
-                          movie.overview,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.82),
-                            fontSize: 14,
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      actions,
                     ],
                   ),
                 ),

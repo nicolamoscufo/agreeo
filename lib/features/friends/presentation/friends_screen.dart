@@ -1,3 +1,4 @@
+import 'dart:async'; // Necessario per il Timer del Debounce
 import 'package:agreeo/features/friends/presentation/friend_profile_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
@@ -18,27 +19,49 @@ class FriendsScreen extends ConsumerStatefulWidget {
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  // Gestione intelligente della ricerca (evita spam al backend)
+  void _onSearchChanged(String query) {
+    setState(
+      () {},
+    ); // Aggiorna la UI per mostrare i risultati solo se c'è testo
+
+    if (_searchDebounce?.isActive ?? false) {
+      _searchDebounce!.cancel();
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .searchFriends(query);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final socialState = ref.watch(friendsMovieNightControllerProvider);
     final controller = ref.read(friendsMovieNightControllerProvider.notifier);
+    final theme = Theme.of(context);
 
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color(0xFF07111F), Color(0xFF111827)],
-        ),
-      ),
-      child: SafeArea(
+    // Stile salvavita per evitare il crash "BoxConstraints(w=Infinity)"
+    final safeButtonStyle = FilledButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      maximumSize: const Size(220, 48), // Impedisce l'espansione infinita
+    );
+
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 128),
           children: <Widget>[
@@ -50,12 +73,22 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                 onPressed: _openCreateMovieNight,
                 icon: const Icon(Icons.local_movies_outlined),
                 label: const Text('Create Movie Night'),
+                style: safeButtonStyle, // Applicato per evitare il crash
               ),
             ),
             const SizedBox(height: 22),
             _FriendsListSection(
               friends: socialState.friends,
               onFriendTap: _openFriend,
+              onFindFriendsTap: () {
+                _searchFocusNode.requestFocus(); // Apre la tastiera
+                // Effettua un piccolo scroll verso il basso per mostrare la barra
+                Scrollable.ensureVisible(
+                  _searchFocusNode.context!,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
             ),
             const SizedBox(height: 26),
             _RequestsSection(
@@ -64,29 +97,34 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               onDecline: controller.declineFriendRequest,
             ),
             const SizedBox(height: 26),
-            SectionHeader(
+            const SectionHeader(
               title: 'Search friends',
               subtitle: 'Invite people who help the group decide faster.',
             ),
             const SizedBox(height: 14),
             AgreeoSearchBar(
               controller: _searchController,
+              focusNode: _searchFocusNode,
               hintText: 'Search by name',
-              onChanged: controller.searchFriends,
+              onChanged: _onSearchChanged,
             ),
             const SizedBox(height: 14),
-            _SearchResults(
-              results: socialState.searchResults,
-              socialState: socialState,
-              onAdd: (friend) {
-                controller.sendFriendRequest(friend.id);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Friend request sent to ${friend.name}.'),
-                  ),
-                );
-              },
-            ),
+
+            // I risultati appaiono solo se l'utente ha digitato qualcosa
+            if (_searchController.text.trim().isNotEmpty)
+              _SearchResults(
+                results: socialState.searchResults,
+                socialState: socialState,
+                onAdd: (friend) {
+                  controller.sendFriendRequest(friend.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Friend request sent to ${friend.name}.'),
+                    ),
+                  );
+                },
+              ),
+
             const SizedBox(height: 26),
             SectionHeader(
               title: 'Movie Nights',
@@ -105,6 +143,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                     'Create one, invite friends, generate a shortlist, then vote together.',
                 action: FilledButton(
                   onPressed: _openCreateMovieNight,
+                  style: safeButtonStyle, // Applicato per evitare il crash
                   child: const Text('Create Movie Night'),
                 ),
               )
@@ -150,10 +189,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 }
 
 class _FriendsListSection extends StatelessWidget {
-  const _FriendsListSection({required this.friends, required this.onFriendTap});
+  const _FriendsListSection({
+    required this.friends,
+    required this.onFriendTap,
+    required this.onFindFriendsTap,
+  });
 
   final List<Friend> friends;
   final ValueChanged<Friend> onFriendTap;
+  final VoidCallback onFindFriendsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +208,11 @@ class _FriendsListSection extends StatelessWidget {
         message:
             'Search for friends and start building better movie nights together.',
         action: FilledButton(
-          onPressed: () {},
+          onPressed: onFindFriendsTap,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 40),
+            maximumSize: const Size(200, 48),
+          ),
           child: const Text('Find friends'),
         ),
       );
@@ -173,11 +221,6 @@ class _FriendsListSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SectionHeader(
-          title: 'Friends list',
-          subtitle: 'Tap a friend to view shared movie context.',
-        ),
-        const SizedBox(height: 14),
         ...friends.map(
           (friend) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -266,6 +309,10 @@ class _RequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (requests.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -274,37 +321,34 @@ class _RequestsSection extends StatelessWidget {
           subtitle: 'Accept people you want in future Movie Nights.',
         ),
         const SizedBox(height: 14),
-        if (requests.isEmpty)
-          const EmptyState(
-            icon: Icons.mark_email_read_outlined,
-            title: 'No pending requests',
-            message: 'Incoming requests will appear here.',
-          )
-        else
-          ...requests.map(
-            (request) => Card(
-              child: ListTile(
-                leading: UserAvatar(initials: request.fromUser.initials),
-                title: Text(request.fromUser.name),
-                subtitle: Text(
-                  '${request.fromUser.watchedCount} watched • ${request.fromUser.reviewsCount} reviews',
-                ),
-                trailing: Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    TextButton(
-                      onPressed: () => onDecline(request.id),
-                      child: const Text('Decline'),
+        ...requests.map(
+          (request) => Card(
+            child: ListTile(
+              leading: UserAvatar(initials: request.fromUser.initials),
+              title: Text(request.fromUser.name),
+              subtitle: Text(
+                '${request.fromUser.watchedCount} watched • ${request.fromUser.reviewsCount} reviews',
+              ),
+              trailing: Wrap(
+                spacing: 8,
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => onDecline(request.id),
+                    child: const Text('Decline'),
+                  ),
+                  FilledButton(
+                    onPressed: () => onAccept(request.id),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      maximumSize: const Size(120, 40), // Impedisce crash
                     ),
-                    FilledButton(
-                      onPressed: () => onAccept(request.id),
-                      child: const Text('Accept'),
-                    ),
-                  ],
-                ),
+                    child: const Text('Accept'),
+                  ),
+                ],
               ),
             ),
           ),
+        ),
       ],
     );
   }
@@ -344,6 +388,10 @@ class _SearchResults extends StatelessWidget {
                   subtitle: const Text('Mutual movie taste preview soon'),
                   trailing: FilledButton.tonal(
                     onPressed: isFriend || pending ? null : () => onAdd(friend),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      maximumSize: const Size(120, 40), // Impedisce crash
+                    ),
                     child: Text(
                       isFriend
                           ? 'Friends'

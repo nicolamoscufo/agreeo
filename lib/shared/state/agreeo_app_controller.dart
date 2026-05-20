@@ -222,6 +222,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   final UserMovieStateService _userMovieStateService;
   final BackendMovieService _backendMovieService;
   bool _isRefillingDailySuggestions = false;
+  bool _hasExhaustedDailySuggestions = false;
 
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
@@ -566,6 +567,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     final recommended = results[0];
     final suggestions = results[1];
 
+    if (page == 1) {
+      _hasExhaustedDailySuggestions = suggestions.isEmpty;
+    }
+
     final currentCatalog = page > 1
         ? <Movie>[...recommended, ...suggestions]
         : _mergeCatalogMovies(state.catalog, [recommended, suggestions]);
@@ -586,7 +591,8 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   Future<void> _ensureDailySuggestionBuffer({bool force = false}) async {
     if (!state.isAuthenticated ||
         !state.onboardingComplete ||
-        _isRefillingDailySuggestions) {
+        _isRefillingDailySuggestions ||
+        (!force && _hasExhaustedDailySuggestions)) {
       return;
     }
 
@@ -605,6 +611,13 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         favoriteMovieIds: state.onboarding.favoriteMovieIds,
         limit: dailySuggestionBatchSize,
       );
+
+      if (suggestions.isEmpty) {
+        _hasExhaustedDailySuggestions = true;
+        return;
+      }
+      
+      _hasExhaustedDailySuggestions = false;
 
       final currentCatalog = _mergeCatalogMovies(state.catalog, [suggestions]);
       final nextDailyIds = _appendUniqueMovieIds(
