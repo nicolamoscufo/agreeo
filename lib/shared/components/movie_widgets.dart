@@ -1,4 +1,5 @@
 import 'package:agreeo/shared/models/agreeo_models.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -359,40 +360,76 @@ class PosterGrid extends StatelessWidget {
       itemCount: movies.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        childAspectRatio: 0.7,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemBuilder: (context, index) {
         final movie = movies[index];
         final selected = selectedIds.contains(movie.id);
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => onToggle(movie),
-            child: Container(
-              decoration: selected
-                  ? BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFF22D3EE),
-                        width: 3,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x4022D3EE),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? AgreeoColors.kernelGold : Colors.white.withValues(alpha: 0.1),
+              width: selected ? 2.5 : 1.0,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      spreadRadius: 1,
                     )
-                  : BoxDecoration(borderRadius: BorderRadius.circular(16)),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: _MovieArtwork(imageUrl: movie.posterUrl),
-              ),
+                  ]
+                : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _MovieArtwork(imageUrl: movie.posterUrl),
+                if (selected)
+                  Container(
+                    color: AgreeoColors.kernelGold.withValues(alpha: 0.15),
+                  ),
+                if (selected)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AgreeoColors.kernelGold,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black38,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        color: Colors.black,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => onToggle(movie),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
