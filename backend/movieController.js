@@ -51,6 +51,8 @@ const TMDB_GENRE_IDS_BY_NAME = {
 const TMDB_GENRE_NAMES_BY_ID = Object.fromEntries(
   Object.entries(TMDB_GENRE_IDS_BY_NAME).map(([name, id]) => [id, name])
 );
+TMDB_GENRE_NAMES_BY_ID[18] = 'drama';
+
 
 function parseStringList(value) {
   if (!Array.isArray(value)) return [];

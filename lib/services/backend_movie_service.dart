@@ -10,11 +10,13 @@ class UserLibrary {
     required this.liked,
     required this.disliked,
     required this.watchlist,
+    required this.alreadySeen,
   });
 
   final List<Movie> liked;
   final List<Movie> disliked;
   final List<Movie> watchlist;
+  final List<Movie> alreadySeen;
 }
 
 class MovieDetails {
@@ -196,6 +198,7 @@ class BackendMovieService {
       liked: _decodeMovieList(body['liked']),
       disliked: _decodeMovieList(body['disliked']),
       watchlist: _decodeMovieList(body['watchlist']),
+      alreadySeen: _decodeMovieList(body['alreadySeen']),
     );
   }
 

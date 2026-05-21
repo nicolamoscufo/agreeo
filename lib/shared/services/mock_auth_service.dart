@@ -55,6 +55,10 @@ class MockAuthService {
     await _authService.logout();
   }
 
+  Future<bool> isOnboardingCompleted() async {
+    return _authService.isOnboardingCompleted();
+  }
+
   Future<void> markOnboardingCompleted({
     List<int> selectedFavoriteTmdbIds = const <int>[],
     List<String> favoriteGenres = const <String>[],

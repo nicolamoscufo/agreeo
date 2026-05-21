@@ -10,6 +10,7 @@ import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agreeo/services/real_time_service.dart';
+import 'package:flutter/foundation.dart';
 
 class AgreeoAppState {
   const AgreeoAppState({
@@ -22,6 +23,7 @@ class AgreeoAppState {
     required this.undoStack,
     required this.recommendedIds,
     required this.dailySuggestionIds,
+    required this.trendingIds,
   });
 
   factory AgreeoAppState.initial() {
@@ -35,6 +37,7 @@ class AgreeoAppState {
       undoStack: const <UndoEntry>[],
       recommendedIds: const <String>[],
       dailySuggestionIds: const <String>[],
+      trendingIds: const <String>[],
     );
   }
 
@@ -47,6 +50,7 @@ class AgreeoAppState {
   final List<UndoEntry> undoStack;
   final List<String> recommendedIds;
   final List<String> dailySuggestionIds;
+  final List<String> trendingIds;
 
   bool get isAuthenticated => session != null;
   bool get onboardingComplete => onboarding.completed;
@@ -87,6 +91,10 @@ class AgreeoAppState {
         .toList(growable: false);
   }
 
+  List<Movie> get trendingMovies {
+    return moviesByIds(trendingIds);
+  }
+
   int get watchlistCount =>
       movieStates.values.where((state) => state.inWatchlist).length;
 
@@ -115,6 +123,7 @@ class AgreeoAppState {
     List<UndoEntry>? undoStack,
     List<String>? recommendedIds,
     List<String>? dailySuggestionIds,
+    List<String>? trendingIds,
   }) {
     return AgreeoAppState(
       hydrated: hydrated ?? this.hydrated,
@@ -126,6 +135,7 @@ class AgreeoAppState {
       undoStack: undoStack ?? this.undoStack,
       recommendedIds: recommendedIds ?? this.recommendedIds,
       dailySuggestionIds: dailySuggestionIds ?? this.dailySuggestionIds,
+      trendingIds: trendingIds ?? this.trendingIds,
     );
   }
 
@@ -140,6 +150,8 @@ class AgreeoAppState {
       'undoStack': undoStack.map((value) => value.toJson()).toList(),
       'recommendedIds': recommendedIds,
       'dailySuggestionIds': dailySuggestionIds,
+      'trendingIds': trendingIds,
+      'catalog': catalog.map((value) => value.toJson()).toList(),
     };
   }
 
@@ -158,6 +170,14 @@ class AgreeoAppState {
     if (rawUndoStack is List) {
       for (final item in rawUndoStack.whereType<Map>()) {
         undoItems.add(UndoEntry.fromJson(item.cast<String, dynamic>()));
+      }
+    }
+
+    final catalogItems = <Movie>[];
+    final rawCatalog = json['catalog'];
+    if (rawCatalog is List) {
+      for (final item in rawCatalog.whereType<Map>()) {
+        catalogItems.add(Movie.fromJson(item.cast<String, dynamic>()));
       }
     }
 
@@ -186,7 +206,7 @@ class AgreeoAppState {
               (json['profilePreferences'] as Map).cast<String, dynamic>(),
             )
           : ProfilePreferences.initial(),
-      catalog: const <Movie>[],
+      catalog: catalogItems,
       movieStates: movieStateItems,
       undoStack: undoItems,
       recommendedIds:
@@ -196,6 +216,11 @@ class AgreeoAppState {
           const <String>[],
       dailySuggestionIds:
           (json['dailySuggestionIds'] as List?)
+              ?.map((value) => value.toString())
+              .toList(growable: false) ??
+          const <String>[],
+      trendingIds:
+          (json['trendingIds'] as List?)
               ?.map((value) => value.toString())
               .toList(growable: false) ??
           const <String>[],
@@ -230,37 +255,59 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString(_storageKey);
-    final catalog = await _movieService.getCatalog();
+    
+    List<Movie> catalog = const <Movie>[];
+    try {
+      catalog = await _movieService.getCatalog();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Failed to fetch catalog from backend during bootstrap: $e');
+    }
 
     if (stored == null || stored.isEmpty) {
       state = state.copyWith(hydrated: true, catalog: catalog);
+      await _persist();
       return;
     }
 
     try {
       final decoded = jsonDecode(stored);
+      AgreeoAppState loadedState;
       if (decoded is Map<String, dynamic>) {
-        state = AgreeoAppState.fromJson(decoded).copyWith(catalog: catalog);
+        loadedState = AgreeoAppState.fromJson(decoded);
       } else if (decoded is Map) {
-        state = AgreeoAppState.fromJson(
+        loadedState = AgreeoAppState.fromJson(
           decoded.cast<String, dynamic>(),
-        ).copyWith(catalog: catalog);
+        );
       } else {
-        state = state.copyWith(hydrated: true, catalog: catalog);
+        loadedState = state;
       }
+      
+      final mergedCatalog = catalog.isEmpty
+          ? loadedState.catalog
+          : _mergeCatalogMovies(loadedState.catalog, [catalog]);
+      
+      state = loadedState.copyWith(catalog: mergedCatalog);
+      await _persist();
     } catch (_) {
       state = state.copyWith(hydrated: true, catalog: catalog);
+      await _persist();
     }
 
     if (state.isAuthenticated &&
         state.onboardingComplete &&
         (state.remainingDailySuggestions.isEmpty ||
             state.recommendedForYou.isEmpty)) {
-      await _refreshDiscoveryFeeds();
+      try {
+        await _refreshDiscoveryFeeds();
+        await _persist();
+      } catch (e) {
+        debugPrint('[AgreeoAppController] Failed to refresh discovery feeds: $e');
+      }
     }
 
     if (state.isAuthenticated) {
       _ref.read(realTimeServiceProvider).connect(state.session!.id);
+      await _syncLibraryFromBackend();
     }
   }
 
@@ -282,24 +329,56 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       undoStack: <UndoEntry>[],
       recommendedIds: <String>[],
       dailySuggestionIds: <String>[],
+      trendingIds: <String>[],
     );
     await _persist();
     _ref.read(realTimeServiceProvider).connect(session.id);
+    await _syncLibraryFromBackend();
   }
 
   Future<void> logIn({required String email, required String password}) async {
     final session = await _authService.logIn(email: email, password: password);
+    final onboardingCompleted = await _authService.isOnboardingCompleted();
+
+    List<Movie> recommended = const [];
+    List<Movie> suggestions = const [];
+    List<Movie> trending = const [];
+
+    if (onboardingCompleted) {
+      try {
+        final results = await Future.wait<List<Movie>>([
+          _movieService.getRecommendedForYou(),
+          _movieService.getDailySuggestions(
+            favoriteGenres: const [],
+            favoriteMovieIds: const [],
+            limit: dailySuggestionBatchSize,
+          ),
+          _movieService.getTrendingMovies(),
+        ]);
+        recommended = results[0];
+        suggestions = results[1];
+        trending = results[2];
+      } catch (e) {
+        debugPrint('[AgreeoAppController] Pre-login feed fetch failed: $e');
+      }
+    }
+
+    final mergedCatalog = _mergeCatalogMovies(state.catalog, [recommended, suggestions, trending]);
+
     state = state.copyWith(
       session: session,
-      onboarding: OnboardingState.initial(),
+      onboarding: OnboardingState.initial().copyWith(completed: onboardingCompleted),
       profilePreferences: ProfilePreferences.initial(),
       movieStates: <String, UserMovieState>{},
       undoStack: <UndoEntry>[],
-      recommendedIds: <String>[],
-      dailySuggestionIds: <String>[],
+      catalog: mergedCatalog,
+      recommendedIds: recommended.map((movie) => movie.id).toList(growable: false),
+      dailySuggestionIds: suggestions.map((movie) => movie.id).toList(growable: false),
+      trendingIds: trending.map((movie) => movie.id).toList(growable: false),
     );
     await _persist();
     _ref.read(realTimeServiceProvider).connect(session.id);
+    await _syncLibraryFromBackend();
   }
 
   Future<void> logOut() async {
@@ -310,8 +389,50 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       catalog: state.catalog,
       recommendedIds: const <String>[],
       dailySuggestionIds: const <String>[],
+      trendingIds: const <String>[],
     );
     await _persist();
+  }
+
+  Future<void> _syncLibraryFromBackend() async {
+    if (!state.isAuthenticated) return;
+    try {
+      final library = await _backendMovieService.getLibrary();
+      final newStates = Map<String, UserMovieState>.from(state.movieStates);
+
+      for (final movie in library.liked) {
+        if (movie.id.isNotEmpty) {
+          final current = newStates[movie.id] ?? UserMovieState.initial(movie.id);
+          newStates[movie.id] = current.copyWith(preference: MoviePreference.liked);
+        }
+      }
+
+      for (final movie in library.disliked) {
+        if (movie.id.isNotEmpty) {
+          final current = newStates[movie.id] ?? UserMovieState.initial(movie.id);
+          newStates[movie.id] = current.copyWith(preference: MoviePreference.disliked);
+        }
+      }
+
+      for (final movie in library.watchlist) {
+        if (movie.id.isNotEmpty) {
+          final current = newStates[movie.id] ?? UserMovieState.initial(movie.id);
+          newStates[movie.id] = current.copyWith(inWatchlist: true);
+        }
+      }
+
+      for (final movie in library.alreadySeen) {
+        if (movie.id.isNotEmpty) {
+          final current = newStates[movie.id] ?? UserMovieState.initial(movie.id);
+          newStates[movie.id] = current.copyWith(watched: true);
+        }
+      }
+
+      state = state.copyWith(movieStates: newStates);
+      await _persist();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Failed to sync library from backend: $e');
+    }
   }
 
   Future<void> updateOnboardingGenres(List<String> genres) async {
@@ -562,36 +683,54 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       return;
     }
 
-    final results = await Future.wait<List<Movie>>([
-      page > 1
-          ? Future.value(const <Movie>[])
-          : _movieService.getRecommendedForYou(),
-      page > 1
-          ? Future.value(const <Movie>[])
-          : _movieService.getDailySuggestions(
-              favoriteGenres: state.onboarding.favoriteGenres,
-              favoriteMovieIds: state.onboarding.favoriteMovieIds,
-              limit: dailySuggestionBatchSize,
-            ),
-    ]);
-    final recommended = results[0];
-    final suggestions = results[1];
+    try {
+      final results = await Future.wait<List<Movie>>([
+        page > 1
+            ? Future.value(const <Movie>[])
+            : _movieService.getRecommendedForYou(),
+        page > 1
+            ? Future.value(const <Movie>[])
+            : _movieService.getDailySuggestions(
+                favoriteGenres: state.onboarding.favoriteGenres,
+                favoriteMovieIds: state.onboarding.favoriteMovieIds,
+                limit: dailySuggestionBatchSize,
+              ),
+        page > 1
+            ? Future.value(const <Movie>[])
+            : _movieService.getTrendingMovies(),
+      ]);
+      final recommended = results[0];
+      final suggestions = results[1];
+      final trending = results[2];
 
-    if (page == 1) {
-      _hasExhaustedDailySuggestions = suggestions.isEmpty;
+      if (page == 1) {
+        _hasExhaustedDailySuggestions = suggestions.isEmpty;
+      }
+
+      if (recommended.isEmpty && suggestions.isEmpty && trending.isEmpty) {
+        return;
+      }
+
+      final currentCatalog = page > 1
+          ? <Movie>[...recommended, ...suggestions, ...trending]
+          : _mergeCatalogMovies(state.catalog, [recommended, suggestions, trending]);
+
+      state = state.copyWith(
+        catalog: currentCatalog,
+        recommendedIds: recommended.isEmpty && state.recommendedIds.isNotEmpty
+            ? state.recommendedIds
+            : recommended.map((movie) => movie.id).toList(growable: false),
+        dailySuggestionIds: suggestions.isEmpty && state.dailySuggestionIds.isNotEmpty
+            ? state.dailySuggestionIds
+            : _dedupeMovieIds(suggestions.map((movie) => movie.id)),
+        trendingIds: trending.isEmpty && state.trendingIds.isNotEmpty
+            ? state.trendingIds
+            : trending.map((movie) => movie.id).toList(growable: false),
+      );
+      await _persist();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Failed to refresh discovery feeds: $e');
     }
-
-    final currentCatalog = page > 1
-        ? <Movie>[...recommended, ...suggestions]
-        : _mergeCatalogMovies(state.catalog, [recommended, suggestions]);
-
-    state = state.copyWith(
-      catalog: currentCatalog,
-      recommendedIds: recommended
-          .map((movie) => movie.id)
-          .toList(growable: false),
-      dailySuggestionIds: _dedupeMovieIds(suggestions.map((movie) => movie.id)),
-    );
   }
 
   Future<void> refreshHomeFeed({int page = 1}) async {
@@ -639,6 +778,9 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         catalog: currentCatalog,
         dailySuggestionIds: nextDailyIds,
       );
+      await _persist();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Failed to refill suggestions: $e');
     } finally {
       _isRefillingDailySuggestions = false;
     }
@@ -686,22 +828,36 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     UserMovieStateMutation mutation, {
     bool refreshSuggestions = true,
   }) async {
-    await _syncBackendMovieState(
-      mutation.movieId,
-      mutation.previousState,
-      mutation.nextState,
-    );
-
     state = state.copyWith(
       movieStates: mutation.states,
       undoStack: mutation.undoStack,
     );
+
+    _syncBackendMovieState(
+      mutation.movieId,
+      mutation.previousState,
+      mutation.nextState,
+    ).catchError((e) {
+      debugPrint('[AgreeoAppController] Mutation background sync failed: $e');
+    });
+
     if (refreshSuggestions && state.onboardingComplete) {
+      _asyncRefreshSuggestionsAndBuffer();
+    } else {
+      await _persist();
+    }
+
+    return mutation.message;
+  }
+
+  Future<void> _asyncRefreshSuggestionsAndBuffer() async {
+    try {
       await _refreshRecommendedForYou();
       await _ensureDailySuggestionBuffer();
+      await _persist();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Async suggestions refresh failed: $e');
     }
-    await _persist();
-    return mutation.message;
   }
 
   Future<void> _refreshRecommendedForYou() async {
@@ -709,14 +865,20 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       return;
     }
 
-    final recommended = await _movieService.getRecommendedForYou();
-    final currentCatalog = _mergeCatalogMovies(state.catalog, [recommended]);
-    state = state.copyWith(
-      catalog: currentCatalog,
-      recommendedIds: recommended
-          .map((movie) => movie.id)
-          .toList(growable: false),
-    );
+    try {
+      final recommended = await _movieService.getRecommendedForYou();
+      if (recommended.isEmpty) return;
+      final currentCatalog = _mergeCatalogMovies(state.catalog, [recommended]);
+      state = state.copyWith(
+        catalog: currentCatalog,
+        recommendedIds: recommended
+            .map((movie) => movie.id)
+            .toList(growable: false),
+      );
+      await _persist();
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Failed to refresh recommended for you: $e');
+    }
   }
 
   Future<void> _syncBackendMovieState(
@@ -735,32 +897,36 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
     final tmdbId = movie!.tmdbId!;
 
-    if (previousState.preference != MoviePreference.liked &&
-        nextState.preference == MoviePreference.liked) {
-      await _backendMovieService.likeMovie(movie);
-    } else if (previousState.preference == MoviePreference.liked &&
-        nextState.preference != MoviePreference.liked) {
-      await _backendMovieService.removeLike(tmdbId);
-    }
+    try {
+      if (previousState.preference != MoviePreference.liked &&
+          nextState.preference == MoviePreference.liked) {
+        await _backendMovieService.likeMovie(movie);
+      } else if (previousState.preference == MoviePreference.liked &&
+          nextState.preference != MoviePreference.liked) {
+        await _backendMovieService.removeLike(tmdbId);
+      }
 
-    if (previousState.preference != MoviePreference.disliked &&
-        nextState.preference == MoviePreference.disliked) {
-      await _backendMovieService.dislikeMovie(movie);
-    } else if (previousState.preference == MoviePreference.disliked &&
-        nextState.preference != MoviePreference.disliked) {
-      await _backendMovieService.removeDislike(tmdbId);
-    }
+      if (previousState.preference != MoviePreference.disliked &&
+          nextState.preference == MoviePreference.disliked) {
+        await _backendMovieService.dislikeMovie(movie);
+      } else if (previousState.preference == MoviePreference.disliked &&
+          nextState.preference != MoviePreference.disliked) {
+        await _backendMovieService.removeDislike(tmdbId);
+      }
 
-    if (!previousState.inWatchlist && nextState.inWatchlist) {
-      await _backendMovieService.addToWatchlist(movie);
-    } else if (previousState.inWatchlist && !nextState.inWatchlist) {
-      await _backendMovieService.removeFromWatchlist(tmdbId);
-    }
+      if (!previousState.inWatchlist && nextState.inWatchlist) {
+        await _backendMovieService.addToWatchlist(movie);
+      } else if (previousState.inWatchlist && !nextState.inWatchlist) {
+        await _backendMovieService.removeFromWatchlist(tmdbId);
+      }
 
-    if (!previousState.watched && nextState.watched) {
-      await _backendMovieService.markAsSeen(movie);
-    } else if (previousState.watched && !nextState.watched) {
-      await _backendMovieService.removeSeen(tmdbId);
+      if (!previousState.watched && nextState.watched) {
+        await _backendMovieService.markAsSeen(movie);
+      } else if (previousState.watched && !nextState.watched) {
+        await _backendMovieService.removeSeen(tmdbId);
+      }
+    } catch (e) {
+      debugPrint('[AgreeoAppController] Offline state synchronization failed: $e');
     }
   }
 

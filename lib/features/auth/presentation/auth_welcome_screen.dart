@@ -1,5 +1,6 @@
 import 'package:agreeo/shared/services/mock_auth_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -82,7 +83,7 @@ class _AgreeoAuthWelcomeScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF161618),
+      backgroundColor: AgreeoColors.deepBlack,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -115,8 +116,8 @@ class _AgreeoAuthWelcomeScreenState
                                     ..shader =
                                         const LinearGradient(
                                           colors: [
-                                            Color(0xFFC026D3),
-                                            Color(0xFF22D3EE),
+                                            AgreeoColors.cinematicRed,
+                                            AgreeoColors.kernelGold,
                                           ],
                                         ).createShader(
                                           const Rect.fromLTWH(0, 0, 200, 70),
@@ -137,8 +138,8 @@ class _AgreeoAuthWelcomeScreenState
                                     ..shader =
                                         const LinearGradient(
                                           colors: [
-                                            Color(0xFFE879F9),
-                                            Color(0xFF67E8F9),
+                                            AgreeoColors.cinematicRed,
+                                            AgreeoColors.kernelGold,
                                           ],
                                         ).createShader(
                                           const Rect.fromLTWH(0, 0, 200, 70),
@@ -158,7 +159,7 @@ class _AgreeoAuthWelcomeScreenState
                               color: Colors.white,
                               fontSize: 16,
                             ),
-                            decoration: _buildInputDecoration('Name'),
+                            decoration: _buildInputDecoration('Name', prefixIcon: Icons.person_outline),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Enter your name';
@@ -177,7 +178,7 @@ class _AgreeoAuthWelcomeScreenState
                             color: Colors.white,
                             fontSize: 16,
                           ),
-                          decoration: _buildInputDecoration('Email'),
+                          decoration: _buildInputDecoration('Email', prefixIcon: Icons.email_outlined),
                           validator: (value) {
                             if (value == null ||
                                 value.trim().isEmpty ||
@@ -197,7 +198,7 @@ class _AgreeoAuthWelcomeScreenState
                             color: Colors.white,
                             fontSize: 16,
                           ),
-                          decoration: _buildInputDecoration('Password')
+                          decoration: _buildInputDecoration('Password', prefixIcon: Icons.lock_outline)
                               .copyWith(
                                 suffixIcon: IconButton(
                                   onPressed: () {
@@ -230,16 +231,16 @@ class _AgreeoAuthWelcomeScreenState
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(28),
                             gradient: const LinearGradient(
-                              colors: [Color(0xFFC026D3), Color(0xFF22D3EE)],
+                              colors: [AgreeoColors.cinematicRed, AgreeoColors.kernelGold],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
-                            boxShadow: const [
+                            boxShadow: [
                               BoxShadow(
-                                color: Color(0x60C026D3),
+                                color: AgreeoColors.cinematicRed.withValues(alpha: 0.4),
                                 blurRadius: 20,
                                 spreadRadius: 2,
-                                offset: Offset(0, 4),
+                                offset: const Offset(0, 4),
                               ), // Glow effect
                             ],
                           ),
@@ -289,7 +290,7 @@ class _AgreeoAuthWelcomeScreenState
                                     TextSpan(
                                       text: _isSignUp ? 'Log in' : 'Sign up',
                                       style: const TextStyle(
-                                        color: Colors.white,
+                                        color: AgreeoColors.cinematicRed,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -311,12 +312,13 @@ class _AgreeoAuthWelcomeScreenState
     );
   }
 
-  InputDecoration _buildInputDecoration(String hint) {
+  InputDecoration _buildInputDecoration(String hint, {IconData? prefixIcon}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.white54, fontSize: 16),
+      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white54) : null,
       filled: true,
-      fillColor: const Color(0xFF232325),
+      fillColor: AgreeoColors.darkSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -334,7 +336,7 @@ class _AgreeoAuthWelcomeScreenState
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF22D3EE), width: 1.5),
+        borderSide: const BorderSide(color: AgreeoColors.cinematicRed, width: 1.5),
       ),
     );
   }

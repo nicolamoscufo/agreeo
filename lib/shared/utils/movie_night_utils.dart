@@ -102,7 +102,7 @@ List<MovieNightCandidateRank> movieNightRanking(MovieNightEvent event) {
         });
         return MovieNightCandidateRank(
           candidate: candidate,
-          finalScore: candidate.compatibilityScore + voteScore,
+          finalScore: voteScore,
           likes: votes
               .where((vote) => vote.vote == MovieNightVoteValue.like)
               .length,

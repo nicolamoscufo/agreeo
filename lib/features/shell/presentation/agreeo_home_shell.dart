@@ -1,4 +1,5 @@
 import 'package:agreeo/features/friends/presentation/friends_screen.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_screen.dart';
@@ -126,8 +127,8 @@ class _AgreeoHomeShellState extends ConsumerState<AgreeoHomeShell> {
                   foreground: Paint()
                     ..shader = const LinearGradient(
                       colors: <Color>[
-                        Color(0xFF38BDF8),
-                        Color(0xFF818CF8),
+                        AgreeoColors.cinematicRed,
+                        AgreeoColors.kernelGold,
                       ],
                     ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
                 ),
@@ -177,7 +178,7 @@ class _NotificationBadgeButton extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
+                  color: AgreeoColors.cinematicRed,
                   shape: BoxShape.circle,
                 ),
                 constraints: const BoxConstraints(

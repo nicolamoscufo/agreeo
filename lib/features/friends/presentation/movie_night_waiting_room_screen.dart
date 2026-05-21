@@ -1,4 +1,5 @@
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/components/primitives.dart';
@@ -284,6 +285,28 @@ class _MovieNightWaitingRoomScreenState
                         return FilledButton.icon(
                           onPressed: canStart
                               ? () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Start Voting?'),
+                                      content: const Text(
+                                        'This will generate the shortlist and begin the voting session. '
+                                        'All joined participants will be asked to vote.\n\n'
+                                        'This action cannot be undone.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          child: const Text('Start Voting'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed != true || !context.mounted) return;
                                   final updated = await controller.startVoting(
                                     event.id,
                                   );
@@ -389,7 +412,7 @@ class _ConnectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isLive ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    final color = isLive ? AgreeoColors.kernelGold : AgreeoColors.cinematicRed;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -472,6 +495,10 @@ class _SummaryCard extends StatelessWidget {
                   Chip(label: Text('Language ${constraints.language}')),
               ],
             ),
+            if (event.dateTime != null && event.dateTime!.isAfter(DateTime.now())) ...<Widget>[
+              const SizedBox(height: 12),
+              _CountdownChip(dateTime: event.dateTime!),
+            ],
           ],
         ),
       ),
@@ -720,7 +747,6 @@ class _GenreSheetWrap extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: agreeoGenreOptions
-          .take(12)
           .map((genre) {
             final isDisabled = disabled.contains(genre);
             return Opacity(
@@ -856,5 +882,53 @@ class _InviteFriendsSheetState extends State<_InviteFriendsSheet> {
         ),
       ),
     );
+  }
+}
+
+class _CountdownChip extends StatelessWidget {
+  const _CountdownChip({required this.dateTime});
+  final DateTime dateTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final diff = dateTime.difference(DateTime.now());
+    final label = _formatDuration(diff);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AgreeoColors.kernelGold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.timer_rounded, size: 18, color: AgreeoColors.kernelGold),
+          const SizedBox(width: 8),
+          Text(
+            'Starts in $label',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: AgreeoColors.kernelGold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.inDays > 0) {
+      final hours = d.inHours.remainder(24);
+      return '${d.inDays}d ${hours}h';
+    }
+    if (d.inHours > 0) {
+      final minutes = d.inMinutes.remainder(60);
+      return '${d.inHours}h ${minutes}m';
+    }
+    return '${d.inMinutes}m';
   }
 }

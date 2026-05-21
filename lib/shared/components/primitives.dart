@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
@@ -371,7 +372,7 @@ class RatingStars extends StatelessWidget {
               padding: const EdgeInsets.all(2),
               child: Icon(
                 selected ? Icons.star_rounded : Icons.star_border_rounded,
-                color: selected ? const Color(0xFFFBBF24) : colorScheme.outline,
+                color: selected ? AgreeoColors.kernelGold : colorScheme.outline,
                 size: size,
               ),
             ),

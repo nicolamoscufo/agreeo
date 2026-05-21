@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MovieNightResultScreen extends ConsumerStatefulWidget {
@@ -21,6 +23,7 @@ class MovieNightResultScreen extends ConsumerStatefulWidget {
 
 class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
     with SingleTickerProviderStateMixin {
+  static final Set<String> _shownConfettiIds = <String>{};
   late final AnimationController _confettiController;
 
   @override
@@ -29,7 +32,10 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
     _confettiController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
-    )..forward();
+    );
+    if (_shownConfettiIds.add(widget.eventId)) {
+      _confettiController.forward();
+    }
   }
 
   @override
@@ -52,7 +58,7 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
     }
 
     final movie = winner.movie;
-    final ranking = movieNightRanking(event).take(3).toList(growable: false);
+    final ranking = movieNightRanking(event);
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -72,44 +78,55 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tonight\'s pick is...',
+                  'The group\'s pick is...',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 18),
-                Center(
-                  child: Container(
-                    width: 220,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: const <BoxShadow>[
-                        BoxShadow(
-                          color: Color(0x6638BDF8),
-                          blurRadius: 34,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: CachedNetworkImage(
-                      imageUrl: movie.posterUrl,
-                      imageBuilder: (context, imageProvider) => ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: AspectRatio(
-                          aspectRatio: 2 / 3,
-                          child: Image(image: imageProvider, fit: BoxFit.cover),
-                        ),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AgreeoMovieDetailsScreen(movieId: movie.id),
                       ),
-                      errorWidget: (context, url, error) => ClipRRect(
+                    );
+                  },
+                  child: Center(
+                    child: Container(
+                      width: 220,
+                      decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(30),
-                        child: AspectRatio(
-                          aspectRatio: 2 / 3,
-                          child: Container(
-                            color: const Color(0xFF1F2937),
-                            child: const Icon(
-                              Icons.movie_creation_outlined,
-                              size: 48,
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: AgreeoColors.cinematicRed.withValues(alpha: 0.4),
+                            blurRadius: 34,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: CachedNetworkImage(
+                        imageUrl: movie.posterUrl,
+                        imageBuilder: (context, imageProvider) => ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: Image(image: imageProvider, fit: BoxFit.cover),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: Container(
+                              color: AgreeoColors.darkSurface,
+                              child: const Icon(
+                                Icons.movie_creation_outlined,
+                                size: 48,
+                              ),
                             ),
                           ),
                         ),
@@ -118,11 +135,22 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                   ),
                 ),
                 const SizedBox(height: 22),
-                Text(
-                  movie.title,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AgreeoMovieDetailsScreen(movieId: movie.id),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    movie.title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -133,33 +161,49 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 18),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Why it won',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w900),
+                if (event.round > 1) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AgreeoColors.kernelGold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AgreeoColors.kernelGold.withValues(alpha: 0.4),
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: winner.explanationTags
-                              .map((tag) => Chip(label: Text(tag)))
-                              .toList(growable: false),
-                        ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.flash_on_rounded,
+                            color: AgreeoColors.kernelGold,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Decided after ${event.round} rounds',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
                 if (ranking.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 18),
-                  _RankingCard(ranking: ranking),
+                  _FullLeaderboard(
+                    ranking: ranking,
+                    winnerMovieId: event.winnerMovieId,
+                  ),
                 ],
                 const SizedBox(height: 18),
                 Wrap(
@@ -193,6 +237,21 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                       icon: const Icon(Icons.visibility_outlined),
                       label: const Text('Mark as Watched'),
                     ),
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        final text = '\u{1F3AC} Movie Night Result\n\n'
+                            '\u{1F3C6} Winner: ${movie.title}\n'
+                            '\u2B50 Score: ${(winner.finalScore ?? winner.compatibilityScore).toStringAsFixed(1)}\n'
+                            '\u2764 ${winner.likesCount ?? 0} likes\n\n'
+                            'Voted on Agreeo!';
+                        Clipboard.setData(ClipboardData(text: text));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Result copied to clipboard!')),
+                        );
+                      },
+                      icon: const Icon(Icons.share_rounded),
+                      label: const Text('Share Result'),
+                    ),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.of(
                         context,
@@ -223,10 +282,11 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
   }
 }
 
-class _RankingCard extends StatelessWidget {
-  const _RankingCard({required this.ranking});
+class _FullLeaderboard extends StatelessWidget {
+  const _FullLeaderboard({required this.ranking, this.winnerMovieId});
 
   final List<MovieNightCandidateRank> ranking;
+  final String? winnerMovieId;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +297,7 @@ class _RankingCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'Top 3 movies',
+              'Full Ranking',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
@@ -247,21 +307,103 @@ class _RankingCard extends StatelessWidget {
               final index = entry.key;
               final rank = entry.value;
               final movie = rank.candidate.movie;
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: _podiumColor(index),
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(fontWeight: FontWeight.w900),
+              final isWinner = movie.id == winnerMovieId;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                decoration: isWinner
+                    ? BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: AgreeoColors.kernelGold.withValues(alpha: 0.08),
+                        border: Border.all(
+                          color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
+                        ),
+                      )
+                    : null,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          _rankEmoji(index),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: movie.posterUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: movie.posterUrl,
+                                width: 36,
+                                height: 54,
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => Container(
+                                  width: 36,
+                                  height: 54,
+                                  color: AgreeoColors.darkSurface,
+                                  child: const Icon(
+                                    Icons.movie_outlined,
+                                    size: 18,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                width: 36,
+                                height: 54,
+                                color: AgreeoColors.darkSurface,
+                                child: const Icon(
+                                  Icons.movie_outlined,
+                                  size: 18,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
-                ),
-                title: Text(movie.title),
-                subtitle: Text('${rank.likes} likes • ${rank.dislikes} nopes'),
-                trailing: Text(
-                  rank.finalScore.toStringAsFixed(1),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                  title: Text(
+                    movie.title,
+                    style: TextStyle(
+                      fontWeight:
+                          isWinner ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isWinner
+                          ? AgreeoColors.kernelGold.withValues(alpha: 0.2)
+                          : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      rank.finalScore.toStringAsFixed(1),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: isWinner
+                            ? AgreeoColors.kernelGold
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -272,11 +414,12 @@ class _RankingCard extends StatelessWidget {
     );
   }
 
-  Color _podiumColor(int index) {
+  String _rankEmoji(int index) {
     return switch (index) {
-      0 => const Color(0xFFFACC15),
-      1 => const Color(0xFFE5E7EB),
-      _ => const Color(0xFFF97316),
+      0 => '\u{1F947}',
+      1 => '\u{1F948}',
+      2 => '\u{1F949}',
+      _ => '${index + 1}.',
     };
   }
 }
@@ -292,11 +435,11 @@ class _ConfettiPainter extends CustomPainter {
       return;
     }
     const colors = <Color>[
-      Color(0xFFFACC15),
-      Color(0xFF22C55E),
-      Color(0xFF38BDF8),
-      Color(0xFFF472B6),
-      Color(0xFFF97316),
+      AgreeoColors.kernelGold,
+      AgreeoColors.cinematicRed,
+      AgreeoColors.popcornWhite,
+      AgreeoColors.kernelGold,
+      AgreeoColors.cinematicRed,
     ];
     final fade = (1 - progress).clamp(0.0, 1.0).toDouble();
     for (var index = 0; index < 56; index++) {
@@ -328,3 +471,5 @@ class _ConfettiPainter extends CustomPainter {
     return oldDelegate.progress != progress;
   }
 }
+
+

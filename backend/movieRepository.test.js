@@ -173,9 +173,9 @@ test('getRecommendations applies a safe disliked-genre penalty', async (t) => {
   await movieRepository.getRecommendations('user-1');
 
   const personalizedQuery = calls[0].query;
-  assert.match(personalizedQuery, /OPTIONAL MATCH \(me\)-\[:DISLIKED\]->\(disliked:Movie\)/);
-  assert.match(personalizedQuery, /dislikedMl:MovieLensMovie\)-\[:IN_GENRE\]->\(mlGenre:Genre\)/);
-  assert.match(personalizedQuery, /OPTIONAL MATCH \(disliked\)-\[:IN_GENRE\]->\(movieGenre:Genre\)/);
+  assert.match(personalizedQuery, /OPTIONAL MATCH \(me\)-\[r:LIKED\|DISLIKED\|SELECTED_FAVORITE\|WATCHLISTED\]->\(m:Movie\)/);
+  assert.match(personalizedQuery, /mMl:MovieLensMovie\)-\[:IN_GENRE\]->\(mlGenre:Genre\)/);
+  assert.match(personalizedQuery, /OPTIONAL MATCH \(m\)-\[:IN_GENRE\]->\(movieGenre:Genre\)/);
   assert.match(personalizedQuery, /g\.count >= \$dislikedGenreThreshold/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(recMl\)-\[:IN_GENRE\]->\(recMlGenre:Genre\)/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(rec\)-\[:IN_GENRE\]->\(recMovieGenre:Genre\)/);

@@ -408,7 +408,7 @@ async function getUserLibrary(uid) {
         overview: m.overview,
         posterPath: m.posterPath,
         backdropPath: m.backdropPath,
-       runtime: record.get('runtime') == null ? null : toNativeNumber(record.get('runtime')),
+        runtime: m.runtime,
         posterUrl: m.posterUrl,
         backdropUrl: m.backdropUrl,
         releaseDate: m.releaseDate,
@@ -456,7 +456,26 @@ async function getUserLibrary(uid) {
         createdAt: toString(r.createdAt)
       }) AS watchlist
     }
-    RETURN liked, disliked, watchlist
+    CALL {
+      WITH u
+      MATCH (u)-[r:ALREADY_SEEN]->(m:Movie)
+      RETURN collect({
+        tmdbId: m.tmdbId,
+        title: m.title,
+        originalTitle: m.originalTitle,
+        overview: m.overview,
+        posterPath: m.posterPath,
+        backdropPath: m.backdropPath,
+        posterUrl: m.posterUrl,
+        backdropUrl: m.backdropUrl,
+        releaseDate: m.releaseDate,
+        voteAverage: m.voteAverage,
+        movieLensAvgRating: m.movieLensAvgRating,
+        movieLensRatingCount: m.movieLensRatingCount,
+        createdAt: toString(r.createdAt)
+      }) AS alreadySeen
+    }
+    RETURN liked, disliked, watchlist, alreadySeen
     `,
     { uid }
   );
@@ -466,6 +485,7 @@ async function getUserLibrary(uid) {
       liked: [],
       disliked: [],
       watchlist: [],
+      alreadySeen: [],
     };
   }
 
@@ -487,6 +507,11 @@ async function getUserLibrary(uid) {
       tmdbId: toNativeNumber(entry.tmdbId),
       movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
     })),
+    alreadySeen: record.get('alreadySeen').map((entry) => ({
+      ...entry,
+      tmdbId: toNativeNumber(entry.tmdbId),
+      movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
+    })),
   };
 }
 
@@ -495,17 +520,19 @@ async function getPersonalizedRecommendationCandidates(uid) {
     `
     MATCH (me:AppUser {uid: $uid})
 
-    // PASSO A: FIX DEL BUG DELLA SUBQUERY. Usiamo la list comprehension per non far morire la query.
+    // PASSO A: FIX DEL BUG DELLA SUBQUERY e calcolo del Soft Dislike Ratio.
     CALL {
       WITH me
-      OPTIONAL MATCH (me)-[:DISLIKED]->(disliked:Movie)
-      OPTIONAL MATCH (disliked)<-[:MATCHES_TMDB]-(dislikedMl:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
-      OPTIONAL MATCH (disliked)-[:IN_GENRE]->(movieGenre:Genre)
-      WITH disliked, collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS genreNames
+      OPTIONAL MATCH (me)-[r:LIKED|DISLIKED|SELECTED_FAVORITE|WATCHLISTED]->(m:Movie)
+      OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(mMl:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
+      OPTIONAL MATCH (m)-[:IN_GENRE]->(movieGenre:Genre)
+      WITH r, collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS genreNames
       UNWIND CASE WHEN size(genreNames) = 0 THEN [null] ELSE genreNames END AS genreName
-      WITH genreName, count(DISTINCT disliked) AS dislikedCount
-      // Non usiamo WHERE qui per non perdere le righe. Filtriamo la lista finale:
-      WITH [g IN collect({name: genreName, count: dislikedCount}) 
+      WITH genreName,
+           sum(CASE WHEN type(r) = 'DISLIKED' THEN 1 ELSE 0 END) AS dislikedCount,
+           count(r) AS totalInteractions
+      // Filtriamo la lista finale mantenendo sia count (dislike) che total (interazioni totali):
+      WITH [g IN collect({name: genreName, count: dislikedCount, total: totalInteractions}) 
             WHERE g.name IS NOT NULL AND g.count >= $dislikedGenreThreshold | g] AS dislikedGenres
       RETURN dislikedGenres
     }
@@ -520,12 +547,15 @@ async function getPersonalizedRecommendationCandidates(uid) {
       similar,
       count(DISTINCT seed) AS overlapCount,
       sum(
-        CASE type(signal)
-          WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, $selectedFavoriteWeight)
-          WHEN 'LIKED' THEN $likedWeight
-          WHEN 'WATCHLISTED' THEN $watchlistedWeight
-          ELSE 1.0
-        END
+        (
+          CASE type(signal)
+            WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, $selectedFavoriteWeight)
+            WHEN 'LIKED' THEN $likedWeight
+            WHEN 'WATCHLISTED' THEN $watchlistedWeight
+            ELSE 1.0
+          END
+          * exp(-0.005 * duration.inDays(coalesce(signal.createdAt, signal.updatedAt, datetime()), datetime()).days)
+        )
         * (toFloat(r1.rating) - 3.0)
         * (1.0 / sqrt(log(toFloat(coalesce(seed.movieLensRatingCount, seedMl.movieLensRatingCount, 0)) + 10.0)))
       ) AS similarityScore
@@ -561,7 +591,7 @@ async function getPersonalizedRecommendationCandidates(uid) {
       similarityScore,
       overlapCount,
       reduce(penalty = 0.0, entry IN matchingDislikedGenres |
-        penalty + ($dislikedGenrePenalty * toFloat(entry.count))
+        penalty + ($dislikedGenrePenalty * toFloat(entry.count) * (toFloat(entry.count) / toFloat(entry.total)))
       ) AS negativePenalty
 
     WITH

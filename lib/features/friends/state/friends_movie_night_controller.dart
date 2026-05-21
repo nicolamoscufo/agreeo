@@ -1139,6 +1139,7 @@ List<Friend> _localFriendSeed() {
       watchedCount: 42,
       reviewsCount: 8,
       privacySettings: privacy,
+      bio: 'Amante del cinema d\'autore e dei pop-corn salati.',
     ),
     Friend(
       id: 'friend-nina',
@@ -1147,6 +1148,7 @@ List<Friend> _localFriendSeed() {
       watchedCount: 37,
       reviewsCount: 6,
       privacySettings: privacy,
+      bio: 'Fantascienza e thriller psicologici sono la mia vita.',
     ),
     Friend(
       id: 'friend-leo',
@@ -1155,6 +1157,7 @@ List<Friend> _localFriendSeed() {
       watchedCount: 29,
       reviewsCount: 4,
       privacySettings: privacy,
+      bio: 'Guardo film per rilassarmi nel weekend.',
     ),
   ];
 }
@@ -1170,6 +1173,7 @@ List<FriendRequest> _localIncomingRequestSeed() {
         watchedCount: 18,
         reviewsCount: 3,
         privacySettings: PrivacySettings.open(),
+        bio: 'Ciao! Sono nuova su Agreeo!',
       ),
       toUserId: 'local-host',
       status: FriendRequestStatus.pending,

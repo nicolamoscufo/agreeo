@@ -375,6 +375,7 @@ class BackendSocialService {
       watchedCount: _int(json['watchedCount']),
       reviewsCount: _int(json['reviewsCount']),
       privacySettings: _decodePrivacy(_castMap(json['privacySettings'])),
+      bio: _string(json['bio']),
     );
   }
 
@@ -457,6 +458,7 @@ class BackendSocialService {
       createdAt: _date(json['createdAt']),
       updatedAt: _date(json['updatedAt']),
       votedUserIds: _stringList(json['votedUserIds']),
+      round: _nullableInt(json['round']) ?? 1,
     );
   }
 
@@ -510,6 +512,10 @@ class BackendSocialService {
             scoreBreakdown: _decodeScoreBreakdown(
               _castMap(json['scoreBreakdown']),
             ),
+            voteScore: _nullableDouble(json['voteScore']),
+            finalScore: _nullableDouble(json['finalScore']),
+            likesCount: _nullableInt(json['likesCount']),
+            dislikesCount: _nullableInt(json['dislikesCount']),
           );
         })
         .toList(growable: false);

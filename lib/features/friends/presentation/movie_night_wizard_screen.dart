@@ -1,4 +1,5 @@
 import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_screen.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/mock_data/mock_movies.dart';
@@ -66,7 +67,7 @@ class _MovieNightWizardScreenState
         subtitle:
             'Give the night a name, then lock the time only if it exists.',
         icon: Icons.nightlight_round,
-        accent: const Color(0xFF8B5CF6),
+        accent: AgreeoColors.cinematicRed,
         child: _BasicsStep(
           nameController: _nameController,
           dateTime: _dateTime,
@@ -79,7 +80,7 @@ class _MovieNightWizardScreenState
         title: 'Tune recommendations',
         subtitle: 'Shape movie suggestions before starting to vote.',
         icon: Icons.tune_rounded,
-        accent: const Color(0xFF06B6D4),
+        accent: AgreeoColors.kernelGold,
         child: _ConstraintsStep(
           includedGenres: _includedGenres,
           excludedGenres: _excludedGenres,
@@ -104,7 +105,7 @@ class _MovieNightWizardScreenState
         title: 'Bring the crew',
         subtitle: 'Invite friends now to your movie night.',
         icon: Icons.groups_rounded,
-        accent: const Color(0xFFF97316),
+        accent: AgreeoColors.kernelGold,
         child: _InviteStep(
           friends: filteredFriends,
           selectedFriendIds: _selectedFriendIds,

@@ -1,9 +1,11 @@
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum _LibraryMediaFilter { all, movie, tv }
@@ -44,16 +46,21 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(agreeoAppControllerProvider);
 
+    final watchlistCount = _moviesForTab(state, _LibraryTab.watchlist).length;
+    final likedCount = _moviesForTab(state, _LibraryTab.liked).length;
+    final watchedCount = _moviesForTab(state, _LibraryTab.watched).length;
+    final hiddenCount = _moviesForTab(state, _LibraryTab.hidden).length;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const SectionHeader(
+            SectionHeader(
               title: 'Library',
               subtitle:
-                  'Your personal memory space: what you saved, liked, watched, and hid.',
+                  'Your personal memory space — $watchedCount watched, $likedCount liked, $watchlistCount saved.',
             ),
             const SizedBox(height: 16),
             AgreeoSearchBar(
@@ -63,6 +70,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               trailing: PopupMenuButton<LibrarySort>(
                 initialValue: _sort,
                 onSelected: (value) {
+                  HapticFeedback.selectionClick();
                   setState(() {
                     _sort = value;
                   });
@@ -90,6 +98,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
                   label: 'All',
                   selected: _mediaFilter == _LibraryMediaFilter.all,
                   onTap: () => setState(() {
+                    HapticFeedback.selectionClick();
                     _mediaFilter = _LibraryMediaFilter.all;
                   }),
                 ),
@@ -97,14 +106,8 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
                   label: 'Movie',
                   selected: _mediaFilter == _LibraryMediaFilter.movie,
                   onTap: () => setState(() {
+                    HapticFeedback.selectionClick();
                     _mediaFilter = _LibraryMediaFilter.movie;
-                  }),
-                ),
-                SelectableChip(
-                  label: 'Series',
-                  selected: _mediaFilter == _LibraryMediaFilter.tv,
-                  onTap: () => setState(() {
-                    _mediaFilter = _LibraryMediaFilter.tv;
                   }),
                 ),
               ],
@@ -113,11 +116,11 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
             TabBar(
               controller: _tabController,
               isScrollable: true,
-              tabs: const <Widget>[
-                Tab(text: 'Watchlist'),
-                Tab(text: 'Liked'),
-                Tab(text: 'Watched'),
-                Tab(text: 'Hidden'),
+              tabs: <Widget>[
+                _buildCountTab('Watchlist', watchlistCount),
+                _buildCountTab('Liked', likedCount),
+                _buildCountTab('Watched', watchedCount),
+                _buildCountTab('Hidden', hiddenCount),
               ],
             ),
             const SizedBox(height: 8),
@@ -132,6 +135,38 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountTab(String label, int count) {
+    return Tab(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(label),
+            if (count > 0) ...<Widget>[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -163,6 +198,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
           movie: movie,
           userState: userState,
           onTap: () {
+            HapticFeedback.lightImpact();
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
@@ -174,6 +210,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Remove',
                 icon: Icons.bookmark_remove_outlined,
+                color: AgreeoColors.cinematicRed,
                 onTap: () => _showUndoAction(
                   () => controller.removeFromWatchlist(movie.id),
                 ),
@@ -181,33 +218,37 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Seen',
                 icon: Icons.visibility_outlined,
+                color: AgreeoColors.popcornWhite,
                 onTap: () =>
                     _showUndoAction(() => controller.markAsWatched(movie.id)),
               ),
               _actionChip(
                 label: 'Like',
                 icon: Icons.thumb_up_alt_outlined,
+                color: AgreeoColors.kernelGold,
                 onTap: () =>
                     _showUndoAction(() => controller.likeMovie(movie.id)),
               ),
               _actionChip(
                 label: 'Dislike',
                 icon: Icons.thumb_down_alt_outlined,
+                color: const Color(0xFF6B7280),
                 onTap: () =>
                     _showUndoAction(() => controller.dislikeMovie(movie.id)),
               ),
-              _disabledChip('Movie Night (Phase 2)'),
             ],
             _LibraryTab.liked => <Widget>[
               _actionChip(
                 label: 'Remove like',
                 icon: Icons.heart_broken_outlined,
+                color: AgreeoColors.cinematicRed,
                 onTap: () =>
                     _showUndoAction(() => controller.clearPreference(movie.id)),
               ),
               _actionChip(
                 label: userState.inWatchlist ? 'Saved' : 'Watchlist',
                 icon: Icons.bookmark_outline_rounded,
+                color: AgreeoColors.kernelGold,
                 onTap: () => _showUndoAction(
                   userState.inWatchlist
                       ? () => controller.removeFromWatchlist(movie.id)
@@ -217,6 +258,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: userState.watched ? 'Watched' : 'Seen',
                 icon: Icons.visibility_outlined,
+                color: AgreeoColors.popcornWhite,
                 onTap: () => _showUndoAction(
                   userState.watched
                       ? () => controller.removeFromWatched(movie.id)
@@ -226,6 +268,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Rate / Review',
                 icon: Icons.rate_review_outlined,
+                color: AgreeoColors.kernelGold,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -242,6 +285,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
                     ? 'Liked'
                     : 'Like',
                 icon: Icons.thumb_up_alt_outlined,
+                color: AgreeoColors.kernelGold,
                 onTap: () => _showUndoAction(
                   userState.preference == MoviePreference.liked
                       ? () => controller.clearPreference(movie.id)
@@ -253,6 +297,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
                     ? 'Hidden'
                     : 'Dislike',
                 icon: Icons.thumb_down_alt_outlined,
+                color: const Color(0xFF6B7280),
                 onTap: () => _showUndoAction(
                   userState.preference == MoviePreference.disliked
                       ? () => controller.clearPreference(movie.id)
@@ -262,6 +307,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Rate again',
                 icon: Icons.star_outline_rounded,
+                color: AgreeoColors.kernelGold,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -274,6 +320,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Edit review',
                 icon: Icons.edit_note_rounded,
+                color: AgreeoColors.popcornWhite,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -286,6 +333,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Remove watched',
                 icon: Icons.remove_red_eye_outlined,
+                color: AgreeoColors.cinematicRed,
                 onTap: () => _showUndoAction(
                   () => controller.removeFromWatched(movie.id),
                 ),
@@ -295,18 +343,21 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               _actionChip(
                 label: 'Undo dislike',
                 icon: Icons.undo_rounded,
+                color: AgreeoColors.kernelGold,
                 onTap: () =>
                     _showUndoAction(() => controller.clearPreference(movie.id)),
               ),
               _actionChip(
                 label: 'Move to Watchlist',
                 icon: Icons.bookmark_add_outlined,
+                color: AgreeoColors.kernelGold,
                 onTap: () =>
                     _showUndoAction(() => controller.addToWatchlist(movie.id)),
               ),
               _actionChip(
                 label: userState.watched ? 'Watched' : 'Mark watched',
                 icon: Icons.visibility_outlined,
+                color: AgreeoColors.popcornWhite,
                 onTap: () => _showUndoAction(
                   userState.watched
                       ? () => controller.removeFromWatched(movie.id)
@@ -406,16 +457,26 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
     required String label,
     required IconData icon,
     required VoidCallback onTap,
+    required Color color,
   }) {
     return ActionChip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      onPressed: onTap,
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+      ),
+      backgroundColor: color.withValues(alpha: 0.10),
+      side: BorderSide(color: color.withValues(alpha: 0.20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
     );
-  }
-
-  Widget _disabledChip(String label) {
-    return Chip(label: Text(label));
   }
 }
 
@@ -434,15 +495,30 @@ class _LibraryMovieCard extends StatelessWidget {
   final VoidCallback onTap;
   final List<Widget> actions;
 
+  static const _badgeColors = <String, Color>{
+    'Watchlist': AgreeoColors.kernelGold,
+    'Liked': AgreeoColors.cinematicRed,
+    'Watched': AgreeoColors.popcornWhite,
+    'Hidden': Color(0xFF6B7280),
+  };
+
+  static const Color _ratingColor = AgreeoColors.kernelGold;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final badges = <String>[
-      if (userState.inWatchlist) 'Watchlist',
-      if (userState.watched) 'Watched',
-      if (userState.preference == MoviePreference.liked) 'Liked',
-      if (userState.preference == MoviePreference.disliked) 'Hidden',
-      if (userState.rating != null) '${userState.rating}/5',
+
+    final badges = <({String label, Color color})>[
+      if (userState.inWatchlist)
+        (label: 'Watchlist', color: _badgeColors['Watchlist']!),
+      if (userState.watched)
+        (label: 'Watched', color: _badgeColors['Watched']!),
+      if (userState.preference == MoviePreference.liked)
+        (label: 'Liked', color: _badgeColors['Liked']!),
+      if (userState.preference == MoviePreference.disliked)
+        (label: 'Hidden', color: _badgeColors['Hidden']!),
+      if (userState.rating != null)
+        (label: '${userState.rating}/5', color: _ratingColor),
     ];
 
     return Material(
@@ -468,7 +544,7 @@ class _LibraryMovieCard extends StatelessWidget {
                         imageUrl: movie.posterUrl,
                         fit: BoxFit.cover,
                         errorWidget: (context, error, stackTrace) => Container(
-                          color: const Color(0xFF1E293B),
+                          color: AgreeoColors.darkSurface,
                           alignment: Alignment.center,
                           child: Text(
                             movie.title,
@@ -509,10 +585,13 @@ class _LibraryMovieCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                          spacing: 6,
+                          runSpacing: 6,
                           children: badges
-                              .map((badge) => Chip(label: Text(badge)))
+                              .map((b) => _MiniPillBadge(
+                                    label: b.label,
+                                    color: b.color,
+                                  ))
                               .toList(),
                         ),
                       ],
@@ -522,17 +601,76 @@ class _LibraryMovieCard extends StatelessWidget {
               ),
               if (userState.hasReview) ...<Widget>[
                 const SizedBox(height: 12),
-                Text(
-                  userState.review!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border(
+                      left: BorderSide(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Icon(
+                        Icons.format_quote_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          userState.review!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontStyle: FontStyle.italic,
+                            height: 1.45,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: actions),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPillBadge extends StatelessWidget {
+  const _MiniPillBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
         ),
       ),
     );

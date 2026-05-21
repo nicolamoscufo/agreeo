@@ -1,10 +1,14 @@
+import 'dart:ui' as ui;
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
+import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MovieNightVotingScreen extends ConsumerStatefulWidget {
@@ -24,9 +28,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
   bool _navigatedToResult = false;
   late final AnimationController _swipeController;
   Animation<Offset>? _swipeAnimation;
-  Offset _dragOffset = Offset.zero;
+  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(Offset.zero);
+  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(0.0);
   bool _isSubmittingSwipe = false;
   int _cardVersion = 0;
+  int _lastKnownRound = 1;
+  bool _showTieBreakerInterstitial = false;
 
   @override
   void initState() {
@@ -40,13 +47,28 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
           if (animation == null || !mounted) {
             return;
           }
-          setState(() => _dragOffset = animation.value);
+          _dragOffsetNotifier.value = animation.value;
+          _updateDragProgress(animation.value);
         });
+  }
+
+  void _updateDragProgress(Offset offset) {
+    if (!mounted) return;
+    final size = MediaQuery.sizeOf(context);
+    final isHorizontalDominant = offset.dx.abs() >= offset.dy.abs();
+    final progress = (isHorizontalDominant
+            ? (offset.dx.abs() / (size.width * 0.45))
+            : (offset.dy.abs() / (size.height * 0.25)))
+        .clamp(0.0, 1.0)
+        .toDouble();
+    _dragProgressNotifier.value = progress;
   }
 
   @override
   void dispose() {
     _swipeController.dispose();
+    _dragOffsetNotifier.dispose();
+    _dragProgressNotifier.dispose();
     super.dispose();
   }
 
@@ -82,14 +104,16 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not submit this vote.')),
       );
-      setState(() => _dragOffset = Offset.zero);
+      _dragOffsetNotifier.value = Offset.zero;
+      _dragProgressNotifier.value = 0.0;
       return false;
     }
 
     if (updated.status != MovieNightStatus.completed) {
       setState(() {
         _currentIndex = 0;
-        _dragOffset = Offset.zero;
+        _dragOffsetNotifier.value = Offset.zero;
+        _dragProgressNotifier.value = 0.0;
         _cardVersion++;
       });
     }
@@ -125,7 +149,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
 
   Future<void> _animateDragTo(Offset target) async {
     _swipeController.stop();
-    _swipeAnimation = Tween<Offset>(begin: _dragOffset, end: target).animate(
+    _swipeAnimation = Tween<Offset>(begin: _dragOffsetNotifier.value, end: target).animate(
       CurvedAnimation(parent: _swipeController, curve: Curves.easeOutCubic),
     );
     await _swipeController.forward(from: 0);
@@ -139,28 +163,52 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     if (_isSubmittingSwipe) {
       return;
     }
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final dragOffset = _dragOffsetNotifier.value;
     final velocityX = details.velocity.pixelsPerSecond.dx;
-    final shouldVote =
-        _dragOffset.dx.abs() > width * 0.28 || velocityX.abs() > 650;
-    if (!shouldVote) {
-      await _animateDragTo(Offset.zero);
-      return;
-    }
+    final velocityY = details.velocity.pixelsPerSecond.dy;
+    final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
 
-    final voteLike = velocityX.abs() > _dragOffset.dx.abs()
-        ? velocityX > 0
-        : _dragOffset.dx > 0;
-    final vote = voteLike
-        ? MovieNightVoteValue.like
-        : MovieNightVoteValue.dislike;
-    final target = Offset((voteLike ? 1 : -1) * (width + 260), _dragOffset.dy);
-
-    setState(() => _isSubmittingSwipe = true);
-    await _animateDragTo(target);
-    await _submitVote(event, candidate, vote);
-    if (mounted) {
-      setState(() => _isSubmittingSwipe = false);
+    if (isHorizontalDominant) {
+      // Horizontal swipe → like / dislike
+      final shouldVote =
+          dragOffset.dx.abs() > size.width * 0.28 || velocityX.abs() > 650;
+      if (!shouldVote) {
+        await _animateDragTo(Offset.zero);
+        return;
+      }
+      final voteLike = velocityX.abs() > dragOffset.dx.abs()
+          ? velocityX > 0
+          : dragOffset.dx > 0;
+      final vote = voteLike
+          ? MovieNightVoteValue.like
+          : MovieNightVoteValue.dislike;
+      final target = Offset((voteLike ? 1 : -1) * (size.width + 260), dragOffset.dy);
+      HapticFeedback.mediumImpact();
+      setState(() => _isSubmittingSwipe = true);
+      await _animateDragTo(target);
+      await _submitVote(event, candidate, vote);
+      if (mounted) setState(() => _isSubmittingSwipe = false);
+    } else {
+      // Vertical swipe → already seen (up) / neutral (down)
+      final shouldVote =
+          dragOffset.dy.abs() > size.height * 0.18 || velocityY.abs() > 650;
+      if (!shouldVote) {
+        await _animateDragTo(Offset.zero);
+        return;
+      }
+      final swipeUp = velocityY.abs() > dragOffset.dy.abs()
+          ? velocityY < 0
+          : dragOffset.dy < 0;
+      final vote = swipeUp
+          ? MovieNightVoteValue.alreadySeen
+          : MovieNightVoteValue.neutral;
+      final target = Offset(dragOffset.dx, (swipeUp ? -1 : 1) * (size.height + 260));
+      HapticFeedback.mediumImpact();
+      setState(() => _isSubmittingSwipe = true);
+      await _animateDragTo(target);
+      await _submitVote(event, candidate, vote);
+      if (mounted) setState(() => _isSubmittingSwipe = false);
     }
   }
 
@@ -198,9 +246,24 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
         .where((participant) => completedVoterIds.contains(participant.userId))
         .length;
 
+    // Detect tie-breaker round change — reset voting state
+    if (event.round > _lastKnownRound) {
+      _lastKnownRound = event.round;
+      _voteHistory.clear();
+      _currentIndex = 0;
+      _dragOffsetNotifier.value = Offset.zero;
+      _dragProgressNotifier.value = 0.0;
+      _cardVersion++;
+      if (votedCount == 0) {
+        _showTieBreakerInterstitial = true;
+      }
+    } else if (event.round < _lastKnownRound) {
+      _lastKnownRound = event.round;
+    }
+
     if (unvoted.isEmpty) {
       return Scaffold(
-        backgroundColor: const Color(0xFF060B16),
+        backgroundColor: AgreeoColors.deepBlack,
         body: SafeArea(
           child: Stack(
             children: [
@@ -230,12 +293,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      const Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 64,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(height: 24),
+                       _PulsingIcon(
+                         icon: Icons.check_circle_outline_rounded,
+                         size: 64,
+                         color: Colors.white,
+                       ),
+                       const SizedBox(height: 24),
                       Text(
                         'All votes in!',
                         style: Theme.of(context).textTheme.headlineSmall
@@ -292,27 +355,75 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     final nextCandidate = unvoted.length > 1
         ? unvoted[(_currentIndex + 1).clamp(0, unvoted.length - 1)]
         : null;
-    final dragProgress =
-        (_dragOffset.dx.abs() / (MediaQuery.sizeOf(context).width * 0.45))
-            .clamp(0.0, 1.0)
-            .toDouble();
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
+          // Tie-breaker round banner
+          if (event.round > 1)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(48, 8, 48, 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AgreeoColors.kernelGold, Color(0xFFD97706)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AgreeoColors.kernelGold.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Tie-Breaker — Round ${event.round}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // Background card (next movie visible behind)
           if (nextCandidate != null && nextCandidate != currentCandidate)
             Positioned.fill(
-              child: AnimatedScale(
-                scale: 0.94 + (dragProgress * 0.04),
-                duration: const Duration(milliseconds: 120),
-                curve: Curves.easeOutCubic,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _dragProgressNotifier,
                 child: _VotingImmersiveCard(
                   candidate: nextCandidate,
                   isBackground: true,
                 ),
+                builder: (context, dragProgress, child) {
+                  return Transform.scale(
+                    scale: 0.94 + (dragProgress * 0.04),
+                    child: child!,
+                  );
+                },
               ),
             ),
 
@@ -341,81 +452,88 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                 onPanUpdate: _isSubmittingSwipe
                     ? null
                     : (details) {
-                        setState(() {
-                          _dragOffset += details.delta;
-                        });
+                        final newOffset = _dragOffsetNotifier.value + details.delta;
+                        _dragOffsetNotifier.value = newOffset;
+                        _updateDragProgress(newOffset);
                       },
                 onPanEnd: (details) =>
                     _handlePanEnd(details, event, currentCandidate),
                 onPanCancel: () => _animateDragTo(Offset.zero),
-                child: AnimatedBuilder(
-                  animation: _swipeController,
-                  builder: (context, child) {
+                child: ValueListenableBuilder<Offset>(
+                  valueListenable: _dragOffsetNotifier,
+                  child: _VotingImmersiveCard(
+                    candidate: currentCandidate,
+                    isBackground: false,
+                    progress: '${votedCount + 1}/$totalCandidates',
+                    onInfoTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => AgreeoMovieDetailsScreen(
+                            movieId: currentCandidate.movie.id,
+                          ),
+                        ),
+                      );
+                    },
+                    actions: _VotingCardActions(
+                      canUndo: _voteHistory.isNotEmpty,
+                      onUndo: () => _undoLastVote(event),
+                      onDislike: () {
+                        _submitVote(
+                          event,
+                          currentCandidate,
+                          MovieNightVoteValue.dislike,
+                        );
+                      },
+                      onAlreadySeen: () {
+                        _submitVote(
+                          event,
+                          currentCandidate,
+                          MovieNightVoteValue.alreadySeen,
+                        );
+                      },
+                      onLike: () {
+                        _submitVote(
+                          event,
+                          currentCandidate,
+                          MovieNightVoteValue.like,
+                        );
+                      },
+                      onNeutral: () {
+                        _submitVote(
+                          event,
+                          currentCandidate,
+                          MovieNightVoteValue.neutral,
+                        );
+                      },
+                    ),
+                  ),
+                  builder: (context, dragOffset, child) {
                     final width = MediaQuery.sizeOf(context).width;
                     final rotation =
-                        (_dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() *
+                        (dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() *
                         0.18;
-                    final overlayProgress =
-                        (_dragOffset.dx.abs() / (width * 0.42))
+                    final hProgress =
+                        (dragOffset.dx.abs() / (width * 0.42))
                             .clamp(0.0, 1.0)
                             .toDouble();
+                    final vProgress =
+                        (dragOffset.dy.abs() / (MediaQuery.sizeOf(context).height * 0.22))
+                            .clamp(0.0, 1.0)
+                            .toDouble();
+                    final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
+                    final overlayProgress = isHorizontalDominant ? hProgress : vProgress;
                     return Transform.translate(
-                      offset: _dragOffset,
+                      offset: dragOffset,
                       child: Transform.rotate(
                         angle: rotation,
                         child: Stack(
                           fit: StackFit.expand,
                           children: <Widget>[
-                            _VotingImmersiveCard(
-                              candidate: currentCandidate,
-                              isBackground: false,
-                              progress: '${votedCount + 1}/$totalCandidates',
-                              onInfoTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => AgreeoMovieDetailsScreen(
-                                      movieId: currentCandidate.movie.id,
-                                    ),
-                                  ),
-                                );
-                              },
-                              actions: _VotingCardActions(
-                                canUndo: _voteHistory.isNotEmpty,
-                                onUndo: () => _undoLastVote(event),
-                                onDislike: () {
-                                  _submitVote(
-                                    event,
-                                    currentCandidate,
-                                    MovieNightVoteValue.dislike,
-                                  );
-                                },
-                                onAlreadySeen: () {
-                                  _submitVote(
-                                    event,
-                                    currentCandidate,
-                                    MovieNightVoteValue.alreadySeen,
-                                  );
-                                },
-                                onLike: () {
-                                  _submitVote(
-                                    event,
-                                    currentCandidate,
-                                    MovieNightVoteValue.like,
-                                  );
-                                },
-                                onNeutral: () {
-                                  _submitVote(
-                                    event,
-                                    currentCandidate,
-                                    MovieNightVoteValue.neutral,
-                                  );
-                                },
-                              ),
-                            ),
+                            child!,
                             if (overlayProgress > 0)
                               _SwipeStampOverlay(
                                 progress: overlayProgress,
-                                isLike: _dragOffset.dx >= 0,
+                                dragOffset: dragOffset,
                               ),
                           ],
                         ),
@@ -426,6 +544,91 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
               ),
             ),
           ),
+          if (_showTieBreakerInterstitial)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.85),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: AgreeoColors.kernelGold.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
+                                width: 2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.bolt_rounded,
+                              color: AgreeoColors.kernelGold,
+                              size: 64,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          const Text(
+                            'Pareggio rilevato! 🍿',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Alcuni film hanno ottenuto lo stesso punteggio. Votate di nuovo per decidere il vincitore!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 16,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _showTieBreakerInterstitial = false;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AgreeoColors.kernelGold,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 8,
+                              shadowColor: AgreeoColors.kernelGold.withValues(alpha: 0.4),
+                            ),
+                            child: const Text(
+                              'Inizia spareggio',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Positioned(
             top: 12,
             left: 12,
@@ -491,7 +694,7 @@ class _ParticipantVoteProgressCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               backgroundColor: Colors.white.withValues(alpha: 0.16),
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF22C55E),
+                AgreeoColors.kernelGold,
               ),
             ),
             const SizedBox(height: 12),
@@ -505,8 +708,8 @@ class _ParticipantVoteProgressCard extends StatelessWidget {
                       ? Icons.check_circle_rounded
                       : Icons.hourglass_top_rounded,
                   color: voted
-                      ? const Color(0xFF22C55E)
-                      : const Color(0xFFF59E0B),
+                      ? AgreeoColors.kernelGold
+                      : AgreeoColors.kernelGold,
                 ),
                 title: Text(
                   participant.name,
@@ -529,17 +732,46 @@ class _ParticipantVoteProgressCard extends StatelessWidget {
 }
 
 class _SwipeStampOverlay extends StatelessWidget {
-  const _SwipeStampOverlay({required this.progress, required this.isLike});
+  const _SwipeStampOverlay({required this.progress, required this.dragOffset});
 
   final double progress;
-  final bool isLike;
+  final Offset dragOffset;
 
   @override
   Widget build(BuildContext context) {
-    final color = isLike ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-    final alignment = isLike ? Alignment.topLeft : Alignment.topRight;
-    final angle = isLike ? -0.18 : 0.18;
-    final label = isLike ? 'LIKE \u2665' : 'NOPE \u2715';
+    final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
+
+    late final Color color;
+    late final Alignment alignment;
+    late final double angle;
+    late final String label;
+
+    if (isHorizontalDominant) {
+      if (dragOffset.dx >= 0) {
+        color = AgreeoColors.kernelGold;
+        alignment = Alignment.topLeft;
+        angle = -0.18;
+        label = 'LIKE \u2665';
+      } else {
+        color = AgreeoColors.cinematicRed;
+        alignment = Alignment.topRight;
+        angle = 0.18;
+        label = 'NOPE \u2715';
+      }
+    } else {
+      if (dragOffset.dy < 0) {
+        color = AgreeoColors.popcornWhite;
+        alignment = Alignment.bottomCenter;
+        angle = 0;
+        label = 'SEEN \u{1F441}';
+      } else {
+        color = AgreeoColors.kernelGold;
+        alignment = Alignment.topCenter;
+        angle = 0;
+        label = 'MAYBE \u223C';
+      }
+    }
+
     return IgnorePointer(
       child: SafeArea(
         child: Padding(
@@ -651,19 +883,19 @@ class _VotingImmersiveCard extends StatelessWidget {
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,
                   errorWidget: (context, url, error) =>
-                      Container(color: const Color(0xFF0F172A)),
+                      _buildFallbackPlaceholder(movie),
                 )
               else
-                Container(color: const Color(0xFF0F172A)),
+                _buildFallbackPlaceholder(movie),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      Color(0x22060B16),
-                      Color(0x66060B16),
-                      Color(0xE6060B16),
+                      Color(0x22121212),
+                      Color(0x66121212),
+                      Color(0xE6121212),
                     ],
                     stops: <double>[0, 0.45, 1],
                   ),
@@ -699,18 +931,18 @@ class _VotingImmersiveCard extends StatelessWidget {
                             )
                           else
                             const SizedBox.shrink(),
-                          if (onInfoTap != null)
-                            Material(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(999),
-                              child: InkWell(
-                                onTap: onInfoTap,
-                                borderRadius: BorderRadius.circular(999),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(10),
-                                  child: Icon(
-                                    Icons.info_outline_rounded,
-                                    color: Colors.white,
+                          if (onInfoTap != null && !isBackground)
+                            ClipOval(
+                              child: Material(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                child: InkWell(
+                                  onTap: onInfoTap,
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(10),
+                                    child: Icon(
+                                      Icons.info_outline_rounded,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -817,6 +1049,31 @@ class _VotingImmersiveCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildFallbackPlaceholder(Movie movie) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AgreeoColors.darkSurface,
+            AgreeoColors.deepBlack,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Opacity(
+          opacity: 0.12,
+          child: Icon(
+            Icons.movie_rounded,
+            size: 160,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _VotingCardActions extends StatelessWidget {
@@ -915,7 +1172,10 @@ class _VotingActionButton extends StatelessWidget {
             elevation: 4,
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: onTap,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onTap();
+              },
               child: SizedBox(
                 width: size,
                 height: size,
@@ -925,6 +1185,63 @@ class _VotingActionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PulsingIcon extends StatefulWidget {
+  const _PulsingIcon({
+    required this.icon,
+    required this.size,
+    required this.color,
+  });
+
+  final IconData icon;
+  final double size;
+  final Color color;
+
+  @override
+  State<_PulsingIcon> createState() => _PulsingIconState();
+}
+
+class _PulsingIconState extends State<_PulsingIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = 1.0 + _controller.value * 0.12;
+        final opacity = 0.6 + _controller.value * 0.4;
+        return Transform.scale(
+          scale: scale,
+          child: Opacity(
+            opacity: opacity,
+            child: Icon(
+              widget.icon,
+              size: widget.size,
+              color: widget.color,
+            ),
+          ),
+        );
+      },
     );
   }
 }

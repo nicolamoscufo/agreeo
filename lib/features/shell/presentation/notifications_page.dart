@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agreeo/models/app_models.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
@@ -9,9 +10,14 @@ import 'package:agreeo/features/friends/presentation/movie_night_result_screen.d
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/nav_index_provider.dart';
 
-class NotificationsPage extends ConsumerWidget {
+class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
 
+  @override
+  ConsumerState<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   String _formatTimestamp(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inDays > 0) return '${diff.inDays}d ago';
@@ -21,7 +27,21 @@ class NotificationsPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(notificationsProvider.notifier).refreshNotifications().then((_) {
+          if (mounted) {
+            ref.read(notificationsProvider.notifier).markLessImportantAsRead();
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(notificationsProvider);
 
     // Group notifications:
@@ -48,69 +68,73 @@ class NotificationsPage extends ConsumerWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF08111F), Color(0xFF0B1120), Color(0xFF111827)],
+              colors: [AgreeoColors.trueBlack, AgreeoColors.deepBlack, AgreeoColors.anthraciteBlack],
             ),
           ),
           child: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                SliverAppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  pinned: true,
-                  title: const Text(
-                    'Notifications',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.bold,
+                SliverOverlapAbsorber(
+                  handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                  sliver: SliverAppBar(
+                    backgroundColor: AgreeoColors.trueBlack,
+                    elevation: 0,
+                    pinned: true,
+                    surfaceTintColor: Colors.transparent,
+                    title: const Text(
+                      'Notifications',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  bottom: TabBar(
-                    indicatorColor: const Color(0xFF38BDF8),
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey,
-                    tabs: [
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Friends'),
-                            if (friendNotifications.any((n) => !n.read)) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEF4444),
-                                  shape: BoxShape.circle,
+                    bottom: TabBar(
+                      indicatorColor: AgreeoColors.cinematicRed,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.grey,
+                      tabs: [
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('Friends'),
+                              if (friendNotifications.any((n) => !n.read)) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AgreeoColors.cinematicRed,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Movie Nights'),
-                            if (movieNightNotifications.any(
-                              (n) => !n.read,
-                            )) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEF4444),
-                                  shape: BoxShape.circle,
+                        Tab(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('Movie Nights'),
+                              if (movieNightNotifications.any(
+                                (n) => !n.read,
+                              )) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AgreeoColors.cinematicRed,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ];
@@ -119,13 +143,13 @@ class NotificationsPage extends ConsumerWidget {
               children: [
                 _NotificationsTabList(
                   notifications: friendNotifications,
-                  onTap: (n) => _handleNotificationTap(context, ref, n),
+                  onTap: (n) => _handleNotificationTap(context, n),
                   emptyMessage: 'No friend activity yet.',
                   formatTimestamp: _formatTimestamp,
                 ),
                 _NotificationsTabList(
                   notifications: movieNightNotifications,
-                  onTap: (n) => _handleNotificationTap(context, ref, n),
+                  onTap: (n) => _handleNotificationTap(context, n),
                   emptyMessage: 'No movie night invites or updates.',
                   formatTimestamp: _formatTimestamp,
                 ),
@@ -139,7 +163,6 @@ class NotificationsPage extends ConsumerWidget {
 
   Future<void> _handleNotificationTap(
     BuildContext context,
-    WidgetRef ref,
     InAppNotification notif,
   ) async {
     // 1. Mark as read
@@ -199,138 +222,159 @@ class _NotificationsTabList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (notifications.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.notifications_none,
-              size: 64,
-              color: Colors.grey.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              emptyMessage,
-              style: TextStyle(
-                color: Colors.grey.withValues(alpha: 0.6),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 8, bottom: 24),
-      itemCount: notifications.length,
-      itemBuilder: (context, index) {
-        final notif = notifications[index];
-        final isUnread = !notif.read;
-
-        IconData iconData = Icons.notifications;
-        Color iconColor = const Color(0xFF818CF8);
-
-        switch (notif.type) {
-          case 'friend_request':
-            iconData = Icons.person_add_outlined;
-            iconColor = const Color(0xFF38BDF8);
-            break;
-          case 'friend_accepted':
-            iconData = Icons.people_outline;
-            iconColor = const Color(0xFF34D399);
-            break;
-          case 'movie_night_invite':
-            iconData = Icons.local_movies_outlined;
-            iconColor = const Color(0xFFFBBF24);
-            break;
-          case 'movie_night_voting':
-            iconData = Icons.how_to_vote_outlined;
-            iconColor = const Color(0xFFF87171);
-            break;
-          case 'movie_night_completed':
-            iconData = Icons.emoji_events_outlined;
-            iconColor = const Color(0xFFC084FC);
-            break;
-        }
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: isUnread
-                ? const Color(0xFF1E293B).withValues(alpha: 0.4)
-                : const Color(0xFF1E293B).withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isUnread
-                  ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
-                  : Colors.grey.withValues(alpha: 0.1),
-              width: 1,
-            ),
+      return CustomScrollView(
+        slivers: [
+          SliverOverlapInjector(
+            handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
           ),
-          child: ListTile(
-            onTap: () => onTap(notif),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(iconData, color: iconColor, size: 24),
-            ),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    notif.title,
-                    style: TextStyle(
-                      fontWeight: isUnread
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: Colors.white,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                if (isUnread)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF38BDF8),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    notif.message,
-                    style: TextStyle(
-                      color: isUnread ? Colors.grey[200] : Colors.grey[400],
-                      fontSize: 13,
-                    ),
+                  Icon(
+                    Icons.notifications_none,
+                    size: 64,
+                    color: Colors.grey.withValues(alpha: 0.4),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   Text(
-                    formatTimestamp(notif.createdAt),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    emptyMessage,
+                    style: TextStyle(
+                      color: Colors.grey.withValues(alpha: 0.6),
+                      fontSize: 16,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-        );
-      },
+        ],
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        SliverOverlapInjector(
+          handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 8, bottom: 24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final notif = notifications[index];
+                final isUnread = !notif.read;
+
+                IconData iconData = Icons.notifications;
+                Color iconColor = AgreeoColors.cinematicRed;
+
+                switch (notif.type) {
+                  case 'friend_request':
+                    iconData = Icons.person_add_outlined;
+                    iconColor = AgreeoColors.cinematicRed;
+                    break;
+                  case 'friend_accepted':
+                    iconData = Icons.people_outline;
+                    iconColor = AgreeoColors.kernelGold;
+                    break;
+                  case 'movie_night_invite':
+                    iconData = Icons.local_movies_outlined;
+                    iconColor = AgreeoColors.kernelGold;
+                    break;
+                  case 'movie_night_voting':
+                    iconData = Icons.how_to_vote_outlined;
+                    iconColor = AgreeoColors.cinematicRed;
+                    break;
+                  case 'movie_night_completed':
+                    iconData = Icons.emoji_events_outlined;
+                    iconColor = AgreeoColors.kernelGold;
+                    break;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isUnread
+                        ? AgreeoColors.darkSurface.withValues(alpha: 0.4)
+                        : AgreeoColors.darkSurface.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isUnread
+                          ? AgreeoColors.cinematicRed.withValues(alpha: 0.3)
+                          : Colors.grey.withValues(alpha: 0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    onTap: () => onTap(notif),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: iconColor.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(iconData, color: iconColor, size: 24),
+                    ),
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notif.title,
+                            style: TextStyle(
+                              fontWeight: isUnread
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (isUnread)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AgreeoColors.cinematicRed,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            notif.message,
+                            style: TextStyle(
+                              color: isUnread ? Colors.grey[200] : Colors.grey[400],
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            formatTimestamp(notif.createdAt),
+                            style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              childCount: notifications.length,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

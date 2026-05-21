@@ -1,4 +1,5 @@
 import 'dart:async'; // Necessario per il Timer del Debounce
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/presentation/friend_profile_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
@@ -68,8 +69,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 128),
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(friendsMovieNightControllerProvider.notifier).refreshSocialLayer(),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 128),
           children: <Widget>[
             SectionHeader(
               title: 'Friends',
@@ -200,20 +204,108 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   child: const Text('Create Movie Night'),
                 ),
               )
-            else
-              ...socialState.movieNights.map(
-                (event) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _MovieNightCard(
-                    event: event,
-                    onTap: () => _openEvent(event),
-                  ),
-                ),
-              ),
+            else ...[
+              // Active Movie Nights
+              ..._buildActiveMovieNights(socialState.movieNights),
+              // Past Movie Nights
+              ..._buildPastMovieNights(socialState.movieNights),
+            ],
           ],
         ),
       ),
+      ),
     );
+  }
+  List<Widget> _buildActiveMovieNights(List<MovieNightEvent> allEvents) {
+    final active = allEvents
+        .where(
+          (e) =>
+              e.status == MovieNightStatus.waiting ||
+              e.status == MovieNightStatus.voting ||
+              e.status == MovieNightStatus.draft,
+        )
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    if (active.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Text(
+            'No active movie nights. Create one!',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      ...active.map(
+        (event) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _MovieNightCard(
+            event: event,
+            onTap: () => _openEvent(event),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildPastMovieNights(List<MovieNightEvent> allEvents) {
+    final past = allEvents
+        .where((e) => e.status == MovieNightStatus.completed)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    if (past.isEmpty) return const [];
+
+    return [
+      const SizedBox(height: 8),
+      Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          initiallyExpanded: false,
+          title: Row(
+            children: [
+              Icon(
+                Icons.history_rounded,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Past Movie Nights (${past.length})',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          children: past
+              .map(
+                (event) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Opacity(
+                    opacity: 0.75,
+                    child: _MovieNightCard(
+                      event: event,
+                      onTap: () => _openEvent(event),
+                    ),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      ),
+    ];
   }
 
   void _openFriend(Friend friend) {
@@ -402,7 +494,7 @@ class _FriendsListSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        ...friends.map(
+        ...(List<Friend>.from(friends)..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()))).map(
           (friend) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _FriendCard(
@@ -434,17 +526,18 @@ class _FriendCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.56),
-      borderRadius: BorderRadius.circular(24),
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: <Widget>[
-              UserAvatar(initials: friend.initials),
+              UserAvatar(initials: friend.initials, size: 50),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -457,16 +550,29 @@ class _FriendCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '${friend.watchedCount} watched • ${friend.reviewsCount} reviews',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        _MiniPill(
+                          icon: Icons.visibility_rounded,
+                          value: friend.watchedCount.toString(),
+                          color: AgreeoColors.popcornWhite,
+                        ),
+                        const SizedBox(width: 8),
+                        _MiniPill(
+                          icon: Icons.rate_review_rounded,
+                          value: friend.reviewsCount.toString(),
+                          color: AgreeoColors.kernelGold,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              Icon(Icons.chevron_right_rounded,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4), size: 22),
               PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded,
+                    color: cs.onSurfaceVariant, size: 20),
                 onSelected: (value) {
                   if (value == 'remove') {
                     onRemove();
@@ -474,20 +580,72 @@ class _FriendCard extends StatelessWidget {
                     onBlock();
                   }
                 },
-                itemBuilder: (context) => const <PopupMenuEntry<String>>[
-                  PopupMenuItem<String>(
+                itemBuilder: (context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
                     value: 'remove',
-                    child: Text('Remove friend'),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_remove_rounded,
+                            size: 18, color: AgreeoColors.cinematicRed),
+                        SizedBox(width: 8),
+                        Text('Remove friend'),
+                      ],
+                    ),
                   ),
-                  PopupMenuItem<String>(
+                  const PopupMenuItem<String>(
                     value: 'block',
-                    child: Text('Block friend'),
+                    child: Row(
+                      children: [
+                        Icon(Icons.block_rounded,
+                            size: 18, color: AgreeoColors.cinematicRed),
+                        SizedBox(width: 8),
+                        Text('Block friend'),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  const _MiniPill({
+    required this.icon,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        color: color.withValues(alpha: 0.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -834,7 +992,7 @@ class _MovieNightCardState extends State<_MovieNightCard>
                                   fit: BoxFit.cover,
                                   errorWidget: (context, url, error) =>
                                       Container(
-                                        color: const Color(0xFF1F2937),
+                                        color: AgreeoColors.darkSurface,
                                         child: const Icon(
                                           Icons.movie_creation_outlined,
                                         ),

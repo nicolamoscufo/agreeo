@@ -33,33 +33,99 @@ class NotificationsController extends StateNotifier<NotificationsState> {
 
   final Ref _ref;
 
+  /// IDs we have locally marked as read. Survives backend re-fetches so a
+  /// slow backend write does not "un-read" a notification the user already saw.
+  final Set<String> _locallyReadIds = {};
+
   Future<void> refreshNotifications() async {
     state = state.copyWith(isLoading: true);
     final socialService = _ref.read(backendSocialServiceProvider);
     final list = await socialService.loadNotifications();
-    state = state.copyWith(notifications: list, isLoading: false);
+
+    // Merge: if we locally marked something as read but the backend has not
+    // yet committed, preserve the local read status.
+    final merged = list.map((n) {
+      if (!n.read && _locallyReadIds.contains(n.id)) {
+        return InAppNotification(
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          entityId: n.entityId,
+          extraData: n.extraData,
+          read: true,
+          createdAt: n.createdAt,
+        );
+      }
+      return n;
+    }).toList();
+
+    // Clean up: remove ids that are already read on the backend
+    for (final n in list) {
+      if (n.read) _locallyReadIds.remove(n.id);
+    }
+
+    state = state.copyWith(notifications: merged, isLoading: false);
   }
 
   Future<void> markAsRead(String id) async {
+    // 1. Optimistic local update (instant UI feedback)
+    _locallyReadIds.add(id);
+    state = state.copyWith(
+      notifications: state.notifications
+          .map((n) => n.id == id
+              ? InAppNotification(
+                  id: n.id,
+                  type: n.type,
+                  title: n.title,
+                  message: n.message,
+                  entityId: n.entityId,
+                  extraData: n.extraData,
+                  read: true,
+                  createdAt: n.createdAt,
+                )
+              : n)
+          .toList(),
+    );
+
+    // 2. Fire and forget the backend call
     final socialService = _ref.read(backendSocialServiceProvider);
-    final ok = await socialService.markNotificationAsRead(id);
-    if (ok) {
-      state = state.copyWith(
-        notifications: state.notifications
-            .map((n) => n.id == id
-                ? InAppNotification(
-                    id: n.id,
-                    type: n.type,
-                    title: n.title,
-                    message: n.message,
-                    entityId: n.entityId,
-                    extraData: n.extraData,
-                    read: true,
-                    createdAt: n.createdAt,
-                  )
-                : n)
-            .toList(),
-      );
+    await socialService.markNotificationAsRead(id);
+  }
+
+  Future<void> markLessImportantAsRead() async {
+    final targetIds = state.notifications
+        .where((n) =>
+            !n.read &&
+            n.type != 'friend_request' &&
+            n.type != 'movie_night_voting' &&
+            n.type != 'movie_night_invite')
+        .map((n) => n.id)
+        .toList();
+
+    if (targetIds.isEmpty) return;
+
+    _locallyReadIds.addAll(targetIds);
+    state = state.copyWith(
+      notifications: state.notifications
+          .map((n) => targetIds.contains(n.id)
+              ? InAppNotification(
+                  id: n.id,
+                  type: n.type,
+                  title: n.title,
+                  message: n.message,
+                  entityId: n.entityId,
+                  extraData: n.extraData,
+                  read: true,
+                  createdAt: n.createdAt,
+                )
+              : n)
+          .toList(),
+    );
+
+    final socialService = _ref.read(backendSocialServiceProvider);
+    for (final id in targetIds) {
+      socialService.markNotificationAsRead(id).catchError((_) => false);
     }
   }
 }

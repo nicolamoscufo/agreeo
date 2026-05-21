@@ -36,6 +36,7 @@ class Friend {
     required this.watchedCount,
     required this.reviewsCount,
     required this.privacySettings,
+    this.bio = '',
   });
 
   final String id;
@@ -44,6 +45,7 @@ class Friend {
   final int watchedCount;
   final int reviewsCount;
   final PrivacySettings privacySettings;
+  final String bio;
 
   String get initials {
     final parts = name
@@ -64,6 +66,7 @@ class Friend {
     int? watchedCount,
     int? reviewsCount,
     PrivacySettings? privacySettings,
+    String? bio,
   }) {
     return Friend(
       id: id,
@@ -72,6 +75,7 @@ class Friend {
       watchedCount: watchedCount ?? this.watchedCount,
       reviewsCount: reviewsCount ?? this.reviewsCount,
       privacySettings: privacySettings ?? this.privacySettings,
+      bio: bio ?? this.bio,
     );
   }
 }
@@ -258,12 +262,20 @@ class ShortlistCandidate {
     required this.compatibilityScore,
     required this.explanationTags,
     required this.scoreBreakdown,
+    this.voteScore,
+    this.finalScore,
+    this.likesCount,
+    this.dislikesCount,
   });
 
   final Movie movie;
   final double compatibilityScore;
   final List<String> explanationTags;
   final ScoreBreakdown scoreBreakdown;
+  final double? voteScore;
+  final double? finalScore;
+  final int? likesCount;
+  final int? dislikesCount;
 }
 
 class MovieNightVote {
@@ -298,6 +310,7 @@ class MovieNightEvent {
     required this.createdAt,
     required this.updatedAt,
     this.votedUserIds = const <String>[],
+    this.round = 1,
   });
 
   final String id;
@@ -314,6 +327,7 @@ class MovieNightEvent {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<String> votedUserIds;
+  final int round;
 
   String get contentTypeLabel => 'Movie';
 
@@ -363,6 +377,7 @@ class MovieNightEvent {
     List<MovieNightVote>? votes,
     DateTime? updatedAt,
     List<String>? votedUserIds,
+    int? round,
   }) {
     return MovieNightEvent(
       id: id,
@@ -381,6 +396,7 @@ class MovieNightEvent {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       votedUserIds: votedUserIds ?? this.votedUserIds,
+      round: round ?? this.round,
     );
   }
 }

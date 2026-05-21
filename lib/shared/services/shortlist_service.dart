@@ -207,7 +207,7 @@ class ShortlistService {
               .length;
           return _WinnerScore(
             candidate: candidate,
-            finalScore: candidate.compatibilityScore + voteScore,
+            finalScore: voteScore,
             likes: likes,
             dislikes: dislikes,
           );

@@ -26,8 +26,10 @@ Would an agent likely miss this without help? Yes. New important files to touch 
 - lib/providers/app_controller.dart (initialization)
 
 Would an agent likely miss this without help? Yes. Local dev environment for Neo4j:
-- Install and run Neo4j locally (Docker):
-  docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo/password neo4j:latest
+- Install and run Neo4j locally using docker-compose (Recommended):
+  docker-compose up -d neo4j
+- Or run manually with persistence volumes:
+  docker run -p 7474:7474 -p 7687:7687 -v neo4j_data:/data -e NEO4J_AUTH=neo4j/password123 neo4j:latest
 - Access management UI at http://localhost:7474
 - Update neo4j_config.dart with the correct URI, username, and password
 

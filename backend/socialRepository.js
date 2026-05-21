@@ -101,6 +101,7 @@ function normalizeFriend(raw) {
     privacySettings: friend.privacySettings || defaultPrivacy(friend),
     isFriend: friend.isFriend === true,
     pending: friend.pending === true,
+    bio: friend.bio || '',
   };
 }
 
@@ -163,6 +164,7 @@ async function getFriends(uid) {
       id: friend.uid,
       name: coalesce(friend.displayName, friend.email, 'Agreeo user'),
       avatarUrl: coalesce(friend.avatarUrl, ''),
+      bio: coalesce(friend.bio, ''),
       watchedCount: watchedCount,
       reviewsCount: reviewsCount,
       privacySettings: {
@@ -192,6 +194,7 @@ async function getFriends(uid) {
         id: from.uid,
         name: coalesce(from.displayName, from.email, 'Agreeo user'),
         avatarUrl: coalesce(from.avatarUrl, ''),
+        bio: coalesce(from.bio, ''),
         watchedCount: watchedCount,
         reviewsCount: reviewsCount,
         privacySettings: {
@@ -234,6 +237,7 @@ async function searchFriends(uid, query) {
       id: candidate.uid,
       name: coalesce(candidate.displayName, candidate.email, 'Agreeo user'),
       avatarUrl: coalesce(candidate.avatarUrl, ''),
+      bio: coalesce(candidate.bio, ''),
       watchedCount: watchedCount,
       reviewsCount: reviewsCount,
       isFriend: friendCount > 0,
@@ -424,6 +428,7 @@ async function getFriendProfile(uid, friendId) {
       id: friend.uid,
       name: coalesce(friend.displayName, friend.email, 'Agreeo user'),
       avatarUrl: coalesce(friend.avatarUrl, ''),
+      bio: coalesce(friend.bio, ''),
       watchedCount: watchedCount,
       reviewsCount: reviewsCount,
       privacySettings: {
@@ -514,6 +519,7 @@ async function createMovieNight(uid, data) {
       inviteLink: $inviteLink,
       status: 'waiting',
       winnerMovieId: null,
+      round: 1,
       createdAt: datetime(),
       updatedAt: datetime()
     })
@@ -643,6 +649,7 @@ async function getMovieNight(uid, eventId) {
       inviteLink: coalesce(event.inviteLink, ''),
       status: coalesce(event.status, 'waiting'),
       winnerMovieId: event.winnerMovieId,
+      round: coalesce(event.round, 1),
       createdAt: toString(event.createdAt),
       updatedAt: toString(event.updatedAt)
     } AS event
@@ -659,7 +666,21 @@ async function getMovieNight(uid, eventId) {
     loadVotes(eventId),
   ]);
 
-  return { ...event, participants, shortlist, votes, votedUserIds: completedVoterIds(participants, shortlist, votes) };
+  // Enrich shortlist with computed vote scores
+  const enrichedShortlist = shortlist.map((candidate) => {
+    const movieId = `tmdb-${candidate.movie.tmdbId}`;
+    const movieVotes = votes.filter((v) => v.movieId === movieId);
+    const voteSc = movieVotes.reduce((sum, v) => sum + voteScore(v.vote), 0);
+    return {
+      ...candidate,
+      voteScore: voteSc,
+      finalScore: voteSc,
+      likesCount: movieVotes.filter((v) => v.vote === 'like').length,
+      dislikesCount: movieVotes.filter((v) => v.vote === 'dislike').length,
+    };
+  });
+
+  return { ...event, participants, shortlist: enrichedShortlist, votes, votedUserIds: completedVoterIds(participants, shortlist, votes) };
 }
 
 function completedVoterIds(participants, shortlist, votes) {
@@ -694,7 +715,8 @@ async function loadParticipants(eventId) {
 async function loadShortlist(eventId) {
   const result = await neo4jService.run(
     `
-    MATCH (:MovieNight {id: $eventId})-[candidate:HAS_CANDIDATE]->(m:Movie)
+    MATCH (event:MovieNight {id: $eventId})-[candidate:HAS_CANDIDATE]->(m:Movie)
+    WHERE event.status = 'completed' OR candidate.eliminated IS NULL OR NOT candidate.eliminated
     RETURN {
       movie: ${movieMapCypher('m')},
       compatibilityScore: coalesce(candidate.compatibilityScore, 0.0),
@@ -834,6 +856,49 @@ async function generateShortlist(uid, eventId) {
   );
   const shortlist = buildShortlist({ constraints, participants: joinedParticipants, movies, states, limit: 10 });
 
+  // Enrich shortlist candidate movies with TMDB details if they are missing poster data
+  await Promise.all(
+    shortlist.map(async (candidate) => {
+      if (candidate.movie && candidate.movie.tmdbId && !candidate.movie.posterPath && !candidate.movie.posterUrl) {
+        try {
+          console.info(`[generateShortlist] Enriching movie tmdbId=${candidate.movie.tmdbId} from TMDB...`);
+          const tmdbMovie = await tmdbGet(`/movie/${candidate.movie.tmdbId}`, { language: 'en-US' });
+          if (tmdbMovie) {
+            const posterUrl = tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.poster_path}` : '';
+            const backdropUrl = tmdbMovie.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.backdrop_path}` : '';
+            
+            candidate.movie.posterPath = tmdbMovie.poster_path || null;
+            candidate.movie.backdropPath = tmdbMovie.backdrop_path || null;
+            candidate.movie.posterUrl = posterUrl;
+            candidate.movie.backdropUrl = backdropUrl;
+            if (tmdbMovie.overview) candidate.movie.overview = tmdbMovie.overview;
+
+            await neo4jService.run(
+              `
+              MATCH (m:Movie {tmdbId: $tmdbId})
+              SET m.posterPath = $posterPath,
+                  m.backdropPath = $backdropPath,
+                  m.posterUrl = $posterUrl,
+                  m.backdropUrl = $backdropUrl,
+                  m.overview = coalesce($overview, m.overview)
+              `,
+              {
+                tmdbId: candidate.movie.tmdbId,
+                posterPath: tmdbMovie.poster_path || null,
+                backdropPath: tmdbMovie.backdrop_path || null,
+                posterUrl,
+                backdropUrl,
+                overview: tmdbMovie.overview || null
+              }
+            );
+          }
+        } catch (e) {
+          console.error(`[generateShortlist] Failed to enrich movie tmdbId=${candidate.movie.tmdbId}:`, e.message);
+        }
+      }
+    })
+  );
+
   await neo4jService.run(
     `
     MATCH (event:MovieNight {id: $eventId})
@@ -928,7 +993,7 @@ async function loadCandidateMovies(constraints, limit = 150) {
     const withGenres = (constraints.includedGenres || [])
       .map(mapGenreNameToId)
       .filter(Boolean)
-      .join(',');
+      .join('|');
     if (withGenres) {
       params['with_genres'] = withGenres;
     }
@@ -1091,7 +1156,7 @@ function calculateCompatibility(movie, participants, states, constraints) {
     if (state.inWatchlist) { watchlistSaves += 1; score += 4; }
     if (state.preference === 'liked') { likes += 1; score += 3; }
     if (toFiniteNumber(state.rating) >= 4) { positiveRatings += 1; score += 1; }
-    if (state.preference === 'disliked') { dislikes += 1; score -= 4; }
+    if (state.preference === 'disliked') { dislikes += 1; score -= 15; }
     if (state.watched) { watched += 1; score -= 1; }
   }
   const includedGenreMatches = movie.genres.filter((genre) => constraints.includedGenres.includes(genre)).length;
@@ -1159,14 +1224,16 @@ function hasEveryoneVoted(event) {
   return true;
 }
 
-function selectWinner(shortlist, votes) {
-  if (!Array.isArray(shortlist) || shortlist.length === 0) return null;
+const MAX_TIE_BREAKER_ROUNDS = 2;
+
+function scoreShortlist(shortlist, votes) {
+  if (!Array.isArray(shortlist) || shortlist.length === 0) return [];
   const scored = shortlist.map((candidate) => {
     const movieId = `tmdb-${candidate.movie.tmdbId}`;
     const movieVotes = votes.filter((vote) => vote.movieId === movieId);
     return {
       candidate,
-      finalScore: candidate.compatibilityScore + movieVotes.reduce((sum, vote) => sum + voteScore(vote.vote), 0),
+      finalScore: movieVotes.reduce((sum, vote) => sum + voteScore(vote.vote), 0),
       likes: movieVotes.filter((vote) => vote.vote === 'like').length,
       dislikes: movieVotes.filter((vote) => vote.vote === 'dislike').length,
     };
@@ -1179,7 +1246,45 @@ function selectWinner(shortlist, votes) {
     toFiniteNumber(right.candidate.movie.voteAverage) - toFiniteNumber(left.candidate.movie.voteAverage) ||
     left.candidate.movie.title.localeCompare(right.candidate.movie.title)
   );
+  return scored;
+}
+
+function selectWinner(shortlist, votes) {
+  const scored = scoreShortlist(shortlist, votes);
+  if (scored.length === 0) return null;
   return scored[0].candidate;
+}
+
+async function clearVotesForTiedMovies(eventId, tiedTmdbIds) {
+  await neo4jService.run(
+    `
+    OPTIONAL MATCH (:AppUser)-[vote:VOTED_IN]->(m:Movie)
+    WHERE vote.eventId = $eventId AND m.tmdbId IN $tiedTmdbIds
+    DELETE vote
+    `,
+    { eventId, tiedTmdbIds }
+  );
+}
+
+async function startTieBreaker(eventId, tiedTmdbIds) {
+  // Set eliminated = true for candidates not in the tied set
+  await neo4jService.run(
+    `
+    MATCH (event:MovieNight {id: $eventId})-[rel:HAS_CANDIDATE]->(m:Movie)
+    WHERE NOT m.tmdbId IN $tiedTmdbIds
+    SET rel.eliminated = true
+    `,
+    { eventId, tiedTmdbIds }
+  );
+  // Increment round
+  await neo4jService.run(
+    `
+    MATCH (event:MovieNight {id: $eventId})
+    SET event.round = coalesce(event.round, 1) + 1, event.updatedAt = datetime()
+    `,
+    { eventId }
+  );
+  await clearVotesForTiedMovies(eventId, tiedTmdbIds);
 }
 
 async function submitVote(uid, eventId, movieId, voteValue) {
@@ -1189,8 +1294,8 @@ async function submitVote(uid, eventId, movieId, voteValue) {
   const result = await neo4jService.run(
     `
     MATCH (user:AppUser {uid: $uid})-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
-    MATCH (event)-[:HAS_CANDIDATE]->(movie:Movie {tmdbId: $tmdbId})
-    WHERE part.status = 'joined'
+    MATCH (event)-[rel:HAS_CANDIDATE]->(movie:Movie {tmdbId: $tmdbId})
+    WHERE part.status = 'joined' AND (rel.eliminated IS NULL OR NOT rel.eliminated)
     MERGE (user)-[v:VOTED_IN {eventId: $eventId}]->(movie)
     ON CREATE SET v.createdAt = datetime()
     SET v.vote = $vote, v.updatedAt = datetime(), event.status = 'voting', event.updatedAt = datetime()
@@ -1203,8 +1308,24 @@ async function submitVote(uid, eventId, movieId, voteValue) {
 
   let event = await getMovieNight(uid, eventId);
   if (event && hasEveryoneVoted(event)) {
-    const winner = selectWinner(event.shortlist, event.votes);
-    if (winner) {
+    const scored = scoreShortlist(event.shortlist, event.votes);
+    if (scored.length === 0) return event;
+
+    const highestScore = scored[0].finalScore;
+    const tied = scored.filter((s) => Math.abs(s.finalScore - highestScore) < 0.001);
+    const currentRound = event.round || 1;
+
+    if (tied.length > 1 && currentRound < MAX_TIE_BREAKER_ROUNDS) {
+      // Tie detected — start tie-breaker round
+      const tiedTmdbIds = tied.map((t) => t.candidate.movie.tmdbId);
+      await startTieBreaker(eventId, tiedTmdbIds);
+      event = await getMovieNight(uid, eventId);
+      // Mark the event with tieBreaker flag for the controller
+      event._tieBreaker = true;
+      event._tiedMovieCount = tiedTmdbIds.length;
+    } else {
+      // Single winner (or max rounds reached — use deterministic sort)
+      const winner = scored[0].candidate;
       await neo4jService.run(
         `
         MATCH (event:MovieNight {id: $eventId})

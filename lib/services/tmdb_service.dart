@@ -371,7 +371,7 @@ class TmdbService {
     878: 'Sci-Fi',
     10770: 'TV Movie',
     53: 'Thriller',
-    52: 'War',
+    10752: 'War',
     37: 'Western',
   };
 

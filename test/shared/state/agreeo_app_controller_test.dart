@@ -71,8 +71,8 @@ class _FakeMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getTrendingMovies() {
-    throw UnimplementedError();
+  Future<List<Movie>> getTrendingMovies() async {
+    return const <Movie>[];
   }
 
   @override

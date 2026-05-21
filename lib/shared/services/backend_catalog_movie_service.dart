@@ -92,7 +92,11 @@ class BackendCatalogMovieService implements MovieService {
 
   @override
   Future<List<Movie>> getTrendingMovies() async {
-    return getCatalog();
+    try {
+      return await _backendMovieService.getPopularMovies();
+    } catch (_) {
+      return getCatalog();
+    }
   }
 
   @override

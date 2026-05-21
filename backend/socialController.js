@@ -444,12 +444,31 @@ exports.submitVote = async (req, res) => {
     const event = await socialRepository.submitVote(uid, req.params.id, movieId, vote);
     if (!event) return res.status(404).json({ error: 'Movie night vote target not found' });
 
-    // Check if status became completed
-    if (event.status === 'completed') {
+    const allUids = event.participants.map(p => p.userId);
+
+    if (event._tieBreaker) {
+      // Tie-breaker round started
+      const tiedCount = event._tiedMovieCount || event.shortlist.length;
+      const round = event.round || 2;
+
+      for (const participant of event.participants) {
+        await socialRepository.createNotification(
+          participant.userId,
+          'movie_night_tie_breaker',
+          'Tie-Breaker!',
+          `${tiedCount} movies tied in "${event.name}"! Vote again in round ${round}.`,
+          event.id,
+          { eventName: event.name, round, tiedCount }
+        );
+      }
+      // Clean internal flags before sending to clients
+      delete event._tieBreaker;
+      delete event._tiedMovieCount;
+      socketService.emitToUsers(allUids, 'movie_night_tie_breaker', { event, round, tiedCount });
+    } else if (event.status === 'completed') {
       const winnerCandidate = event.shortlist.find(c => `tmdb-${c.movie.tmdbId}` === event.winnerMovieId);
       const winnerTitle = winnerCandidate ? winnerCandidate.movie.title : 'Selected Movie';
 
-      // Notify all participants (host and friends)
       for (const participant of event.participants) {
         await socialRepository.createNotification(
           participant.userId,
@@ -462,11 +481,12 @@ exports.submitVote = async (req, res) => {
         socketService.emitToUser(participant.userId, 'movie_night_completed', { event, winnerTitle });
       }
     } else {
-      // Emit movie_night_updated to all participants
-      const allUids = event.participants.map(p => p.userId);
       socketService.emitToUsers(allUids, 'movie_night_updated', { event });
     }
 
+    // Clean internal flags before JSON response
+    delete event._tieBreaker;
+    delete event._tiedMovieCount;
     return res.json({ event });
   } catch (error) {
     return handleError(res, error, 'Failed to submit movie night vote');

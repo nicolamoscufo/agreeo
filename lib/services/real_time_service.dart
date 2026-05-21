@@ -91,6 +91,11 @@ class RealTimeService {
       _handleMovieNightUpdated(data);
     });
 
+    _socket!.on('movie_night_tie_breaker', (data) {
+      debugPrint('[RealTimeService] movie_night_tie_breaker: $data');
+      _handleMovieNightUpdated(data);
+    });
+
     _socket!.on('movie_state_changed', (data) {
       debugPrint('[RealTimeService] movie_state_changed: $data');
       _handleMovieStateChanged(data);

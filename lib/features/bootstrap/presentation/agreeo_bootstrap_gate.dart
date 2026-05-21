@@ -2,6 +2,7 @@ import 'package:agreeo/features/auth/presentation/auth_welcome_screen.dart';
 import 'package:agreeo/features/onboarding/presentation/onboarding_flow_screen.dart';
 import 'package:agreeo/features/shell/presentation/agreeo_home_shell.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,9 +42,9 @@ class _AgreeoLoadingScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: <Color>[
-              Color(0xFF020617),
-              Color(0xFF0F172A),
-              Color(0xFF111827),
+              AgreeoColors.trueBlack,
+              AgreeoColors.deepBlack,
+              AgreeoColors.anthraciteBlack,
             ],
           ),
         ),
