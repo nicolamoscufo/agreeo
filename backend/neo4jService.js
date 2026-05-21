@@ -4,7 +4,7 @@ class Neo4jService {
   constructor() {
     const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
     const user = process.env.NEO4J_USERNAME || 'neo4j';
-    const password = process.env.NEO4J_PASSWORD || 'password';
+    const password = process.env.NEO4J_PASSWORD || 'password123';
     const database = process.env.NEO4J_DATABASE || undefined;
 
     this._uri = uri;

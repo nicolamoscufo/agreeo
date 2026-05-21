@@ -2,8 +2,8 @@ import 'package:agreeo/models/neo4j/neo4j_models.dart';
 import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 
-class MockAuthException implements Exception {
-  const MockAuthException(this.message);
+class BackendAuthException implements Exception {
+  const BackendAuthException(this.message);
 
   final String message;
 
@@ -11,8 +11,8 @@ class MockAuthException implements Exception {
   String toString() => message;
 }
 
-class MockAuthService {
-  MockAuthService({AuthService? authService})
+class BackendAuthSessionService {
+  BackendAuthSessionService({AuthService? authService})
     : _authService = authService ?? AuthService();
 
   final AuthService _authService;
@@ -29,7 +29,7 @@ class MockAuthService {
     );
 
     if (!success) {
-      throw MockAuthException(
+      throw BackendAuthException(
         _authService.lastErrorMessage ?? 'Unable to create the account.',
       );
     }
@@ -43,7 +43,7 @@ class MockAuthService {
   }) async {
     final accessToken = await _authService.login(email.trim(), password);
     if (accessToken == null || accessToken.isEmpty) {
-      throw MockAuthException(
+      throw BackendAuthException(
         _authService.lastErrorMessage ?? 'Email or password did not match.',
       );
     }
@@ -53,6 +53,13 @@ class MockAuthService {
 
   Future<void> logOut() async {
     await _authService.logout();
+  }
+
+  Future<AgreeoUserSession?> restoreSession() async {
+    final user = await _authService.getCurrentNeo4jUser();
+    if (user == null) return null;
+
+    return _toSession(user);
   }
 
   Future<bool> isOnboardingCompleted() async {
@@ -72,7 +79,7 @@ class MockAuthService {
   Future<AgreeoUserSession> _loadSessionFromBackend() async {
     final user = await _authService.getCurrentNeo4jUser();
     if (user == null) {
-      throw const MockAuthException(
+      throw const BackendAuthException(
         'Authenticated, but unable to load profile.',
       );
     }

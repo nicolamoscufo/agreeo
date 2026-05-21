@@ -128,6 +128,11 @@ class FriendsMovieNightController
   bool _usingBackend = false;
   String _latestSearchKey = '';
 
+  bool get _allowLocalDevFallbacks => const bool.fromEnvironment(
+    'ALLOW_LOCAL_DEV_FALLBACKS',
+    defaultValue: false,
+  );
+
   Future<void> _hydrateSocialLayer() async {
     try {
       final snapshot = await _backendSocialService.loadSnapshot();
@@ -148,9 +153,25 @@ class FriendsMovieNightController
         movieNights: snapshot.movieNights,
       );
     } catch (e) {
-      debugPrint('Backend social layer unavailable; using local fallback: $e');
-      _usingBackend = false;
-      _hydrateLocalFallback();
+      debugPrint('Backend social layer unavailable: $e');
+      if (_allowLocalDevFallbacks) {
+        _usingBackend = false;
+        _hydrateLocalFallback();
+        return;
+      }
+
+      _usingBackend = true;
+      state = state.copyWith(
+        friends: const <Friend>[],
+        incomingRequests: const <FriendRequest>[],
+        discoverableUsers: const <Friend>[],
+        searchResults: const <Friend>[],
+        outgoingPendingIds: const <String>{},
+        incomingRequestIdsByUserId: const <String, String>{},
+        profiles: const <String, FriendProfile>{},
+        friendMovieStates: const <String, Map<String, UserMovieState>>{},
+        movieNights: const <MovieNightEvent>[],
+      );
     }
   }
 
@@ -219,7 +240,7 @@ class FriendsMovieNightController
         );
       }
       return;
-    } // Mock profiles removed
+    }
 
     state = state.copyWith(
       friends: state.isFriend(request.fromUser.id)
@@ -334,6 +355,7 @@ class FriendsMovieNightController
       final snapshot = await _backendSocialService.acceptFriendRequest(
         requestId,
       );
+      if (!mounted) return;
       state = state.copyWith(
         friends: snapshot.friends,
         incomingRequests: snapshot.incomingRequests,
@@ -342,6 +364,7 @@ class FriendsMovieNightController
         ),
       );
     } catch (_) {
+      if (!mounted) return;
       state = previous;
     }
   }
@@ -372,8 +395,10 @@ class FriendsMovieNightController
   ) async {
     try {
       final snapshot = await _backendSocialService.removeFriend(friendId);
+      if (!mounted) return;
       _applySocialSnapshot(snapshot);
     } catch (_) {
+      if (!mounted) return;
       state = previous;
     }
   }
@@ -504,7 +529,7 @@ class FriendsMovieNightController
   }
 
   List<ShortlistCandidate> _fallbackShortlist() {
-    const mockBreakdown = ScoreBreakdown(
+    const fallbackBreakdown = ScoreBreakdown(
       watchlistSaves: 1,
       likes: 2,
       dislikes: 0,
@@ -538,7 +563,7 @@ class FriendsMovieNightController
         ),
         compatibilityScore: 0.95,
         explanationTags: const ['Highly compatible'],
-        scoreBreakdown: mockBreakdown,
+        scoreBreakdown: fallbackBreakdown,
       ),
       ShortlistCandidate(
         movie: Movie(
@@ -562,7 +587,7 @@ class FriendsMovieNightController
         ),
         compatibilityScore: 0.88,
         explanationTags: const ['Highly compatible'],
-        scoreBreakdown: mockBreakdown,
+        scoreBreakdown: fallbackBreakdown,
       ),
     ];
   }
@@ -768,10 +793,10 @@ class FriendsMovieNightController
         }
       }
 
-      // Local fallback: generate mock shortlist if empty
+      // Local dev fallback: generate a shortlist if explicitly enabled.
       var shortlist = event.shortlist;
       if (shortlist.isEmpty) {
-        const mockBreakdown = ScoreBreakdown(
+        const fallbackBreakdown = ScoreBreakdown(
           watchlistSaves: 1,
           likes: 2,
           dislikes: 0,
@@ -805,7 +830,7 @@ class FriendsMovieNightController
             ),
             compatibilityScore: 0.95,
             explanationTags: const ['Highly compatible'],
-            scoreBreakdown: mockBreakdown,
+            scoreBreakdown: fallbackBreakdown,
           ),
           ShortlistCandidate(
             movie: Movie(
@@ -829,7 +854,7 @@ class FriendsMovieNightController
             ),
             compatibilityScore: 0.88,
             explanationTags: const ['Highly compatible'],
-            scoreBreakdown: mockBreakdown,
+            scoreBreakdown: fallbackBreakdown,
           ),
         ];
       }
@@ -942,7 +967,7 @@ class FriendsMovieNightController
         return event;
       }
 
-      // Local mock fallback:
+      // Local dev fallback.
       final event = state.eventById(eventId);
       if (event == null) return null;
 

@@ -1,0 +1,18 @@
+const List<String> agreeoGenreOptions = <String>[
+  'Action',
+  'Thriller',
+  'Comedy',
+  'Drama',
+  'Sci-Fi',
+  'Fantasy',
+  'Horror',
+  'Romance',
+  'Animation',
+  'Crime',
+  'Mystery',
+  'Adventure',
+  'Documentary',
+  'Family',
+  'War',
+  'History',
+];

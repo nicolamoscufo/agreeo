@@ -3,7 +3,7 @@ import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/components/primitives.dart';
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
+import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
@@ -296,21 +296,27 @@ class _MovieNightWaitingRoomScreenState
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(ctx).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(false),
                                           child: const Text('Cancel'),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.of(ctx).pop(true),
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(true),
                                           child: const Text('Start Voting'),
                                         ),
                                       ],
                                     ),
                                   );
-                                  if (confirmed != true || !context.mounted) return;
+                                  if (confirmed != true || !context.mounted) {
+                                    return;
+                                  }
                                   final updated = await controller.startVoting(
                                     event.id,
                                   );
-                                  if (!context.mounted) return;
+                                  if (!context.mounted) {
+                                    return;
+                                  }
                                   if (updated == null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
@@ -495,7 +501,8 @@ class _SummaryCard extends StatelessWidget {
                   Chip(label: Text('Language ${constraints.language}')),
               ],
             ),
-            if (event.dateTime != null && event.dateTime!.isAfter(DateTime.now())) ...<Widget>[
+            if (event.dateTime != null &&
+                event.dateTime!.isAfter(DateTime.now())) ...<Widget>[
               const SizedBox(height: 12),
               _CountdownChip(dateTime: event.dateTime!),
             ],
@@ -905,7 +912,11 @@ class _CountdownChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.timer_rounded, size: 18, color: AgreeoColors.kernelGold),
+          const Icon(
+            Icons.timer_rounded,
+            size: 18,
+            color: AgreeoColors.kernelGold,
+          ),
           const SizedBox(width: 8),
           Text(
             'Starts in $label',

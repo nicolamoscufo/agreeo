@@ -32,7 +32,11 @@ The backend now owns TMDB movie reads and Neo4j movie interactions for the MVP. 
 
 ### Backend environment
 
-The backend now loads `backend/.env` automatically through `dotenv`. A ready-to-edit local file is already in place at `backend/.env`.
+The backend loads `backend/.env` automatically through `dotenv`. For local `npm start`, create it from the tracked template:
+
+```bash
+cp backend/.env.example backend/.env
+```
 
 Keep `backend/.env.example` as the tracked template. The critical new variable is:
 
@@ -43,6 +47,14 @@ TMDB_ACCESS_TOKEN=your_tmdb_bearer_token
 ### MovieLens import
 
 Place `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv` in `backend/data/movielens/`.
+
+For Docker local development, the repo expects those files under `backend/data/ml-latest-small/` and imports them with:
+
+```bash
+docker compose up neo4j-init
+```
+
+Without this import, authenticated swipe suggestions can be empty because Neo4j has no `MovieLensMovie`, `MATCHES_TMDB`, or `RATED` recommendation data.
 
 The import workflow, Docker command, graph schema, and verification queries are documented in:
 

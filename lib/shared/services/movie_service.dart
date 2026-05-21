@@ -19,7 +19,7 @@ abstract class MovieService {
 
   Future<List<Movie>> getMoviesByGenre(String genre);
 
-  Future<List<Movie>> getMockShortMovies();
+  Future<List<Movie>> getShortMovies();
 
   Future<Map<String, dynamic>> getRecommendationDebugStats();
 }

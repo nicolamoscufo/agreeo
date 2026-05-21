@@ -2,7 +2,7 @@ import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_sc
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/components/primitives.dart';
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
+import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:flutter/material.dart';

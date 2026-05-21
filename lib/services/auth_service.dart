@@ -147,11 +147,18 @@ class AuthService {
   }
 
   Future<Neo4jUser?> getCurrentNeo4jUser() async {
-    final token = await readToken();
+    var token = await readToken();
     if (token == null || token.isEmpty) return null;
 
     try {
-      final responseUser = await _fetchMe(token);
+      var responseUser = await _fetchMe(token);
+      if (responseUser == null) {
+        token = await _refreshAccessToken();
+        if (token == null || token.isEmpty) return null;
+
+        responseUser = await _fetchMe(token);
+      }
+
       if (responseUser == null) return null;
 
       final responseData = {'user': responseUser};
@@ -164,6 +171,39 @@ class AuthService {
       );
     } catch (e) {
       debugPrint('[AuthService] getCurrentNeo4jUser failed: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _refreshAccessToken() async {
+    final refreshToken = await readRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse(_config.refreshUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      if (response.statusCode != 200) {
+        debugPrint('[AuthService] Refresh response: ${response.statusCode}');
+        return null;
+      }
+
+      final data = _decodeBody(response.body);
+      final accessToken = data['accessToken'] as String?;
+      final newRefreshToken = data['refreshToken'] as String?;
+
+      if (accessToken == null || newRefreshToken == null) {
+        debugPrint('[AuthService] Refresh failed: missing tokens');
+        return null;
+      }
+
+      await _storeTokens(accessToken, newRefreshToken);
+      return accessToken;
+    } catch (e) {
+      debugPrint('[AuthService] Refresh exception: $e');
       return null;
     }
   }

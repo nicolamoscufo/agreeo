@@ -16,8 +16,8 @@ class _OfflineBackendSocialService extends BackendSocialService {
   }
 }
 
-class _AcceptFailingBackendSocialService extends BackendSocialService {
-  _AcceptFailingBackendSocialService()
+class _RemoteSocialService extends BackendSocialService {
+  _RemoteSocialService()
     : super(config: const BackendConfig(baseUrl: 'http://localhost:3000'));
 
   Friend get _friend => Friend(
@@ -59,13 +59,35 @@ class _AcceptFailingBackendSocialService extends BackendSocialService {
 
   @override
   Future<SocialBackendSnapshot> acceptFriendRequest(String requestId) async {
+    return SocialBackendSnapshot(
+      friends: <Friend>[_friend],
+      incomingRequests: const <FriendRequest>[],
+      movieNights: const <MovieNightEvent>[],
+    );
+  }
+
+  @override
+  Future<SocialBackendSnapshot> removeFriend(String friendId) async {
+    return const SocialBackendSnapshot(
+      friends: <Friend>[],
+      incomingRequests: <FriendRequest>[],
+      movieNights: <MovieNightEvent>[],
+    );
+  }
+}
+
+class _AcceptFailingBackendSocialService extends _RemoteSocialService {
+  _AcceptFailingBackendSocialService();
+
+  @override
+  Future<SocialBackendSnapshot> acceptFriendRequest(String requestId) async {
     throw StateError('accept failed');
   }
 }
 
 void main() {
   test(
-    'controller keeps local movie-night fallback when backend is offline',
+    'controller does not seed local fallback when backend is offline',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final container = ProviderContainer(
@@ -84,84 +106,23 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       final seeded = container.read(friendsMovieNightControllerProvider);
-      expect(seeded.friends, isNotEmpty);
+      expect(seeded.friends, isEmpty);
+      expect(seeded.incomingRequests, isEmpty);
+      expect(seeded.movieNights, isEmpty);
 
-      final event = await controller.createMovieNight(
-        name: 'Fallback Night',
-        dateTime: null,
-        constraints: MovieNightConstraints.empty(),
-        invitedFriendIds: <String>[seeded.friends.first.id],
-      );
-
-      expect(event.id, isNotEmpty);
-      expect(event.shortlist, isNotEmpty);
-      expect(
-        container.read(friendsMovieNightControllerProvider).eventById(event.id),
-        isNotNull,
+      await expectLater(
+        controller.createMovieNight(
+          name: 'Fallback Night',
+          dateTime: null,
+          constraints: MovieNightConstraints.empty(),
+          invitedFriendIds: const <String>[],
+        ),
+        throwsA(isA<StateError>()),
       );
     },
   );
 
-  test(
-    'local friend search handles accents, punctuation, and token order',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final container = ProviderContainer(
-        overrides: <Override>[
-          backendSocialServiceProvider.overrideWithValue(
-            _OfflineBackendSocialService(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      final controller = container.read(
-        friendsMovieNightControllerProvider.notifier,
-      );
-      await Future<void>.delayed(Duration.zero);
-      await Future<void>.delayed(Duration.zero);
-
-      controller.searchFriends('mor  giu');
-      expect(
-        container
-            .read(friendsMovieNightControllerProvider)
-            .searchResults
-            .single
-            .name,
-        'Giulia Moretti',
-      );
-
-      controller.searchFriends('nina!! ah');
-      expect(
-        container
-            .read(friendsMovieNightControllerProvider)
-            .searchResults
-            .single
-            .name,
-        'Nina Ahmed',
-      );
-
-      controller.searchFriends('léo mar');
-      expect(
-        container
-            .read(friendsMovieNightControllerProvider)
-            .searchResults
-            .single
-            .name,
-        'Leo Martin',
-      );
-
-      controller.searchFriends('a');
-      final aResults = container
-          .read(friendsMovieNightControllerProvider)
-          .searchResults
-          .map((friend) => friend.name)
-          .toList(growable: false);
-      expect(aResults, <String>['Nina Ahmed']);
-    },
-  );
-
-  test('accepting friend request moves requester into friends', () async {
+  test('offline friend search does not use local mock users', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final container = ProviderContainer(
       overrides: <Override>[
@@ -178,11 +139,35 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
 
+    controller.searchFriends('mor  giu');
+    expect(
+      container.read(friendsMovieNightControllerProvider).searchResults,
+      isEmpty,
+    );
+  });
+
+  test('accepting friend request moves requester into friends', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(_RemoteSocialService()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
     final request = container
         .read(friendsMovieNightControllerProvider)
         .incomingRequests
         .single;
     controller.acceptFriendRequest(request.id);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
 
     final state = container.read(friendsMovieNightControllerProvider);
     expect(state.incomingRequests, isEmpty);
@@ -223,9 +208,7 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final container = ProviderContainer(
       overrides: <Override>[
-        backendSocialServiceProvider.overrideWithValue(
-          _OfflineBackendSocialService(),
-        ),
+        backendSocialServiceProvider.overrideWithValue(_RemoteSocialService()),
       ],
     );
     addTearDown(container.dispose);
@@ -238,10 +221,12 @@ void main() {
 
     final friendId = container
         .read(friendsMovieNightControllerProvider)
-        .friends
+        .searchResults
         .first
         .id;
     controller.removeFriend(friendId);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
 
     final state = container.read(friendsMovieNightControllerProvider);
     expect(state.friends.any((friend) => friend.id == friendId), false);
