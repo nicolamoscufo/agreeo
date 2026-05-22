@@ -57,7 +57,6 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   }
 
   Future<void> _handleSwiped(String movieId, SwipeDirection direction) async {
-    _dragProgressNotifier.value = 0.0;
     final controller = ref.read(agreeoAppControllerProvider.notifier);
     Future<String> Function() action;
 
@@ -83,7 +82,16 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString())),
       );
+    } finally {
+      _resetDragProgressAfterFrame();
     }
+  }
+
+  void _resetDragProgressAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _dragProgressNotifier.value = 0.0;
+    });
   }
 
   @override
@@ -213,15 +221,18 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
             Positioned.fill(
               child: ValueListenableBuilder<double>(
                 valueListenable: _dragProgressNotifier,
-                child: _ImmersiveMovieCard(
-                  movie: nextMovie,
-                  isBackground: true,
-                  actions: const _SwipeCardFooterSkeleton(),
-                ),
-                builder: (context, dragProgress, child) {
+                builder: (context, dragProgress, _) {
+                  final easedProgress = Curves.easeOutCubic.transform(
+                    dragProgress,
+                  );
                   return Transform.scale(
-                    scale: 0.94 + (dragProgress * 0.04),
-                    child: child,
+                    scale: 0.96 + (easedProgress * 0.04),
+                    child: _ImmersiveMovieCard(
+                      movie: nextMovie,
+                      isBackground: true,
+                      backgroundProgress: easedProgress,
+                      actions: const _SwipeCardFooterSkeleton(),
+                    ),
                   );
                 },
               ),
@@ -230,20 +241,11 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
           // Current Movie
           Positioned.fill(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
+              duration: const Duration(milliseconds: 220),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
               transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.08),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
+                return FadeTransition(opacity: animation, child: child);
               },
               child: SwipeableCard(
                 key: ValueKey<String>(currentMovie.id),
@@ -572,17 +574,26 @@ class _ImmersiveMovieCard extends StatelessWidget {
     required this.movie,
     required this.actions,
     this.isBackground = false,
+    this.backgroundProgress = 0,
     this.onInfoTap,
   });
 
   final Movie movie;
   final Widget actions;
   final bool isBackground;
+  final double backgroundProgress;
   final VoidCallback? onInfoTap;
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = _preferredImageUrl(movie);
+    final expansionProgress = isBackground
+        ? backgroundProgress.clamp(0.0, 1.0).toDouble()
+        : 1.0;
+    double expandPadding(double background, double foreground) {
+      return background + ((foreground - background) * expansionProgress);
+    }
+
     final metadata = <String>[
       if (movie.releaseYear > 0) movie.releaseYear.toString(),
       if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
@@ -590,10 +601,10 @@ class _ImmersiveMovieCard extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isBackground ? 26 : 16,
-        isBackground ? 36 : 18,
-        isBackground ? 26 : 16,
-        isBackground ? 120 : 18,
+        expandPadding(26, 16),
+        expandPadding(36, 18),
+        expandPadding(26, 16),
+        expandPadding(120, 18),
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
