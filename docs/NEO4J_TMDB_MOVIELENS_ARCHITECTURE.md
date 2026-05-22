@@ -185,7 +185,7 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=password
 NEO4J_DATABASE=neo4j
-JWT_SECRET=CHANGE_ME
+JWT_SECRET=replace_with_a_long_random_secret
 TMDB_ACCESS_TOKEN=your_tmdb_bearer_token
 ```
 

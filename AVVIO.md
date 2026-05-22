@@ -10,8 +10,12 @@ Assicurati di aver installato sul tuo sistema:
 
 ## Passaggi per l'avvio
 
-1. **Configura le variabili d'ambiente (opzionale)**  
-   Se hai un token di TheMovieDB (TMDB) per sfruttare le funzionalità relative ai film, apri il file `docker-compose.yml` e aggiungi/modifica la variabile `TMDB_ACCESS_TOKEN` sotto la sezione `environment` del servizio `backend`. Altrimenti, puoi ignorare questo passaggio, ricordando che senza token di TMDB alcune query remote verso i film potrebbero fallire o restituire dati fittizi/vuoti se non presenti nel database locale.
+1. **Configura le variabili d'ambiente**
+   Copia il template locale e inserisci valori reali per `JWT_SECRET` e `TMDB_ACCESS_TOKEN` senza modificare `docker-compose.yml`:
+   ```bash
+   cp .env.example .env
+   ```
+   `TMDB_ACCESS_TOKEN` serve per le funzionalità film basate su TheMovieDB; senza token alcune query backend falliranno.
 
 2. **Costruire i container (Build)**  
    Apri il terminale nella root del progetto (dove si trova il file `docker-compose.yml`) ed esegui il seguente comando per buildare le immagini Docker:

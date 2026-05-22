@@ -1,6 +1,19 @@
 const jwt = require('jsonwebtoken');
 
-const SECRET = process.env.JWT_SECRET || 'CHANGE_ME';
+function resolveSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (secret && secret !== 'CHANGE_ME') {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set to a non-default value in production.');
+  }
+
+  return secret || 'CHANGE_ME';
+}
+
+const SECRET = resolveSecret();
 
 function sign(payload) {
   return jwt.sign(payload, SECRET, {

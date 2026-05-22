@@ -49,7 +49,7 @@ app.*.map.json
 backend/node_modules/
 node_modules/
 npm-debug.log
-package-lock.json
+/package-lock.json
 
 # Local MovieLens dataset
 backend/data/movielens/

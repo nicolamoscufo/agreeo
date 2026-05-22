@@ -44,6 +44,14 @@ Keep `backend/.env.example` as the tracked template. The critical new variable i
 TMDB_ACCESS_TOKEN=your_tmdb_bearer_token
 ```
 
+For Docker Compose local development, create the root env file as well:
+
+```bash
+cp .env.example .env
+```
+
+Set real values for `JWT_SECRET` and `TMDB_ACCESS_TOKEN` before starting the stack. Do not edit secrets directly into `docker-compose.yml`.
+
 ### MovieLens import
 
 Place `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv` in `backend/data/movielens/`.
