@@ -81,3 +81,11 @@ Intent auto-detection, hybrid ranking, session memory, auto-expanding budget.
 ### Multi-Repo
 `run_pipeline` auto-queries all indexed repos. Use `repos: ["alias"]` to scope. Run `index_status` to see aliases.
 <!-- /vexp -->
+
+## Graphify MCP
+
+Use the `graphify` MCP server when graph traversal is a better fit than plain text search.
+
+- Build or refresh the workspace graph with `graphify_run` and `graphify_update`.
+- Use `graphify_query`, `graphify_explain`, `graphify_path`, and `graphify_stats` for agent-facing navigation.
+- Graphify output is generated under `.graphify/` and is already ignored by git.

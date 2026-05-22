@@ -9,6 +9,13 @@
       "env": {
         "VEXP_WORKSPACE": "c:\\Users\\Anton\\agreeo"
       }
+    },
+    "graphify": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "c:\\Users\\Anton\\agreeo\\tools\\mcp\\graphify_server.py"
+      ]
     }
   }
 }

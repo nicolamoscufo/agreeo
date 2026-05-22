@@ -4,6 +4,14 @@ Questo documento definisce l'identità visiva, la palette di colori e i componen
 
 ---
 
+## 🏆 Logo Ufficiale dell'App
+
+Abbiamo generato il logo ufficiale di brand basato sul nuovo tema: un logo lockup ultra-moderno e minimalista che unisce un simbolo astratto (fusione di un secchiello di popcorn e la lettera 'A' stilizzata) alla scritta wordmark 'Agreeo' realizzata con un font futuristico, elegante e audace. Il design utilizza i toni rosso cinema, oro caldo e bianco popcorn su sfondo scuro con finiture in vetro e accenti neon.
+
+![Logo Ufficiale Agreeo - Cinema Popcorn Edition](agreeo_logo.png)
+
+---
+
 ## 🎨 Palette dei Colori (Color System)
 
 Tutti i componenti visivi dell'applicazione utilizzano i token colore definiti nella classe [AgreeoColors](file:///c:/Users/Anton/agreeo/lib/shared/theme/agreeo_colors.dart#L7-L41):

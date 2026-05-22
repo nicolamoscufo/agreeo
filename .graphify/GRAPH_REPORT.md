@@ -1,522 +1,1169 @@
-# Graph Report - .  (2026-05-20)
-
-## Corpus Check
-- Large corpus: 199 files · ~842.086 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder, or use --no-semantic to run AST-only.
-
-## Summary
-- 1097 nodes · 1454 edges · 91 communities detected
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
-- Token cost: 0 input · 0 output
-
-
-## Input Scope
-- Requested: auto
-- Resolved: committed (source: default-auto)
-- Included files: 199 · Candidates: 279
-- Excluded: 0 untracked · 9711 ignored · 0 sensitive · 0 missing committed
-- Recommendation: Use --scope all or graphify.yaml inputs.corpus for a knowledge-base folder.
-
-## Graph Freshness
-- Built from Git commit: `7dbd579`
-- Compare this hash to `git rev-parse HEAD` before trusting freshness-sensitive graph output.
-## God Nodes (most connected - your core abstractions)
-1. `WebBrowserSession` - 23 edges
-2. `invoke_json_service_extension()` - 20 edges
-3. `FlutterMachineSession` - 19 edges
-4. `session_or_error()` - 19 edges
-5. `getMovieNight()` - 14 edges
-6. `flutter_run_start()` - 14 edges
-7. `format_page_summary()` - 14 edges
-8. `generateShortlist()` - 10 edges
-9. `get_session()` - 10 edges
-10. `invoke_text_service_extension()` - 10 edges
-
-## Surprising Connections (you probably didn't know these)
-- `get_workspace_session()` --calls--> `resolve_working_directory()`  [EXTRACTED]
-  tools/mcp/flutter_runtime_server.py → tools/mcp/flutter_runtime_server.py  _Bridges community 12 → community 13_
-- `flutter_list_devices()` --calls--> `resolve_flutter_command()`  [EXTRACTED]
-  tools/mcp/flutter_runtime_server.py → tools/mcp/flutter_runtime_server.py  _Bridges community 13 → community 16_
-- `flutter_run_start()` --calls--> `FlutterMachineSession`  [EXTRACTED]
-  tools/mcp/flutter_runtime_server.py → tools/mcp/flutter_runtime_server.py  _Bridges community 13 → community 19_
-- `invoke_json_service_extension()` --calls--> `get_workspace_session()`  [EXTRACTED]
-  tools/mcp/flutter_runtime_server.py → tools/mcp/flutter_runtime_server.py  _Bridges community 8 → community 12_
-- `flutter_debug_dump_app()` --calls--> `invoke_text_service_extension()`  [EXTRACTED]
-  tools/mcp/flutter_runtime_server.py → tools/mcp/flutter_runtime_server.py  _Bridges community 16 → community 12_
-
-## Communities
-
-### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (64): build_output_path(), build_search_query_variants(), close_all_sessions(), close_all_sessions_sync(), decode_bing_redirect_url(), fetch_bing_rss_results(), fetch_bing_search_results(), format_json_block() (+56 more)
-
-### Community 1 - "Community 1"
-Cohesion: 0.08
-Nodes (47): buildShortlist(), calculateCompatibility(), cleanString(), cleanStringList(), clearShortlistAndVotes(), clearVotesOnly(), compareCandidates(), createInviteLink() (+39 more)
-
-### Community 2 - "Community 2"
-Cohesion: 0.05
-Nodes (38): bcrypt, DEFAULT_ROLES, displayNameFromEmail(), emailNormalized, neo4jService, normalizeEmail(), passwordHash, { sign, signRefresh } (+30 more)
-
-### Community 3 - "Community 3"
-Cohesion: 0.05
-Nodes (25): dailyBreakdown, dailySourceBreakdown, favoriteGenres, filteredMovies, forYouIds, forYouSample, forYouSourceBreakdown, maxReleaseDate (+17 more)
-
-### Community 4 - "Community 4"
-Cohesion: 0.06
-Nodes (2): FriendsMovieNightController, FriendsMovieNightState
-
-### Community 5 - "Community 5"
-Cohesion: 0.06
-Nodes (2): AgreeoAppController, AgreeoAppState
-
-### Community 6 - "Community 6"
-Cohesion: 0.1
-Nodes (24): dislikeMovie(), findMovieByTmdbId(), getCandidatePoolStats(), getExploratoryCandidates(), getPersonalizedRecommendationCandidates(), getRecommendationCandidates(), getRecommendations(), getRecommendationUserProfile() (+16 more)
-
-### Community 7 - "Community 7"
-Cohesion: 0.08
-Nodes (17): neo4j, Neo4jService, bcrypt, emailNormalized, neo4jService, assert, calls, candidate() (+9 more)
-
-### Community 8 - "Community 8"
-Cohesion: 0.07
-Nodes (30): build_vararg_params(), flutter_widget_children(), flutter_widget_children_details_subtree(), flutter_widget_children_summary_tree(), flutter_widget_creation_tracked(), flutter_widget_details_subtree(), flutter_widget_layout_explorer_node(), flutter_widget_location_id_map() (+22 more)
-
-### Community 9 - "Community 9"
-Cohesion: 0.08
-Nodes (2): AppController, AppState
-
-### Community 10 - "Community 10"
-Cohesion: 0.19
-Nodes (23): ensure_git_repo(), format_command(), git_blame(), git_diff(), git_log(), git_status(), has_git_commit(), is_ignored_path() (+15 more)
-
-### Community 11 - "Community 11"
-Cohesion: 0.09
-Nodes (4): BackendSocialService, FriendRequestMutationResult, FriendSearchResponse, SocialBackendSnapshot
-
-### Community 12 - "Community 12"
-Cohesion: 0.18
-Nodes (21): call_flutter_service_extension(), flutter_call_service_extension(), flutter_hot_reload(), flutter_hot_restart(), flutter_widget_screenshot(), flutter_widget_selected_widget(), format_json_tool_output(), format_response_value() (+13 more)
-
-### Community 13 - "Community 13"
-Cohesion: 0.15
-Nodes (18): flutter_detach(), flutter_list_devices(), flutter_run_start(), flutter_session_status(), flutter_stop(), format_command(), format_startup_summary(), get_session() (+10 more)
-
-### Community 14 - "Community 14"
-Cohesion: 0.17
-Nodes (16): Create(), Destroy(), EnableFullDpiSupportIfAvailable(), GetClientArea(), GetThisFromHandle(), GetWindowClass(), MessageHandler(), OnCreate() (+8 more)
-
-### Community 15 - "Community 15"
-Cohesion: 0.1
-Nodes (11): _BasicsStep, _ConstraintsStep, _GenreWrap, _InviteStep, MovieNightWizardScreen, _MovieNightWizardScreenState, _StepDots, _WizardActions (+3 more)
-
-### Community 16 - "Community 16"
-Cohesion: 0.13
-Nodes (18): bool_string(), build_run_command(), flutter_debug_dump_app(), flutter_debug_dump_focus_tree(), flutter_debug_dump_layer_tree(), flutter_debug_dump_render_tree(), flutter_debug_dump_semantics_tree(), flutter_widget_root_tree() (+10 more)
-
-### Community 17 - "Community 17"
-Cohesion: 0.12
-Nodes (3): BackendMovieService, MovieDetails, UserLibrary
-
-### Community 18 - "Community 18"
-Cohesion: 0.13
-Nodes (8): _FriendCard, _FriendRequestCard, _FriendsListSection, FriendsScreen, _FriendsScreenState, _MovieNightCard, _RequestsSection, _SearchResults
-
-### Community 19 - "Community 19"
-Cohesion: 0.3
-Nodes (3): FlutterMachineSession, summarize_params(), truncate_text()
-
-### Community 20 - "Community 20"
-Cohesion: 0.13
-Nodes (1): AuthService
-
-### Community 21 - "Community 21"
-Cohesion: 0.13
-Nodes (1): Neo4jService
-
-### Community 22 - "Community 22"
-Cohesion: 0.28
-Nodes (14): dart_format(), flutter_analyze(), flutter_pub_get(), flutter_test(), format_command(), Run flutter analyze and return the full analyzer output., Run flutter test and return the full test output., Run flutter pub get and return the full output. (+6 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.14
-Nodes (10): _EditConstraintsSheet, _EditConstraintsSheetState, _GenreSheetWrap, _InviteLinkCard, _JoinMovieNightCard, MovieNightWaitingRoomScreen, _MovieNightWaitingRoomScreenState, _ParticipantsCard (+2 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.14
-Nodes (11): Friend, FriendMovieReview, FriendProfile, FriendRequest, MovieNightConstraints, MovieNightEvent, MovieNightParticipant, MovieNightVote (+3 more)
-
-### Community 25 - "Community 25"
-Cohesion: 0.15
-Nodes (7): AgreeoSwipeScreen, _AgreeoSwipeScreenState, _ImmersiveMovieCard, _SwipeBackground, _SwipeCardActionButton, _SwipeCardActions, _SwipeCardFooterSkeleton
-
-### Community 26 - "Community 26"
-Cohesion: 0.17
-Nodes (9): ActionButton, AgreeoSearchBar, EmptyState, GenreChip, InfoBadge, RatingStars, SectionHeader, SelectableChip (+1 more)
-
-### Community 27 - "Community 27"
-Cohesion: 0.17
-Nodes (6): _DebugCard, _KeyValueRow, RecommendationDebugScreen, _RecommendationDebugScreenState, _StatCard, _TokenWrap
-
-### Community 28 - "Community 28"
-Cohesion: 0.18
-Nodes (1): TmdbService
-
-### Community 29 - "Community 29"
-Cohesion: 0.18
-Nodes (6): MovieCard, _MovieCardState, _OutlineAction, _PosterFallback, _SwipeBadge, _Tag
-
-### Community 30 - "Community 30"
-Cohesion: 0.2
-Nodes (7): FriendProfileScreen, _FriendProfileScreenState, _MovieList, _MovieTile, _PrivacyState, _ReviewList, _StatPill
-
-### Community 31 - "Community 31"
-Cohesion: 0.2
-Nodes (8): AppSession, EventConstraints, EventVote, Movie, MovieEvent, MovieFeedbackRecord, MovieGroup, UserPreferences
-
-### Community 32 - "Community 32"
-Cohesion: 0.2
-Nodes (1): BackendService
-
-### Community 33 - "Community 33"
-Cohesion: 0.2
-Nodes (7): AgreeoUserSession, Movie, MovieSearchFilters, OnboardingState, ProfilePreferences, UndoEntry, UserMovieState
-
-### Community 35 - "Community 35"
-Cohesion: 0.22
-Nodes (7): assert, calls, diversified, { diversifyRecommendations }, movieRepository, neo4jService, test
-
-### Community 36 - "Community 36"
-Cohesion: 0.22
-Nodes (3): AgreeoHomeScreen, _AgreeoHomeScreenState, _CollectionSection
-
-### Community 37 - "Community 37"
-Cohesion: 0.22
-Nodes (2): MockAuthException, MockAuthService
-
-### Community 38 - "Community 38"
-Cohesion: 0.32
-Nodes (8): buildDailySuggestionQueue(), buildTasteLearningPersonalizedPool(), diversifyRecommendations(), hydrateRecommendationEntries(), hydrateRecommendations(), loadDailySuggestions(), loadForYouRecommendations(), toPositiveInteger()
-
-### Community 39 - "Community 39"
-Cohesion: 0.29
-Nodes (8): extractDirector(), extractTrailerUrl(), fetchInteractionMovie(), imageUrl(), mapInteractionMovie(), mapMovieLens(), mapTmdbMovie(), mapTmdbMovieDetails()
-
-### Community 40 - "Community 40"
-Cohesion: 0.25
-Nodes (3): AgreeoLibraryScreen, _AgreeoLibraryScreenState, _LibraryMovieCard
-
-### Community 41 - "Community 41"
-Cohesion: 0.29
-Nodes (6): GenreChip, _MovieArtwork, MovieHorizontalCarousel, MoviePosterCard, MovieSwipeCard, PosterGrid
-
-### Community 42 - "Community 42"
-Cohesion: 0.29
-Nodes (2): AgreeoApp, _AgreeoAppState
-
-### Community 43 - "Community 43"
-Cohesion: 0.29
-Nodes (4): AgreeoOnboardingFlowScreen, _AgreeoOnboardingFlowScreenState, _FavoriteMoviesStep, _GenresStep
-
-### Community 44 - "Community 44"
-Cohesion: 0.29
-Nodes (1): NotificationService
-
-### Community 45 - "Community 45"
-Cohesion: 0.29
-Nodes (2): ShortlistService, _WinnerScore
-
-### Community 46 - "Community 46"
-Cohesion: 0.29
-Nodes (2): _AcceptFailingBackendSocialService, _OfflineBackendSocialService
-
-### Community 47 - "Community 47"
-Cohesion: 0.33
-Nodes (5): code, endIdx, fs, lines, startIdx
-
-### Community 48 - "Community 48"
-Cohesion: 0.33
-Nodes (3): _FilterSection, _MovieFilterBottomSheet, _MovieFilterBottomSheetState
-
-### Community 49 - "Community 49"
-Cohesion: 0.33
-Nodes (2): _ReviewEditorSheet, _ReviewEditorSheetState
-
-### Community 50 - "Community 50"
-Cohesion: 0.33
-Nodes (2): AgreeoAuthWelcomeScreen, _AgreeoAuthWelcomeScreenState
-
-### Community 51 - "Community 51"
-Cohesion: 0.33
-Nodes (4): MovieNightVotingScreen, _MovieNightVotingScreenState, _VoteButton, _VotingCandidateCard
-
-### Community 52 - "Community 52"
-Cohesion: 0.33
-Nodes (3): AgreeoMovieDetailsScreen, _AgreeoMovieDetailsScreenState, _GlassButton
-
-### Community 53 - "Community 53"
-Cohesion: 0.33
-Nodes (2): AgreeoHomeShell, _AgreeoHomeShellState
-
-### Community 54 - "Community 54"
-Cohesion: 0.33
-Nodes (1): FlutterWindow()
-
-### Community 55 - "Community 55"
-Cohesion: 0.4
-Nodes (4): assert, { hydrateRecommendations }, test, warned
-
-### Community 56 - "Community 56"
-Cohesion: 0.4
-Nodes (3): controller, { initNeo4j, closeNeo4j }, repo
-
-### Community 57 - "Community 57"
-Cohesion: 0.4
-Nodes (2): MovieNightResultScreen, _MovieNightResultScreenState
-
-### Community 58 - "Community 58"
-Cohesion: 0.4
-Nodes (3): AgreeoProfileScreen, _ProfileActivity, _StatCard
-
-### Community 59 - "Community 59"
-Cohesion: 0.4
-Nodes (3): LocalUserMovieStateService, UserMovieStateMutation, UserMovieStateService
-
-### Community 60 - "Community 60"
-Cohesion: 0.4
-Nodes (2): RecommendationEngine, _VoteTally
-
-### Community 61 - "Community 61"
-Cohesion: 0.5
-Nodes (4): buildSearchRequest(), genreIdsForNames(), parseSearchFilters(), parseStringList()
-
-### Community 62 - "Community 62"
-Cohesion: 0.67
-Nodes (3): doReq(), http, test()
-
-### Community 63 - "Community 63"
-Cohesion: 0.67
-Nodes (3): doReq(), http, test()
-
-### Community 64 - "Community 64"
-Cohesion: 0.5
-Nodes (1): http
-
-### Community 65 - "Community 65"
-Cohesion: 0.5
-Nodes (2): controller, { initNeo4j, closeNeo4j }
-
-### Community 66 - "Community 66"
-Cohesion: 0.5
-Nodes (2): movieRepository, neo4jService
-
-### Community 68 - "Community 68"
-Cohesion: 0.5
-Nodes (1): ThemeModeController
-
-### Community 69 - "Community 69"
-Cohesion: 0.67
-Nodes (2): GetCommandLineArguments(), Utf8FromUtf16()
-
-### Community 70 - "Community 70"
-Cohesion: 0.5
-Nodes (1): _FakeMovieService
-
-### Community 71 - "Community 71"
-Cohesion: 0.67
-Nodes (3): attachRecommendationMetadata(), buildForYouReason(), toFiniteNumber()
-
-### Community 72 - "Community 72"
-Cohesion: 0.67
-Nodes (1): http
-
-### Community 73 - "Community 73"
-Cohesion: 0.67
-Nodes (1): controller
-
-### Community 74 - "Community 74"
-Cohesion: 0.67
-Nodes (1): http
-
-### Community 75 - "Community 75"
-Cohesion: 0.67
-Nodes (1): http
-
-### Community 76 - "Community 76"
-Cohesion: 0.67
-Nodes (1): controller
-
-### Community 77 - "Community 77"
-Cohesion: 0.67
-Nodes (2): AgreeoBottomNavigation, _NavItem
-
-### Community 78 - "Community 78"
-Cohesion: 0.67
-Nodes (2): AgreeoBootstrapGate, _AgreeoLoadingScreen
-
-### Community 80 - "Community 80"
-Cohesion: 0.67
-Nodes (1): BackendCatalogMovieService
-
-### Community 81 - "Community 81"
-Cohesion: 0.67
-Nodes (1): MockMovieService
-
-### Community 82 - "Community 82"
-Cohesion: 0.67
-Nodes (1): MovieService
-
-### Community 83 - "Community 83"
-Cohesion: 0.67
-Nodes (1): _FakeTmdbService
-
-### Community 84 - "Community 84"
-Cohesion: 1
-Nodes (2): matchesSearchFilters(), normalizeGenreName()
-
-### Community 85 - "Community 85"
-Cohesion: 1
-Nodes (2): parseTmdbId(), parseTmdbIds()
-
-### Community 86 - "Community 86"
-Cohesion: 1
-Nodes (1): BackendConfig
-
-### Community 87 - "Community 87"
-Cohesion: 1
-Nodes (1): Neo4jConfig
-
-### Community 90 - "Community 90"
-Cohesion: 1
-Nodes (1): FriendsPlaceholderScreen
-
-### Community 92 - "Community 92"
-Cohesion: 1
-Nodes (1): Neo4jUser
-
-### Community 93 - "Community 93"
-Cohesion: 1
-Nodes (1): ConsensusBanner
-
-### Community 94 - "Community 94"
-Cohesion: 1
-Nodes (1): EmptyState
-
-### Community 95 - "Community 95"
-Cohesion: 1
-Nodes (1): GradientScaffold
-
-### Community 96 - "Community 96"
-Cohesion: 1
-Nodes (1): SectionHeader
-
-## Knowledge Gaps
-- **336 isolated node(s):** `neo4jService`, `bcrypt`, `{ sign, signRefresh }`, `DEFAULT_ROLES`, `emailNormalized` (+331 more)
-  These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 4`** (2 nodes): `FriendsMovieNightController`, `FriendsMovieNightState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 5`** (2 nodes): `AgreeoAppController`, `AgreeoAppState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 9`** (2 nodes): `AppController`, `AppState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 20`** (1 nodes): `AuthService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 21`** (1 nodes): `Neo4jService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 28`** (1 nodes): `TmdbService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 32`** (1 nodes): `BackendService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (2 nodes): `MockAuthException`, `MockAuthService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (2 nodes): `AgreeoApp`, `_AgreeoAppState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 44`** (1 nodes): `NotificationService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (2 nodes): `ShortlistService`, `_WinnerScore`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (2 nodes): `_AcceptFailingBackendSocialService`, `_OfflineBackendSocialService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (2 nodes): `_ReviewEditorSheet`, `_ReviewEditorSheetState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (2 nodes): `AgreeoAuthWelcomeScreen`, `_AgreeoAuthWelcomeScreenState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 53`** (2 nodes): `AgreeoHomeShell`, `_AgreeoHomeShellState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 54`** (1 nodes): `FlutterWindow()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (2 nodes): `MovieNightResultScreen`, `_MovieNightResultScreenState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (2 nodes): `RecommendationEngine`, `_VoteTally`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (1 nodes): `http`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (2 nodes): `controller`, `{ initNeo4j, closeNeo4j }`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (2 nodes): `movieRepository`, `neo4jService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (1 nodes): `ThemeModeController`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (2 nodes): `GetCommandLineArguments()`, `Utf8FromUtf16()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (1 nodes): `_FakeMovieService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (1 nodes): `http`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (1 nodes): `controller`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (1 nodes): `http`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `http`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `controller`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (2 nodes): `AgreeoBottomNavigation`, `_NavItem`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (2 nodes): `AgreeoBootstrapGate`, `_AgreeoLoadingScreen`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `BackendCatalogMovieService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `MockMovieService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `MovieService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `_FakeTmdbService`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (2 nodes): `matchesSearchFilters()`, `normalizeGenreName()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (2 nodes): `parseTmdbId()`, `parseTmdbIds()`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (1 nodes): `BackendConfig`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (1 nodes): `Neo4jConfig`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (1 nodes): `FriendsPlaceholderScreen`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (1 nodes): `Neo4jUser`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (1 nodes): `ConsensusBanner`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (1 nodes): `EmptyState`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (1 nodes): `GradientScaffold`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (1 nodes): `SectionHeader`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+# Graph Report
+
+**Nodes:** 1425 | **Edges:** 3588 | **Communities:** 237
+
+## Hub Nodes (God Nodes)
+
+- **flutter_call_service_extension()** (degree: 175, community: 895)
+- **backend_movieRepository.test::get** (degree: 135, community: 464)
+- **isinstance** (degree: 98, community: 895)
+- **flutter_runtime_server.py** (degree: 96, community: 895)
+- **backend_neo4jService::Neo4jService::run** (degree: 90, community: 484)
+- **web_browser_server_async.py** (degree: 68, community: 1150)
+- **append** (degree: 65, community: 871)
+- **map** (degree: 63, community: 857)
+- **socialRepository.js** (degree: 61, community: 857)
+- **format_json_tool_output()** (degree: 58, community: 895)
+
+## Surprising Connections
+
+- **Agent Prompt: Real-Time Socket.io Implementation for Agreeo** -> **📋 Task Backend (Node.js)** (contains) [community 74 -> 72]
+- **Agent Prompt: Real-Time Socket.io Implementation for Agreeo** -> **📱 Task Frontend (Flutter)** (contains) [community 74 -> 73]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **6. Product Positioning** (contains) [community 310 -> 321]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **7. Competitor Gap** (contains) [community 310 -> 306]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **8. Current Functional Scope** (contains) [community 310 -> 319]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **10. Main App Areas** (contains) [community 310 -> 255]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **11. HCI Design Principles to Preserve** (contains) [community 310 -> 259]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **14. Recommended High-Level Architecture** (contains) [community 310 -> 339]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **15. Proposed Neo4j Graph Model** (contains) [community 310 -> 267]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **16. Preference Semantics** (contains) [community 310 -> 322]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **17. Why Neo4j Fits the Recommendation Logic** (contains) [community 310 -> 272]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **18. Example Cypher-Like Queries** (contains) [community 310 -> 276]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **21. Backend Integration Rules** (contains) [community 310 -> 283]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **22. MVP vs Future Neo4j Usage** (contains) [community 310 -> 318]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **24. Edge Cases to Handle** (contains) [community 310 -> 326]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **26. Acceptance Criteria for Coding Agents** (contains) [community 310 -> 291]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **27. Suggested Implementation Roadmap** (contains) [community 310 -> 331]
+- **Agreeo / MoveMate Project Context and Neo4j Integration Guide** -> **30. Glossary** (contains) [community 310 -> 337]
+- **30. Glossary** -> **Movie Night** (contains) [community 337 -> 326]
+- **30. Glossary** -> **Swipe** (contains) [community 337 -> 326]
+- **jwtUtils.js** -> **sign()** (contains) [community 393 -> 391]
+- **jwtUtils.js** -> **signRefresh()** (contains) [community 393 -> 391]
+- **verifyMiddleware()** -> **startswith** (calls) [community 393 -> 464]
+- **verifyMiddleware()** -> **status** (calls) [community 393 -> 1323]
+- **verifyMiddleware()** -> **substring** (calls) [community 393 -> 1140]
+- **verifyMiddleware()** -> **status** (calls) [community 393 -> 1323]
+- **parseTmdbId()** -> **isinteger** (calls) [community 398 -> 857]
+- **parseTmdbIds()** -> **isarray** (calls) [community 398 -> 857]
+- **parseTmdbIds()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **parseTmdbIds()** -> **push** (calls) [community 398 -> 1178]
+- **parseStringList()** -> **isarray** (calls) [community 398 -> 857]
+- **parseStringList()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **parseStringList()** -> **push** (calls) [community 398 -> 1178]
+- **parseSearchFilters()** -> **parsefloat** (calls) [community 398 -> 569]
+- **parseSearchFilters()** -> **isinteger** (calls) [community 398 -> 857]
+- **parseSearchFilters()** -> **isinteger** (calls) [community 398 -> 857]
+- **parseSearchFilters()** -> **isfinite** (calls) [community 398 -> 808]
+- **genreIdsForNames()** -> **filter** (calls) [community 398 -> 857]
+- **genreIdsForNames()** -> **map** (calls) [community 398 -> 857]
+- **genreIdsForNames()** -> **isinteger** (calls) [community 398 -> 857]
+- **buildSearchRequest()** -> **join** (calls) [community 398 -> 871]
+- **matchesSearchFilters()** -> **isarray** (calls) [community 398 -> 857]
+- **matchesSearchFilters()** -> **map** (calls) [community 398 -> 857]
+- **matchesSearchFilters()** -> **isarray** (calls) [community 398 -> 857]
+- **matchesSearchFilters()** -> **includes** (calls) [community 398 -> 441]
+- **matchesSearchFilters()** -> **number** (calls) [community 398 -> 857]
+- **matchesSearchFilters()** -> **slice** (calls) [community 398 -> 441]
+- **matchesSearchFilters()** -> **isinteger** (calls) [community 398 -> 857]
+- **matchesSearchFilters()** -> **number** (calls) [community 398 -> 857]
+- **movieController.js** -> **imageUrl()** (contains) [community 398 -> 857]
+- **movieController.js** -> **toFiniteNumber()** (contains) [community 398 -> 441]
+- **toFiniteNumber()** -> **number** (calls) [community 441 -> 857]
+- **toFiniteNumber()** -> **isfinite** (calls) [community 441 -> 808]
+- **buildDailySuggestionSettings()** -> **isinteger** (calls) [community 398 -> 857]
+- **dedupeByTmdbId()** -> **isarray** (calls) [community 398 -> 857]
+- **dedupeByTmdbId()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **dedupeByTmdbId()** -> **push** (calls) [community 398 -> 1178]
+- **buildForYouReason()** -> **toFiniteNumber()** (calls) [community 398 -> 441]
+- **toPositiveInteger()** -> **isinteger** (calls) [community 398 -> 857]
+- **movieController.js** -> **attachRecommendationMetadata()** (contains) [community 398 -> 441]
+- **movieController.js** -> **summarizeRecommendationSources()** (contains) [community 398 -> 857]
+- **summarizeRecommendationSources()** -> **set** (calls) [community 857 -> 895]
+- **summarizeRecommendationSources()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **normalizeRecommendationTitle()** -> **replace** (calls) [community 398 -> 857]
+- **normalizeRecommendationTitle()** -> **replace** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **isarray** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **filter** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **isarray** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **max** (calls) [community 398 -> 440]
+- **diversifyRecommendations()** -> **ceil** (calls) [community 398 -> 441]
+- **diversifyRecommendations()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **diversifyRecommendations()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **diversifyRecommendations()** -> **isarray** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **filter** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **isinteger** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **map** (calls) [community 398 -> 857]
+- **diversifyRecommendations()** -> **backend_movieRepository.test::get** (calls) [community 398 -> 464]
+- **diversifyRecommendations()** -> **set** (calls) [community 398 -> 895]
+- **diversifyRecommendations()** -> **backend_movieRepository.test::get** (calls) [community 398 -> 464]
+- **diversifyRecommendations()** -> **push** (calls) [community 398 -> 1178]
+- **diversifyRecommendations()** -> **push** (calls) [community 398 -> 1178]
+- **diversifyRecommendations()** -> **slice** (calls) [community 398 -> 441]
+- **markSeen()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **markSeen()** -> **mcp_web_browser_server_async::add** (calls) [community 398 -> 988]
+- **candidateGenreIds()** -> **isarray** (calls) [community 398 -> 857]
+- **candidateGenreIds()** -> **filter** (calls) [community 398 -> 857]
+- **candidateGenreIds()** -> **isinteger** (calls) [community 398 -> 857]
+- **canTake()** -> **map** (calls) [community 398 -> 857]
+- **canTake()** -> **backend_movieRepository.test::get** (calls) [community 398 -> 464]
+- **applyGenreCounts()** -> **set** (calls) [community 398 -> 895]
+- **applyGenreCounts()** -> **backend_movieRepository.test::get** (calls) [community 398 -> 464]
+- **hydrateRecommendations()** -> **hydrateRecommendationEntries()** (calls) [community 398 -> 441]
+- **hydrateRecommendations()** -> **map** (calls) [community 398 -> 857]
+- **movieController.js** -> **hydrateRecommendationEntries()** (contains) [community 398 -> 441]
+- **hydrateRecommendationEntries()** -> **isarray** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **filter** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **all** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **map** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **isinteger** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **backend_movieRepository::findMovieByTmdbId** (calls) [community 441 -> 484]
+- **hydrateRecommendationEntries()** -> **mapTmdbMovie()** (calls) [community 441 -> 857]
+- **hydrateRecommendationEntries()** -> **warn** (calls) [community 441 -> 854]
+- **hydrateRecommendationEntries()** -> **push** (calls) [community 441 -> 1178]
+- **movieController.js** -> **extractTrailerUrl()** (contains) [community 398 -> 857]
+- **movieController.js** -> **extractDirector()** (contains) [community 398 -> 857]
+- **movieController.js** -> **resolveMovieRuntime()** (contains) [community 398 -> 857]
+- **resolveMovieRuntime()** -> **backend_movieRepository::setMovieRuntime** (calls) [community 857 -> 484]
+- **movieController.js** -> **mapTmdbMovie()** (contains) [community 398 -> 857]
+- **mapTmdbMovie()** -> **trim** (calls) [community 857 -> 398]
+- **mapTmdbMovie()** -> **trim** (calls) [community 857 -> 398]
+- **mapTmdbMovie()** -> **mapMovieLens()** (calls) [community 857 -> 398]
+- **movieController.js** -> **mapTmdbMovieDetails()** (contains) [community 398 -> 857]
+- **mapTmdbMovieDetails()** -> **trim** (calls) [community 857 -> 398]
+- **mapTmdbMovieDetails()** -> **slice** (calls) [community 857 -> 441]
+- **mapTmdbMovieDetails()** -> **slice** (calls) [community 857 -> 441]
+- **mapTmdbMovieDetails()** -> **slice** (calls) [community 857 -> 441]
+- **mapRepositoryMovieToResponse()** -> **isarray** (calls) [community 398 -> 857]
+- **movieController.js** -> **mapInteractionMovie()** (contains) [community 398 -> 857]
+- **movieController.js** -> **enrichMovies()** (contains) [community 398 -> 857]
+- **enrichMovies()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **movieController.js** -> **fetchInteractionMovie()** (contains) [community 398 -> 857]
+- **fetchInteractionMovie()** -> **backend_movieRepository::setMovieRuntime** (calls) [community 857 -> 484]
+- **movieController.js** -> **requestUid()** (contains) [community 398 -> 503]
+- **buildTasteLearningPersonalizedPool()** -> **isarray** (calls) [community 398 -> 857]
+- **buildTasteLearningPersonalizedPool()** -> **filter** (calls) [community 398 -> 857]
+- **buildTasteLearningPersonalizedPool()** -> **slice** (calls) [community 398 -> 441]
+- **buildTasteLearningPersonalizedPool()** -> **concat** (calls) [community 398 -> 365]
+- **buildTasteLearningPersonalizedPool()** -> **slice** (calls) [community 398 -> 441]
+- **movieController.js** -> **buildDailySuggestionQueue()** (contains) [community 398 -> 440]
+- **buildDailySuggestionQueue()** -> **filter** (calls) [community 440 -> 857]
+- **buildDailySuggestionQueue()** -> **map** (calls) [community 440 -> 857]
+- **buildDailySuggestionQueue()** -> **slice** (calls) [community 440 -> 441]
+- **buildDailySuggestionQueue()** -> **isarray** (calls) [community 440 -> 857]
+- **buildDailySuggestionQueue()** -> **buildTasteLearningPersonalizedPool()** (calls) [community 440 -> 398]
+- **buildDailySuggestionQueue()** -> **isarray** (calls) [community 440 -> 857]
+- **buildDailySuggestionQueue()** -> **filter** (calls) [community 440 -> 857]
+- **buildDailySuggestionQueue()** -> **string** (calls) [community 440 -> 398]
+- **buildDailySuggestionQueue()** -> **has** (calls) [community 440 -> 398]
+- **buildDailySuggestionQueue()** -> **mcp_web_browser_server_async::add** (calls) [community 440 -> 988]
+- **buildDailySuggestionQueue()** -> **push** (calls) [community 440 -> 1178]
+- **buildDailySuggestionQueue()** -> **has** (calls) [community 440 -> 398]
+- **buildDailySuggestionQueue()** -> **buildDailyPersonalizedReason()** (calls) [community 440 -> 398]
+- **buildDailySuggestionQueue()** -> **buildDailyPersonalizedReason()** (calls) [community 440 -> 398]
+- **movieController.js** -> **takeFrom()** (contains) [community 398 -> 440]
+- **takeFrom()** -> **string** (calls) [community 440 -> 398]
+- **takeFrom()** -> **has** (calls) [community 440 -> 398]
+- **takeFrom()** -> **mcp_web_browser_server_async::add** (calls) [community 440 -> 988]
+- **takeFrom()** -> **push** (calls) [community 440 -> 1178]
+- **takeFrom()** -> **has** (calls) [community 440 -> 398]
+- **loadForYouRecommendations()** -> **backend_movieRepository::getRecommendationCandidates** (calls) [community 398 -> 484]
+- **loadForYouRecommendations()** -> **map** (calls) [community 398 -> 857]
+- **loadForYouRecommendations()** -> **max** (calls) [community 398 -> 440]
+- **movieController.js** -> **loadDailySuggestions()** (contains) [community 398 -> 857]
+- **loadDailySuggestions()** -> **min** (calls) [community 857 -> 398]
+- **loadDailySuggestions()** -> **toPositiveInteger()** (calls) [community 857 -> 398]
+- **loadDailySuggestions()** -> **backend_movieRepository::getRecommendationCandidates** (calls) [community 857 -> 484]
+- **loadDailySuggestions()** -> **buildForYouReason()** (calls) [community 857 -> 398]
+- **loadDailySuggestions()** -> **slice** (calls) [community 857 -> 441]
+- **loadDailySuggestions()** -> **max** (calls) [community 857 -> 440]
+- **loadDailySuggestions()** -> **round** (calls) [community 857 -> 440]
+- **loadDailySuggestions()** -> **buildDailySuggestionQueue()** (calls) [community 857 -> 440]
+- **loadDailySuggestions()** -> **hydrateRecommendations()** (calls) [community 857 -> 398]
+- **loadDailySuggestions()** -> **diversifyRecommendations()** (calls) [community 857 -> 398]
+- **movieController.js** -> **handleError()** (contains) [community 398 -> 1323]
+- **handleError()** -> **error** (calls) [community 1323 -> 1140]
+- **handleError()** -> **json** (calls) [community 1323 -> 393]
+- **notifyMovieStateChange()** -> **backend_socketService::emitToUser** (calls) [community 398 -> 854]
+- **notifyMovieStateChange()** -> **error** (calls) [community 398 -> 1140]
+- **movieRepository.js** -> **toNativeNumber()** (contains) [community 484 -> 475]
+- **toNativeNumber()** -> **tonumber** (calls) [community 475 -> 857]
+- **toNativeNumber()** -> **number** (calls) [community 475 -> 857]
+- **movieRepository.js** -> **normalizeMovieRecord()** (contains) [community 484 -> 464]
+- **normalizeMovieRecord()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **normalizeMovieRecord()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **normalizeMovieRecord()** -> **number** (calls) [community 464 -> 857]
+- **normalizeMovieRecord()** -> **number** (calls) [community 464 -> 857]
+- **normalizeMovieRecord()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **mergeTmdbMovie()** -> **toNativeNumber()** (calls) [community 484 -> 475]
+- **mergeTmdbMovie()** -> **number** (calls) [community 484 -> 857]
+- **mergeTmdbMovie()** -> **number** (calls) [community 484 -> 857]
+- **mergeTmdbMovie()** -> **toNativeNumber()** (calls) [community 484 -> 475]
+- **movieRepository.js** -> **backend_movieRepository::findMoviesByTmdbIds** (contains) [community 484 -> 857]
+- **backend_movieRepository::findMoviesByTmdbIds** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **backend_movieRepository::findMoviesByTmdbIds** -> **normalizeMovieRecord()** (calls) [community 857 -> 464]
+- **movieRepository.js** -> **toFiniteNumber()** (contains) [community 484 -> 808]
+- **toFiniteNumber()** -> **number** (calls) [community 808 -> 857]
+- **movieRepository.js** -> **toPositiveInteger()** (contains) [community 484 -> 398]
+- **toPositiveInteger()** -> **isinteger** (calls) [community 398 -> 857]
+- **movieRepository.js** -> **normalizeRecommendationRecord()** (contains) [community 484 -> 470]
+- **normalizeRecommendationRecord()** -> **isarray** (calls) [community 470 -> 857]
+- **normalizeRecommendationRecord()** -> **backend_movieRepository.test::get** (calls) [community 470 -> 464]
+- **normalizeRecommendationRecord()** -> **toNativeNumber()** (calls) [community 470 -> 475]
+- **normalizeRecommendationRecord()** -> **toNativeNumber()** (calls) [community 470 -> 475]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toFiniteNumber()** (calls) [community 470 -> 441]
+- **normalizeRecommendationRecord()** -> **toNativeNumber()** (calls) [community 470 -> 475]
+- **movieRepository.js** -> **safeGet()** (contains) [community 484 -> 470]
+- **safeGet()** -> **isarray** (calls) [community 470 -> 857]
+- **safeGet()** -> **backend_movieRepository.test::get** (calls) [community 470 -> 464]
+- **backend_movieRepository::findMovieByTmdbId** -> **normalizeMovieRecord()** (calls) [community 484 -> 464]
+- **backend_movieRepository::setMovieRuntime** -> **toNativeNumber()** (calls) [community 484 -> 475]
+- **backend_movieRepository::setMovieRuntime** -> **isfinite** (calls) [community 484 -> 808]
+- **movieRepository.js** -> **saveSelectedFavorites()** (contains) [community 484 -> 857]
+- **saveSelectedFavorites()** -> **mergeTmdbMovie()** (calls) [community 857 -> 484]
+- **saveSelectedFavorites()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **movieRepository.js** -> **savePreferredGenres()** (contains) [community 484 -> 857]
+- **savePreferredGenres()** -> **trim** (calls) [community 857 -> 398]
+- **savePreferredGenres()** -> **string** (calls) [community 857 -> 398]
+- **savePreferredGenres()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **movieRepository.js** -> **getUserLibrary()** (contains) [community 484 -> 475]
+- **getUserLibrary()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 475 -> 484]
+- **getUserLibrary()** -> **map** (calls) [community 475 -> 857]
+- **getUserLibrary()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getUserLibrary()** -> **map** (calls) [community 475 -> 857]
+- **getUserLibrary()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getUserLibrary()** -> **map** (calls) [community 475 -> 857]
+- **getUserLibrary()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getUserLibrary()** -> **map** (calls) [community 475 -> 857]
+- **getUserLibrary()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getPersonalizedRecommendationCandidates()** -> **filter** (calls) [community 484 -> 857]
+- **getPersonalizedRecommendationCandidates()** -> **map** (calls) [community 484 -> 857]
+- **getPersonalizedRecommendationCandidates()** -> **normalizeRecommendationRecord()** (calls) [community 484 -> 470]
+- **movieRepository.js** -> **backend_movieRepository::getExploratoryCandidates** (contains) [community 484 -> 857]
+- **backend_movieRepository::getExploratoryCandidates** -> **toPositiveInteger()** (calls) [community 857 -> 398]
+- **backend_movieRepository::getExploratoryCandidates** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **backend_movieRepository::getExploratoryCandidates** -> **normalizeRecommendationRecord()** (calls) [community 857 -> 470]
+- **movieRepository.js** -> **getRecommendationUserProfile()** (contains) [community 484 -> 464]
+- **getRecommendationUserProfile()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **getRecommendationUserProfile()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getRecommendationUserProfile()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getRecommendationUserProfile()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getRecommendationUserProfile()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getRecommendationUserProfile()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **movieRepository.js** -> **getTopPositiveGenreSignals()** (contains) [community 484 -> 464]
+- **getTopPositiveGenreSignals()** -> **toPositiveInteger()** (calls) [community 464 -> 398]
+- **getTopPositiveGenreSignals()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **getTopPositiveGenreSignals()** -> **map** (calls) [community 464 -> 857]
+- **getTopPositiveGenreSignals()** -> **toFiniteNumber()** (calls) [community 464 -> 441]
+- **movieRepository.js** -> **getTopNegativeGenreSignals()** (contains) [community 484 -> 464]
+- **getTopNegativeGenreSignals()** -> **toPositiveInteger()** (calls) [community 464 -> 398]
+- **getTopNegativeGenreSignals()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **getTopNegativeGenreSignals()** -> **map** (calls) [community 464 -> 857]
+- **getTopNegativeGenreSignals()** -> **toFiniteNumber()** (calls) [community 464 -> 441]
+- **movieRepository.js** -> **getTopPositiveMovies()** (contains) [community 484 -> 464]
+- **getTopPositiveMovies()** -> **toPositiveInteger()** (calls) [community 464 -> 398]
+- **getTopPositiveMovies()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **getTopPositiveMovies()** -> **map** (calls) [community 464 -> 857]
+- **getTopPositiveMovies()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getTopPositiveMovies()** -> **toFiniteNumber()** (calls) [community 464 -> 441]
+- **movieRepository.js** -> **getTopNegativeMovies()** (contains) [community 484 -> 464]
+- **getTopNegativeMovies()** -> **toPositiveInteger()** (calls) [community 464 -> 398]
+- **getTopNegativeMovies()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **getTopNegativeMovies()** -> **map** (calls) [community 464 -> 857]
+- **getTopNegativeMovies()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **getTopNegativeMovies()** -> **toFiniteNumber()** (calls) [community 464 -> 441]
+- **movieRepository.js** -> **getCandidatePoolStats()** (contains) [community 484 -> 475]
+- **getCandidatePoolStats()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 475 -> 484]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **getCandidatePoolStats()** -> **backend_movieRepository.test::get** (calls) [community 475 -> 464]
+- **movieRepository.test.js** -> **backend_movieRepository.test::get** (contains) [community 446 -> 464]
+- **Neo4jService** -> **session()** (contains) [community 484 -> 485]
+- **backend_neo4jService::Neo4jService::run** -> **session()** (calls) [community 484 -> 485]
+- **backend_neo4jService::Neo4jService::run** -> **close()** (calls) [community 484 -> 968]
+- **Neo4jService** -> **close()** (contains) [community 484 -> 968]
+- **doReq()** -> **request** (calls) [community 493 -> 1140]
+- **doReq()** -> **on** (calls) [community 493 -> 1140]
+- **doReq()** -> **on** (calls) [community 493 -> 1140]
+- **doReq()** -> **resolve** (calls) [community 493 -> 1043]
+- **doReq()** -> **parse** (calls) [community 493 -> 1140]
+- **doReq()** -> **resolve** (calls) [community 493 -> 1043]
+- **doReq()** -> **on** (calls) [community 493 -> 1140]
+- **doReq()** -> **write** (calls) [community 493 -> 1140]
+- **doReq()** -> **end** (calls) [community 493 -> 1140]
+- **test()** -> **stringify** (calls) [community 493 -> 1140]
+- **test()** -> **log** (calls) [community 493 -> 854]
+- **test()** -> **error** (calls) [community 493 -> 1140]
+- **test()** -> **log** (calls) [community 493 -> 854]
+- **test()** -> **log** (calls) [community 493 -> 854]
+- **register_and_test2.js** -> **doReq()** (contains) [community 493 -> 1140]
+- **doReq()** -> **resolve** (calls) [community 1140 -> 1043]
+- **doReq()** -> **resolve** (calls) [community 1140 -> 1043]
+- **test()** -> **stringify** (calls) [community 493 -> 1140]
+- **test()** -> **error** (calls) [community 493 -> 1140]
+- **test()** -> **log** (calls) [community 493 -> 854]
+- **test()** -> **log** (calls) [community 493 -> 854]
+- **start()** -> **initialize()** (calls) [community 497 -> 484]
+- **start()** -> **backend_socketService::init** (calls) [community 497 -> 854]
+- **start()** -> **log** (calls) [community 497 -> 854]
+- **start()** -> **error** (calls) [community 497 -> 1140]
+- **start()** -> **exit** (calls) [community 497 -> 854]
+- **cleanString()** -> **trim** (calls) [community 569 -> 398]
+- **cleanString()** -> **string** (calls) [community 569 -> 398]
+- **cleanStringList()** -> **isarray** (calls) [community 569 -> 857]
+- **cleanStringList()** -> **has** (calls) [community 569 -> 398]
+- **cleanStringList()** -> **mcp_web_browser_server_async::add** (calls) [community 569 -> 988]
+- **cleanStringList()** -> **push** (calls) [community 569 -> 1178]
+- **socialController.js** -> **handleError()** (contains) [community 569 -> 1323]
+- **handleError()** -> **error** (calls) [community 1323 -> 1140]
+- **handleError()** -> **json** (calls) [community 1323 -> 393]
+- **socialController.js** -> **requireUid()** (contains) [community 569 -> 503]
+- **requireUid()** -> **json** (calls) [community 503 -> 393]
+- **requireUid()** -> **status** (calls) [community 503 -> 1323]
+- **toFiniteNumber()** -> **isfinite** (calls) [community 857 -> 808]
+- **socialRepository.js** -> **toPositiveInteger()** (contains) [community 857 -> 398]
+- **toPositiveInteger()** -> **isinteger** (calls) [community 398 -> 857]
+- **socialRepository.js** -> **cleanString()** (contains) [community 857 -> 398]
+- **normalizeSearchText()** -> **trim** (calls) [community 857 -> 398]
+- **normalizeSearchText()** -> **normalize** (calls) [community 857 -> 398]
+- **normalizeSearchText()** -> **tolowercase** (calls) [community 857 -> 398]
+- **normalizeSearchText()** -> **cleanString()** (calls) [community 857 -> 569]
+- **searchTokens()** -> **split** (calls) [community 857 -> 988]
+- **cleanStringList()** -> **cleanString()** (calls) [community 857 -> 569]
+- **cleanStringList()** -> **has** (calls) [community 857 -> 398]
+- **cleanStringList()** -> **mcp_web_browser_server_async::add** (calls) [community 857 -> 988]
+- **cleanStringList()** -> **push** (calls) [community 857 -> 1178]
+- **socialRepository.js** -> **normalizeConstraints()** (contains) [community 857 -> 569]
+- **normalizeConstraints()** -> **parseint** (calls) [community 569 -> 398]
+- **normalizeConstraints()** -> **string** (calls) [community 569 -> 398]
+- **normalizeConstraints()** -> **string** (calls) [community 569 -> 398]
+- **normalizeConstraints()** -> **isinteger** (calls) [community 569 -> 857]
+- **normalizeConstraints()** -> **isfinite** (calls) [community 569 -> 808]
+- **socialRepository.js** -> **randomId()** (contains) [community 857 -> 1358]
+- **randomId()** -> **slice** (calls) [community 1358 -> 441]
+- **normalizeFriend()** -> **toNativeNumber()** (calls) [community 857 -> 475]
+- **normalizeFriend()** -> **toNativeNumber()** (calls) [community 857 -> 475]
+- **normalizeMovie()** -> **toNativeNumber()** (calls) [community 857 -> 475]
+- **normalizeMovie()** -> **startswith** (calls) [community 857 -> 464]
+- **normalizeMovie()** -> **startswith** (calls) [community 857 -> 464]
+- **normalizeMovie()** -> **toNativeNumber()** (calls) [community 857 -> 475]
+- **normalizeMovie()** -> **toNativeNumber()** (calls) [community 857 -> 475]
+- **getFriends()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **getFriends()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **getFriends()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **getFriends()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **searchFriends()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **searchFriends()** -> **join** (calls) [community 857 -> 871]
+- **searchFriends()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **sendFriendRequest()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **sendFriendRequest()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **sendFriendRequest()** -> **randomId()** (calls) [community 857 -> 1358]
+- **sendFriendRequest()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **sendFriendRequest()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **socialRepository.js** -> **acceptFriendRequest()** (contains) [community 857 -> 464]
+- **acceptFriendRequest()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **socialRepository.js** -> **declineFriendRequest()** (contains) [community 857 -> 464]
+- **declineFriendRequest()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **socialRepository.js** -> **removeFriend()** (contains) [community 857 -> 484]
+- **socialRepository.js** -> **blockFriend()** (contains) [community 857 -> 484]
+- **getFriendProfile()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **getFriendProfile()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **loadFriendMovies()** -> **has** (calls) [community 857 -> 398]
+- **loadFriendMovies()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadFriendMovies()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **loadFriendReviews()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadFriendReviews()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **socialRepository.js** -> **createMovieNight()** (contains) [community 857 -> 569]
+- **createMovieNight()** -> **randomId()** (calls) [community 569 -> 1358]
+- **createMovieNight()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 569 -> 484]
+- **createMovieNight()** -> **inviteFriends()** (calls) [community 569 -> 857]
+- **createMovieNight()** -> **getMovieNight()** (calls) [community 569 -> 857]
+- **inviteFriends()** -> **cleanStringList()** (calls) [community 857 -> 569]
+- **inviteFriends()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **joinMovieNight()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **socialRepository.js** -> **leaveMovieNight()** (contains) [community 857 -> 484]
+- **listMovieNights()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **listMovieNights()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **listMovieNights()** -> **push** (calls) [community 857 -> 1178]
+- **getMovieNight()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **getMovieNight()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **completedVoterIds()** -> **some** (calls) [community 857 -> 398]
+- **loadParticipants()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadParticipants()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **loadShortlist()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadShortlist()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **normalizeCandidate()** -> **parse** (calls) [community 857 -> 1140]
+- **normalizeCandidate()** -> **toFiniteNumber()** (calls) [community 857 -> 441]
+- **loadVotes()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadVotes()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **socialRepository.js** -> **updateMovieNight()** (contains) [community 857 -> 569]
+- **updateMovieNight()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 569 -> 484]
+- **updateMovieNight()** -> **clearShortlistAndVotes()** (calls) [community 569 -> 484]
+- **updateMovieNight()** -> **generateShortlist()** (calls) [community 569 -> 857]
+- **updateMovieNight()** -> **getMovieNight()** (calls) [community 569 -> 857]
+- **socialRepository.js** -> **clearShortlistAndVotes()** (contains) [community 857 -> 484]
+- **createInviteLink()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **createInviteLink()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **generateShortlist()** -> **normalizeConstraints()** (calls) [community 857 -> 569]
+- **generateShortlist()** -> **loadUserMovieStates()** (calls) [community 857 -> 464]
+- **generateShortlist()** -> **buildShortlist()** (calls) [community 857 -> 441]
+- **generateShortlist()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **generateShortlist()** -> **error** (calls) [community 857 -> 1140]
+- **generateShortlist()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **generateShortlist()** -> **stringify** (calls) [community 857 -> 1140]
+- **clearVotesOnly()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **socialRepository.js** -> **mapGenreNameToId()** (contains) [community 857 -> 398]
+- **loadCandidateMovies()** -> **join** (calls) [community 857 -> 871]
+- **loadCandidateMovies()** -> **join** (calls) [community 857 -> 871]
+- **loadCandidateMovies()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadCandidateMovies()** -> **error** (calls) [community 857 -> 1140]
+- **loadCandidateMovies()** -> **toPositiveInteger()** (calls) [community 857 -> 398]
+- **loadCandidateMovies()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **loadCandidateMovies()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **socialRepository.js** -> **loadUserMovieStates()** (contains) [community 857 -> 464]
+- **loadUserMovieStates()** -> **isarray** (calls) [community 464 -> 857]
+- **loadUserMovieStates()** -> **isarray** (calls) [community 464 -> 857]
+- **loadUserMovieStates()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **loadUserMovieStates()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **loadUserMovieStates()** -> **string** (calls) [community 464 -> 398]
+- **loadUserMovieStates()** -> **toNativeNumber()** (calls) [community 464 -> 475]
+- **socialRepository.js** -> **buildShortlist()** (contains) [community 857 -> 441]
+- **buildShortlist()** -> **some** (calls) [community 441 -> 398]
+- **buildShortlist()** -> **push** (calls) [community 441 -> 1178]
+- **buildShortlist()** -> **sort** (calls) [community 441 -> 857]
+- **socialRepository.js** -> **calculateCompatibility()** (contains) [community 857 -> 441]
+- **calculateCompatibility()** -> **string** (calls) [community 441 -> 398]
+- **calculateCompatibility()** -> **filter** (calls) [community 441 -> 857]
+- **calculateCompatibility()** -> **explainCandidate()** (calls) [community 441 -> 1178]
+- **socialRepository.js** -> **explainCandidate()** (contains) [community 857 -> 1178]
+- **explainCandidate()** -> **ceil** (calls) [community 1178 -> 441]
+- **explainCandidate()** -> **toFiniteNumber()** (calls) [community 1178 -> 441]
+- **socialRepository.js** -> **compareCandidates()** (contains) [community 857 -> 441]
+- **compareCandidates()** -> **localecompare** (calls) [community 441 -> 857]
+- **socialRepository.js** -> **releaseYear()** (contains) [community 857 -> 441]
+- **releaseYear()** -> **parseint** (calls) [community 441 -> 398]
+- **releaseYear()** -> **string** (calls) [community 441 -> 398]
+- **releaseYear()** -> **isinteger** (calls) [community 441 -> 857]
+- **hasEveryoneVoted()** -> **has** (calls) [community 857 -> 398]
+- **scoreShortlist()** -> **toFiniteNumber()** (calls) [community 857 -> 441]
+- **scoreShortlist()** -> **toFiniteNumber()** (calls) [community 857 -> 441]
+- **socialRepository.js** -> **clearVotesForTiedMovies()** (contains) [community 857 -> 484]
+- **socialRepository.js** -> **startTieBreaker()** (contains) [community 857 -> 484]
+- **submitVote()** -> **parseint** (calls) [community 857 -> 398]
+- **submitVote()** -> **string** (calls) [community 857 -> 398]
+- **submitVote()** -> **includes** (calls) [community 857 -> 441]
+- **submitVote()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **submitVote()** -> **startTieBreaker()** (calls) [community 857 -> 484]
+- **submitVote()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **deleteVote()** -> **parseint** (calls) [community 857 -> 398]
+- **deleteVote()** -> **string** (calls) [community 857 -> 398]
+- **deleteVote()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **deleteVote()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **socialRepository.js** -> **createNotification()** (contains) [community 857 -> 1358]
+- **createNotification()** -> **stringify** (calls) [community 1358 -> 1140]
+- **createNotification()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 1358 -> 484]
+- **socialRepository.js** -> **listNotifications()** (contains) [community 857 -> 464]
+- **listNotifications()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 464 -> 484]
+- **listNotifications()** -> **map** (calls) [community 464 -> 857]
+- **listNotifications()** -> **parse** (calls) [community 464 -> 1140]
+- **socialRepository.js** -> **markNotificationAsRead()** (contains) [community 857 -> 484]
+- **getUserDisplayName()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 857 -> 484]
+- **getUserDisplayName()** -> **backend_movieRepository.test::get** (calls) [community 857 -> 464]
+- **backend_socketService::init** -> **on** (calls) [community 854 -> 1140]
+- **backend_socketService::init** -> **on** (calls) [community 854 -> 1140]
+- **backend_socketService::init** -> **join** (calls) [community 854 -> 871]
+- **backend_socketService::init** -> **on** (calls) [community 854 -> 1140]
+- **test()** -> **log** (calls) [community 1140 -> 854]
+- **test()** -> **log** (calls) [community 1140 -> 854]
+- **test()** -> **log** (calls) [community 1140 -> 854]
+- **getDaily()** -> **log** (calls) [community 1140 -> 854]
+- **getDaily()** -> **log** (calls) [community 1140 -> 854]
+- **test()** -> **log** (calls) [community 1140 -> 854]
+- **test()** -> **getFriends()** (calls) [community 484 -> 857]
+- **test()** -> **log** (calls) [community 484 -> 854]
+- **test()** -> **stringify** (calls) [community 484 -> 1140]
+- **test()** -> **exit** (calls) [community 484 -> 854]
+- **test()** -> **log** (calls) [community 1140 -> 854]
+- **run()** -> **initneo4j** (calls) [community 854 -> 791]
+- **run()** -> **loadDailySuggestions()** (calls) [community 854 -> 857]
+- **run()** -> **closeneo4j** (calls) [community 854 -> 791]
+- **run()** -> **log** (calls) [community 791 -> 854]
+- **run()** -> **loadDailySuggestions()** (calls) [community 791 -> 857]
+- **run()** -> **loadDailySuggestions()** (calls) [community 854 -> 857]
+- **test()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 854 -> 484]
+- **test()** -> **backend_movieRepository::getExploratoryCandidates** (calls) [community 854 -> 857]
+- **test()** -> **map** (calls) [community 854 -> 857]
+- **test()** -> **backend_movieRepository::getRecommendationCandidates** (calls) [community 854 -> 484]
+- **backend_tmdbClient::tmdbGet** -> **set** (calls) [community 857 -> 895]
+- **backend_tmdbClient::tmdbGet** -> **string** (calls) [community 857 -> 398]
+- **backend_tmdbClient::tmdbGet** -> **json** (calls) [community 857 -> 393]
+- **Legacy Code Cleanup & Improvements** -> **Proposed Flaw/Architecture Improvements** (contains) [community 96 -> 97]
+- **design.md** -> **Linee Guida di Design & Palette di Colori — Agreeo (Cinema Popcorn Edition)** (contains) [community 342 -> 349]
+- **Linee Guida di Design & Palette di Colori — Agreeo (Cinema Popcorn Edition)** -> **✨ Effetti Visivi e Decorazioni** (contains) [community 349 -> 345]
+- **Neo4j, TMDB, and MovieLens MVP Architecture** -> **MovieLens Import Workflow** (contains) [community 642 -> 641]
+- **Neo4j, TMDB, and MovieLens MVP Architecture** -> **Flutter Integration Plan** (contains) [community 642 -> 637]
+- **AppDelegate.swift** -> **flutter** (imports) [community 27 -> 689]
+- **AppDelegate.swift** -> **uikit** (imports) [community 27 -> 689]
+- **AppDelegate** -> **application()** (contains) [community 27 -> 28]
+- **didInitializeImplicitFlutterEngine()** -> **register** (calls) [community 27 -> 1192]
+- **RunnerTests.swift** -> **flutter** (imports) [community 1423 -> 689]
+- **RunnerTests.swift** -> **uikit** (imports) [community 1423 -> 689]
+- **generated_plugin_registrant.cc** -> **fl_register_plugins(FlPluginRegistry* registry)()** (contains) [community 712 -> 714]
+- **main.cc** -> **main(int argc, char** argv)()** (contains) [community 1225 -> 1226]
+- **main(int argc, char** argv)()** -> **g_autoptr** (calls) [community 1226 -> 714]
+- **my_application.cc** -> **my_application_h** (imports) [community 1228 -> 1225]
+- **my_application.cc** -> **flutter_linux_flutter_linux_h** (imports) [community 1228 -> 712]
+- **my_application.cc** -> **first_frame_cb(MyApplication* self, FlView* view)()** (contains) [community 1228 -> 1231]
+- **my_application.cc** -> **my_application_activate(GApplication* application)()** (contains) [community 1228 -> 1231]
+- **my_application_activate(GApplication* application)()** -> **g_autoptr** (calls) [community 1231 -> 714]
+- **my_application.cc** -> **my_application_local_command_line(GApplication* application,
+                                                  gchar*** arguments,
+                                                  int* exit_status)()** (contains) [community 1228 -> 1235]
+- **my_application_local_command_line(GApplication* application,
+                                                  gchar*** arguments,
+                                                  int* exit_status)()** -> **my_application** (calls) [community 1235 -> 1231]
+- **my_application_local_command_line(GApplication* application,
+                                                  gchar*** arguments,
+                                                  int* exit_status)()** -> **g_autoptr** (calls) [community 1235 -> 714]
+- **my_application.cc** -> **my_application_startup(GApplication* application)()** (contains) [community 1228 -> 1237]
+- **my_application_startup(GApplication* application)()** -> **g_application_class** (calls) [community 1237 -> 1232]
+- **my_application.cc** -> **my_application_shutdown(GApplication* application)()** (contains) [community 1228 -> 1236]
+- **my_application_shutdown(GApplication* application)()** -> **g_application_class** (calls) [community 1236 -> 1232]
+- **my_application.cc** -> **my_application_dispose(GObject* object)()** (contains) [community 1228 -> 1233]
+- **my_application_dispose(GObject* object)()** -> **my_application** (calls) [community 1233 -> 1231]
+- **my_application.cc** -> **my_application_class_init(MyApplicationClass* klass)()** (contains) [community 1228 -> 1232]
+- **my_application_class_init(MyApplicationClass* klass)()** -> **g_object_class** (calls) [community 1232 -> 1233]
+- **my_application.cc** -> *** my_application_new()()** (contains) [community 1228 -> 1129]
+- *** my_application_new()()** -> **my_application** (calls) [community 1129 -> 1231]
+- **GeneratedPluginRegistrant.swift** -> **fluttermacos** (imports) [community 1369 -> 723]
+- **GeneratedPluginRegistrant.swift** -> **RegisterGeneratedPlugins()** (contains) [community 1369 -> 1192]
+- **AppDelegate.swift** -> **fluttermacos** (imports) [community 27 -> 723]
+- **MainFlutterWindow.swift** -> **cocoa** (imports) [community 723 -> 27]
+- **MainFlutterWindow.swift** -> **MainFlutterWindow** (contains) [community 723 -> 34]
+- **awakeFromNib()** -> **RegisterGeneratedPlugins()** (calls) [community 34 -> 1192]
+- **RunnerTests.swift** -> **cocoa** (imports) [community 1423 -> 27]
+- **RunnerTests.swift** -> **fluttermacos** (imports) [community 1423 -> 723]
+- **Agreeo - Neo4j Integration & Implementation Report** -> **Log 1: Authentication and Base AppUser Schema Migration** (contains) [community 149 -> 150]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Data Source Responsibilities** (contains) [community 157 -> 182]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Duplicate `tmdbId` Issue and Final Schema Decision** (contains) [community 157 -> 170]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Labels** (contains) [community 157 -> 175]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Relationships** (contains) [community 157 -> 180]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Backend TMDB Integration** (contains) [community 157 -> 162]
+- **Agreeo Neo4j, TMDB and MovieLens Technical Architecture** -> **Backend Query Patterns** (contains) [community 157 -> 177]
+- **Agreeo** -> **Step 1 Setup** (contains) [community 191 -> 199]
+- **Agreeo** -> **Backend Movie MVP** (contains) [community 191 -> 193]
+- **Agreeo Remaining Work** -> **Completed** (contains) [community 201 -> 209]
+- **Agreeo Remaining Work** -> **In Progress** (contains) [community 201 -> 214]
+- **In Progress** -> **Friends and Movie Night Phase** (contains) [community 214 -> 209]
+- **Agreeo Remaining Work** -> **Remaining Work** (contains) [community 201 -> 231]
+- **Agreeo Remaining Work** -> **Remaining Phase 1 Work** (contains) [community 201 -> 230]
+- **Agreeo Remaining Work** -> **Next Steps** (contains) [community 201 -> 228]
+- **searchMdFiles()** -> **join** (calls) [community 365 -> 871]
+- **searchMdFiles()** -> **startswith** (calls) [community 365 -> 464]
+- **searchMdFiles()** -> **endswith** (calls) [community 365 -> 1000]
+- **searchMdFiles()** -> **push** (calls) [community 365 -> 1178]
+- **flutter_analyze_server.py** -> **shlex** (imports) [community 871 -> 1038]
+- **flutter_analyze_server.py** -> **shutil** (imports) [community 871 -> 1038]
+- **flutter_analyze_server.py** -> **subprocess** (imports) [community 871 -> 895]
+- **flutter_analyze_server.py** -> **pathlib** (imports) [community 871 -> 1149]
+- **flutter_analyze_server.py** -> **mcp** (imports) [community 871 -> 1038]
+- **resolve_sdk_command()** -> **which** (calls) [community 871 -> 1392]
+- **resolve_sdk_command()** -> **str** (calls) [community 871 -> 895]
+- **format_command()** -> **list2cmdline** (calls) [community 871 -> 951]
+- **run_command()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 871 -> 484]
+- **resolve_working_directory()** -> **resolve** (calls) [community 871 -> 1043]
+- **resolve_working_directory()** -> **expanduser** (calls) [community 871 -> 895]
+- **resolve_working_directory()** -> **path** (calls) [community 871 -> 1043]
+- **resolve_working_directory()** -> **cwd** (calls) [community 871 -> 1043]
+- **resolve_working_directory()** -> **filenotfounderror** (calls) [community 871 -> 1043]
+- **flutter_runtime_server.py** -> **base64** (imports) [community 895 -> 1150]
+- **flutter_runtime_server.py** -> **json** (imports) [community 895 -> 393]
+- **flutter_runtime_server.py** -> **os** (imports) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **re** (imports) [community 895 -> 340]
+- **flutter_runtime_server.py** -> **shlex** (imports) [community 895 -> 1038]
+- **flutter_runtime_server.py** -> **shutil** (imports) [community 895 -> 1038]
+- **flutter_runtime_server.py** -> **dataclasses** (imports) [community 895 -> 1150]
+- **flutter_runtime_server.py** -> **pathlib** (imports) [community 895 -> 1149]
+- **flutter_runtime_server.py** -> **typing** (imports) [community 895 -> 1150]
+- **flutter_runtime_server.py** -> **mcp** (imports) [community 895 -> 1038]
+- **flutter_runtime_server.py** -> **resolve_sdk_command()** (contains) [community 895 -> 871]
+- **resolve_sdk_command()** -> **which** (calls) [community 871 -> 1392]
+- **resolve_sdk_command()** -> **str** (calls) [community 871 -> 895]
+- **resolve_flutter_command()** -> **resolve_sdk_command()** (calls) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **format_command()** (contains) [community 895 -> 951]
+- **format_command()** -> **join** (calls) [community 951 -> 871]
+- **flutter_runtime_server.py** -> **run_command()** (contains) [community 895 -> 871]
+- **run_command()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 871 -> 484]
+- **flutter_runtime_server.py** -> **resolve_working_directory()** (contains) [community 895 -> 1043]
+- **resolve_working_directory()** -> **expanduser** (calls) [community 1043 -> 895]
+- **resolve_working_directory()** -> **exists** (calls) [community 1043 -> 871]
+- **pretty_json()** -> **dumps** (calls) [community 895 -> 1019]
+- **truncate_text()** -> **len** (calls) [community 895 -> 1047]
+- **summarize_params()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **summarize_params()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **summarize_params()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **summarize_params()** -> **append** (calls) [community 895 -> 871]
+- **summarize_params()** -> **append** (calls) [community 895 -> 871]
+- **summarize_params()** -> **join** (calls) [community 895 -> 871]
+- **summarize_params()** -> **append** (calls) [community 895 -> 871]
+- **summarize_params()** -> **join** (calls) [community 895 -> 871]
+- **truncate_multiline_text()** -> **len** (calls) [community 895 -> 1047]
+- **build_vararg_params()** -> **enumerate** (calls) [community 895 -> 1046]
+- **sanitize_filename_component()** -> **sub** (calls) [community 895 -> 871]
+- **sanitize_filename_component()** -> **strip** (calls) [community 895 -> 871]
+- **sanitize_filename_component()** -> **strip** (calls) [community 895 -> 871]
+- **get_workspace_session()** -> **resolve_working_directory()** (calls) [community 895 -> 871]
+- **get_workspace_session()** -> **get_session()** (calls) [community 895 -> 871]
+- **get_workspace_session()** -> **session_error_message()** (calls) [community 895 -> 871]
+- **call_flutter_service_extension()** -> **runtimeerror** (calls) [community 895 -> 871]
+- **call_flutter_service_extension()** -> **send_request()** (calls) [community 895 -> 876]
+- **format_json_tool_output()** -> **path** (calls) [community 895 -> 1043]
+- **format_json_tool_output()** -> **len** (calls) [community 895 -> 1047]
+- **format_json_tool_output()** -> **join** (calls) [community 895 -> 871]
+- **format_text_tool_output()** -> **path** (calls) [community 895 -> 1043]
+- **format_text_tool_output()** -> **len** (calls) [community 895 -> 1047]
+- **format_text_tool_output()** -> **join** (calls) [community 895 -> 871]
+- **resolve_screenshot_path()** -> **path** (calls) [community 895 -> 1043]
+- **flutter_runtime_server.py** -> **format_startup_summary()** (contains) [community 895 -> 871]
+- **format_startup_summary()** -> **is_set** (calls) [community 871 -> 890]
+- **format_startup_summary()** -> **transcript_tail()** (calls) [community 871 -> 895]
+- **format_startup_summary()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_runtime_server.py** -> **workspace_key()** (contains) [community 895 -> 871]
+- **workspace_key()** -> **str** (calls) [community 871 -> 895]
+- **workspace_key()** -> **resolve** (calls) [community 871 -> 1043]
+- **flutter_runtime_server.py** -> **FlutterMachineSession** (contains) [community 895 -> 876]
+- **FlutterMachineSession** -> **start_reader_threads()** (contains) [community 876 -> 497]
+- **FlutterMachineSession** -> **is_running()** (contains) [community 876 -> 871]
+- **is_running()** -> **poll** (calls) [community 871 -> 889]
+- **FlutterMachineSession** -> **transcript_tail()** (contains) [community 876 -> 895]
+- **transcript_tail()** -> **list** (calls) [community 895 -> 989]
+- **_append_transcript()** -> **splitlines** (calls) [community 876 -> 1046]
+- **_append_transcript()** -> **append** (calls) [community 876 -> 871]
+- **_append_transcript()** -> **append** (calls) [community 876 -> 871]
+- **_read_stdout()** -> **poll** (calls) [community 876 -> 889]
+- **_read_stdout()** -> **set** (calls) [community 876 -> 895]
+- **_read_stdout()** -> **notify_all** (calls) [community 876 -> 895]
+- **_read_stderr()** -> **set** (calls) [community 876 -> 895]
+- **_read_stderr()** -> **notify_all** (calls) [community 876 -> 895]
+- **_handle_stdout_line()** -> **isinstance** (calls) [community 876 -> 895]
+- **_handle_stdout_line()** -> **str** (calls) [community 876 -> 895]
+- **_handle_stdout_line()** -> **backend_movieRepository.test::get** (calls) [community 876 -> 464]
+- **_handle_stdout_line()** -> **backend_movieRepository.test::get** (calls) [community 876 -> 464]
+- **_handle_stdout_line()** -> **_handle_event()** (calls) [community 876 -> 895]
+- **_handle_stdout_line()** -> **_handle_response()** (calls) [community 876 -> 895]
+- **FlutterMachineSession** -> **_handle_event()** (contains) [community 876 -> 895]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **_append_transcript()** (calls) [community 895 -> 876]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **_append_transcript()** (calls) [community 895 -> 876]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **_append_transcript()** (calls) [community 895 -> 876]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **_handle_event()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **FlutterMachineSession** -> **_handle_response()** (contains) [community 876 -> 895]
+- **_handle_response()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **FlutterMachineSession** -> **_wait_for_response()** (contains) [community 876 -> 1126]
+- **_wait_for_response()** -> **pop** (calls) [community 1126 -> 871]
+- **_wait_for_response()** -> **poll** (calls) [community 1126 -> 889]
+- **_wait_for_response()** -> **runtimeerror** (calls) [community 1126 -> 871]
+- **_wait_for_response()** -> **_process_exit_message()** (calls) [community 1126 -> 889]
+- **_wait_for_response()** -> **min** (calls) [community 1126 -> 398]
+- **FlutterMachineSession** -> **_process_exit_message()** (contains) [community 876 -> 889]
+- **_process_exit_message()** -> **format_command()** (calls) [community 889 -> 871]
+- **_process_exit_message()** -> **transcript_tail()** (calls) [community 889 -> 895]
+- **_process_exit_message()** -> **append** (calls) [community 889 -> 871]
+- **_process_exit_message()** -> **extend** (calls) [community 889 -> 895]
+- **_process_exit_message()** -> **join** (calls) [community 889 -> 871]
+- **send_request()** -> **poll** (calls) [community 876 -> 889]
+- **send_request()** -> **runtimeerror** (calls) [community 876 -> 871]
+- **send_request()** -> **_process_exit_message()** (calls) [community 876 -> 889]
+- **send_request()** -> **dumps** (calls) [community 876 -> 1019]
+- **send_request()** -> **truncate_text()** (calls) [community 876 -> 895]
+- **send_request()** -> **runtimeerror** (calls) [community 876 -> 871]
+- **send_request()** -> **write** (calls) [community 876 -> 1140]
+- **send_request()** -> **_wait_for_response()** (calls) [community 876 -> 1126]
+- **FlutterMachineSession** -> **wait_for_started()** (contains) [community 876 -> 890]
+- **wait_for_started()** -> **monotonic** (calls) [community 890 -> 1126]
+- **wait_for_started()** -> **monotonic** (calls) [community 890 -> 1126]
+- **wait_for_started()** -> **poll** (calls) [community 890 -> 889]
+- **wait_for_started()** -> **sleep** (calls) [community 890 -> 889]
+- **FlutterMachineSession** -> **wait_for_exit()** (contains) [community 876 -> 889]
+- **wait_for_exit()** -> **monotonic** (calls) [community 889 -> 1126]
+- **wait_for_exit()** -> **monotonic** (calls) [community 889 -> 1126]
+- **FlutterMachineSession** -> **graceful_stop()** (contains) [community 876 -> 889]
+- **graceful_stop()** -> **send_request()** (calls) [community 889 -> 876]
+- **graceful_stop()** -> **truncate_text()** (calls) [community 889 -> 895]
+- **graceful_stop()** -> **str** (calls) [community 889 -> 895]
+- **FlutterMachineSession** -> **detach()** (contains) [community 876 -> 889]
+- **detach()** -> **send_request()** (calls) [community 889 -> 876]
+- **detach()** -> **truncate_text()** (calls) [community 889 -> 895]
+- **detach()** -> **str** (calls) [community 889 -> 895]
+- **FlutterMachineSession** -> **_force_kill_process()** (contains) [community 876 -> 889]
+- **_force_kill_process()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 889 -> 484]
+- **_force_kill_process()** -> **str** (calls) [community 889 -> 895]
+- **flutter_runtime_server.py** -> **get_session()** (contains) [community 895 -> 871]
+- **get_session()** -> **backend_movieRepository.test::get** (calls) [community 871 -> 464]
+- **get_session()** -> **backend_movieRepository.test::get** (calls) [community 871 -> 464]
+- **flutter_runtime_server.py** -> **store_session()** (contains) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **remove_session()** (contains) [community 895 -> 871]
+- **remove_session()** -> **backend_movieRepository.test::get** (calls) [community 871 -> 464]
+- **flutter_runtime_server.py** -> **build_run_command()** (contains) [community 895 -> 871]
+- **build_run_command()** -> **extend** (calls) [community 871 -> 895]
+- **build_run_command()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_runtime_server.py** -> **session_error_message()** (contains) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **flutter_list_devices()** (contains) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **flutter_run_start()** (contains) [community 895 -> 871]
+- **flutter_run_start()** -> **graceful_stop()** (calls) [community 871 -> 889]
+- **flutter_run_start()** -> **FlutterMachineSession** (calls) [community 871 -> 876]
+- **flutter_run_start()** -> **list** (calls) [community 871 -> 989]
+- **flutter_run_start()** -> **start_reader_threads()** (calls) [community 871 -> 497]
+- **flutter_run_start()** -> **wait_for_started()** (calls) [community 871 -> 890]
+- **flutter_run_start()** -> **poll** (calls) [community 871 -> 889]
+- **flutter_runtime_server.py** -> **flutter_session_status()** (contains) [community 895 -> 871]
+- **flutter_session_status()** -> **transcript_tail()** (calls) [community 871 -> 895]
+- **flutter_runtime_server.py** -> **flutter_hot_reload()** (contains) [community 895 -> 871]
+- **flutter_hot_reload()** -> **send_request()** (calls) [community 871 -> 876]
+- **flutter_hot_reload()** -> **format_response_value()** (calls) [community 871 -> 895]
+- **flutter_hot_reload()** -> **transcript_tail()** (calls) [community 871 -> 895]
+- **flutter_hot_reload()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_hot_reload()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_runtime_server.py** -> **flutter_hot_restart()** (contains) [community 895 -> 871]
+- **flutter_hot_restart()** -> **send_request()** (calls) [community 871 -> 876]
+- **flutter_hot_restart()** -> **format_response_value()** (calls) [community 871 -> 895]
+- **flutter_hot_restart()** -> **transcript_tail()** (calls) [community 871 -> 895]
+- **flutter_hot_restart()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_hot_restart()** -> **extend** (calls) [community 871 -> 895]
+- **flutter_call_service_extension()** -> **loads** (calls) [community 895 -> 876]
+- **flutter_call_service_extension()** -> **session_error_message()** (calls) [community 895 -> 871]
+- **flutter_call_service_extension()** -> **session_error_message()** (calls) [community 895 -> 871]
+- **flutter_call_service_extension()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **flutter_call_service_extension()** -> **len** (calls) [community 895 -> 1047]
+- **flutter_call_service_extension()** -> **join** (calls) [community 895 -> 871]
+- **flutter_widget_screenshot()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **flutter_widget_screenshot()** -> **len** (calls) [community 895 -> 1047]
+- **flutter_widget_screenshot()** -> **join** (calls) [community 895 -> 871]
+- **flutter_runtime_server.py** -> **flutter_stop()** (contains) [community 895 -> 871]
+- **flutter_stop()** -> **graceful_stop()** (calls) [community 871 -> 889]
+- **flutter_runtime_server.py** -> **flutter_detach()** (contains) [community 895 -> 871]
+- **flutter_detach()** -> **detach()** (calls) [community 871 -> 889]
+- **resolve_selected_widget_value_id()** -> **backend_movieRepository.test::get** (calls) [community 895 -> 464]
+- **flutter_widget_screenshot()** -> **len** (calls) [community 895 -> 1047]
+- **flutter_widget_screenshot()** -> **join** (calls) [community 895 -> 871]
+- **graphify_server.py** -> **os** (imports) [community 960 -> 871]
+- **graphify_server.py** -> **shlex** (imports) [community 960 -> 1038]
+- **graphify_server.py** -> **shutil** (imports) [community 960 -> 1038]
+- **graphify_server.py** -> **subprocess** (imports) [community 960 -> 895]
+- **graphify_server.py** -> **pathlib** (imports) [community 960 -> 1149]
+- **graphify_server.py** -> **mcp** (imports) [community 960 -> 1038]
+- **resolve_workspace_root()** -> **resolve** (calls) [community 960 -> 1043]
+- **resolve_workspace_root()** -> **expanduser** (calls) [community 960 -> 895]
+- **resolve_workspace_root()** -> **path** (calls) [community 960 -> 1043]
+- **resolve_workspace_root()** -> **exists** (calls) [community 960 -> 871]
+- **resolve_workspace_root()** -> **filenotfounderror** (calls) [community 960 -> 1043]
+- **graphify_server.py** -> **resolve_graphify_command()** (contains) [community 960 -> 1392]
+- **resolve_graphify_command()** -> **runtimeerror** (calls) [community 1392 -> 871]
+- **graphify_server.py** -> **format_command()** (contains) [community 960 -> 951]
+- **format_command()** -> **join** (calls) [community 951 -> 871]
+- **graphify_server.py** -> **run_graphify_command()** (contains) [community 960 -> 871]
+- **run_graphify_command()** -> **resolve_graphify_command()** (calls) [community 871 -> 1392]
+- **run_graphify_command()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 871 -> 484]
+- **graphify_run()** -> **run_graphify_command()** (calls) [community 960 -> 871]
+- **graphify_run()** -> **str** (calls) [community 960 -> 895]
+- **graphify_update()** -> **run_graphify_command()** (calls) [community 960 -> 871]
+- **graphify_update()** -> **str** (calls) [community 960 -> 895]
+- **graphify_server.py** -> **graphify_query()** (contains) [community 960 -> 895]
+- **graphify_query()** -> **resolve_workspace_root()** (calls) [community 895 -> 960]
+- **graphify_query()** -> **run_graphify_command()** (calls) [community 895 -> 871]
+- **graphify_explain()** -> **run_graphify_command()** (calls) [community 960 -> 871]
+- **graphify_explain()** -> **str** (calls) [community 960 -> 895]
+- **graphify_path()** -> **run_graphify_command()** (calls) [community 960 -> 871]
+- **graphify_path()** -> **str** (calls) [community 960 -> 895]
+- **graphify_stats()** -> **run_graphify_command()** (calls) [community 960 -> 871]
+- **graphify_stats()** -> **str** (calls) [community 960 -> 895]
+- **graphify_server.py** -> **graphify_export()** (contains) [community 960 -> 895]
+- **graphify_export()** -> **resolve_workspace_root()** (calls) [community 895 -> 960]
+- **graphify_export()** -> **run_graphify_command()** (calls) [community 895 -> 871]
+- **web_browser_server_async.py** -> **json** (imports) [community 1150 -> 393]
+- **web_browser_server_async.py** -> **re** (imports) [community 1150 -> 340]
+- **web_browser_server_async.py** -> **threading** (imports) [community 1150 -> 895]
+- **web_browser_server_async.py** -> **time** (imports) [community 1150 -> 895]
+- **web_browser_server_async.py** -> **pathlib** (imports) [community 1150 -> 1149]
+- **web_browser_server_async.py** -> **mcp** (imports) [community 1150 -> 1038]
+- **web_browser_server_async.py** -> **resolve_workspace_root()** (contains) [community 1150 -> 1043]
+- **resolve_workspace_root()** -> **expanduser** (calls) [community 1043 -> 895]
+- **resolve_workspace_root()** -> **exists** (calls) [community 1043 -> 871]
+- **web_browser_server_async.py** -> **sanitize_filename_component()** (contains) [community 1150 -> 871]
+- **truncate_text()** -> **len** (calls) [community 1150 -> 1047]
+- **web_browser_server_async.py** -> **normalize_url()** (contains) [community 1150 -> 871]
+- **normalize_url()** -> **urlparse** (calls) [community 871 -> 464]
+- **web_browser_server_async.py** -> **build_output_path()** (contains) [community 1150 -> 895]
+- **build_output_path()** -> **path** (calls) [community 895 -> 1043]
+- **web_browser_server_async.py** -> **decode_bing_redirect_url()** (contains) [community 1150 -> 464]
+- **decode_bing_redirect_url()** -> **len** (calls) [community 464 -> 1047]
+- **decode_bing_redirect_url()** -> **encode** (calls) [community 464 -> 895]
+- **web_browser_server_async.py** -> **normalize_search_query()** (contains) [community 1150 -> 988]
+- **normalize_search_query()** -> **strip** (calls) [community 988 -> 871]
+- **normalize_search_query()** -> **join** (calls) [community 988 -> 871]
+- **web_browser_server_async.py** -> **build_search_query_variants()** (contains) [community 1150 -> 988]
+- **build_search_query_variants()** -> **set** (calls) [community 988 -> 895]
+- **build_search_query_variants()** -> **append** (calls) [community 988 -> 871]
+- **build_search_query_variants()** -> **lower** (calls) [community 988 -> 871]
+- **build_search_query_variants()** -> **sub** (calls) [community 988 -> 871]
+- **build_search_query_variants()** -> **is_stop_word()** (calls) [community 988 -> 871]
+- **build_search_query_variants()** -> **join** (calls) [community 988 -> 871]
+- **build_search_query_variants()** -> **casefold** (calls) [community 988 -> 1047]
+- **build_search_query_variants()** -> **len** (calls) [community 988 -> 1047]
+- **build_search_query_variants()** -> **join** (calls) [community 988 -> 871]
+- **web_browser_server_async.py** -> **mcp_web_browser_server_async::add** (contains) [community 1150 -> 988]
+- **mcp_web_browser_server_async::add** -> **append** (calls) [community 988 -> 871]
+- **web_browser_server_async.py** -> **is_stop_word()** (contains) [community 1150 -> 871]
+- **web_browser_server_async.py** -> **get_allowed_result_domains()** (contains) [community 1150 -> 988]
+- **get_allowed_result_domains()** -> **set** (calls) [community 988 -> 895]
+- **get_allowed_result_domains()** -> **casefold** (calls) [community 988 -> 1047]
+- **web_browser_server_async.py** -> **href_matches_allowed_domains()** (contains) [community 1150 -> 1000]
+- **href_matches_allowed_domains()** -> **urlparse** (calls) [community 1000 -> 464]
+- **href_matches_allowed_domains()** -> **casefold** (calls) [community 1000 -> 1047]
+- **web_browser_server_async.py** -> **fetch_bing_rss_results()** (contains) [community 1150 -> 992]
+- **fetch_bing_rss_results()** -> **quote_plus** (calls) [community 992 -> 464]
+- **fetch_bing_rss_results()** -> **request** (calls) [community 992 -> 1140]
+- **fetch_bing_rss_results()** -> **decode** (calls) [community 992 -> 464]
+- **fetch_bing_rss_results()** -> **find** (calls) [community 992 -> 857]
+- **fetch_bing_rss_results()** -> **set** (calls) [community 992 -> 895]
+- **fetch_bing_rss_results()** -> **strip** (calls) [community 992 -> 871]
+- **fetch_bing_rss_results()** -> **decode_bing_redirect_url()** (calls) [community 992 -> 464]
+- **fetch_bing_rss_results()** -> **strip** (calls) [community 992 -> 871]
+- **fetch_bing_rss_results()** -> **urlparse** (calls) [community 992 -> 464]
+- **fetch_bing_rss_results()** -> **href_matches_allowed_domains()** (calls) [community 992 -> 1000]
+- **fetch_bing_rss_results()** -> **mcp_web_browser_server_async::add** (calls) [community 992 -> 988]
+- **fetch_bing_rss_results()** -> **append** (calls) [community 992 -> 871]
+- **fetch_bing_rss_results()** -> **len** (calls) [community 992 -> 1047]
+- **web_browser_server_async.py** -> **fetch_bing_search_results()** (contains) [community 1150 -> 464]
+- **fetch_bing_search_results()** -> **open_url()** (calls) [community 464 -> 969]
+- **fetch_bing_search_results()** -> **wait_for_selector()** (calls) [community 464 -> 969]
+- **fetch_bing_search_results()** -> **locator** (calls) [community 464 -> 969]
+- **fetch_bing_search_results()** -> **set** (calls) [community 464 -> 895]
+- **fetch_bing_search_results()** -> **isinstance** (calls) [community 464 -> 895]
+- **fetch_bing_search_results()** -> **strip** (calls) [community 464 -> 871]
+- **fetch_bing_search_results()** -> **str** (calls) [community 464 -> 895]
+- **fetch_bing_search_results()** -> **strip** (calls) [community 464 -> 871]
+- **fetch_bing_search_results()** -> **str** (calls) [community 464 -> 895]
+- **fetch_bing_search_results()** -> **href_matches_allowed_domains()** (calls) [community 464 -> 1000]
+- **fetch_bing_search_results()** -> **mcp_web_browser_server_async::add** (calls) [community 464 -> 988]
+- **fetch_bing_search_results()** -> **append** (calls) [community 464 -> 871]
+- **fetch_bing_search_results()** -> **len** (calls) [community 464 -> 1047]
+- **fetch_bing_search_results()** -> **strip** (calls) [community 464 -> 871]
+- **fetch_bing_search_results()** -> **str** (calls) [community 464 -> 895]
+- **fetch_bing_search_results()** -> **mcp_web_browser_server_async::add** (calls) [community 464 -> 988]
+- **fetch_bing_search_results()** -> **append** (calls) [community 464 -> 871]
+- **fetch_bing_search_results()** -> **len** (calls) [community 464 -> 1047]
+- **web_browser_server_async.py** -> **format_json_block()** (contains) [community 1150 -> 1019]
+- **format_json_block()** -> **format_text_block()** (calls) [community 1019 -> 1150]
+- **format_text_block()** -> **join** (calls) [community 1150 -> 871]
+- **web_browser_server_async.py** -> **format_page_summary()** (contains) [community 1150 -> 969]
+- **format_page_summary()** -> **append** (calls) [community 969 -> 871]
+- **format_page_summary()** -> **append** (calls) [community 969 -> 871]
+- **format_page_summary()** -> **join** (calls) [community 969 -> 871]
+- **web_browser_server_async.py** -> **WebBrowserSession** (contains) [community 1150 -> 969]
+- **ensure_browser()** -> **close()** (calls) [community 969 -> 968]
+- **ensure_browser()** -> **start()** (calls) [community 969 -> 497]
+- **ensure_browser()** -> **lower** (calls) [community 969 -> 871]
+- **ensure_browser()** -> **strip** (calls) [community 969 -> 871]
+- **ensure_browser()** -> **str** (calls) [community 969 -> 895]
+- **ensure_page()** -> **runtimeerror** (calls) [community 969 -> 871]
+- **ensure_page()** -> **is_closed** (calls) [community 969 -> 968]
+- **WebBrowserSession** -> **summary()** (contains) [community 969 -> 871]
+- **summary()** -> **is_closed** (calls) [community 871 -> 968]
+- **summary()** -> **title** (calls) [community 871 -> 969]
+- **summary()** -> **strftime** (calls) [community 871 -> 895]
+- **open_url()** -> **normalize_url()** (calls) [community 969 -> 871]
+- **page_text()** -> **strip** (calls) [community 969 -> 871]
+- **page_html()** -> **strip** (calls) [community 969 -> 871]
+- **WebBrowserSession** -> **extract_links()** (contains) [community 969 -> 464]
+- **extract_links()** -> **ensure_page()** (calls) [community 464 -> 969]
+- **extract_links()** -> **locator** (calls) [community 464 -> 969]
+- **extract_links()** -> **set** (calls) [community 464 -> 895]
+- **extract_links()** -> **isinstance** (calls) [community 464 -> 895]
+- **extract_links()** -> **strip** (calls) [community 464 -> 871]
+- **extract_links()** -> **str** (calls) [community 464 -> 895]
+- **extract_links()** -> **strip** (calls) [community 464 -> 871]
+- **extract_links()** -> **str** (calls) [community 464 -> 895]
+- **extract_links()** -> **mcp_web_browser_server_async::add** (calls) [community 464 -> 988]
+- **extract_links()** -> **append** (calls) [community 464 -> 871]
+- **extract_links()** -> **len** (calls) [community 464 -> 1047]
+- **screenshot()** -> **build_output_path()** (calls) [community 969 -> 895]
+- **screenshot()** -> **str** (calls) [community 969 -> 895]
+- **WebBrowserSession** -> **close()** (contains) [community 969 -> 968]
+- **close()** -> **stop** (calls) [community 968 -> 969]
+- **close()** -> **dumps** (calls) [community 968 -> 1019]
+- **web_browser_server_async.py** -> **workspace_key()** (contains) [community 1150 -> 895]
+- **workspace_key()** -> **resolve** (calls) [community 895 -> 1043]
+- **get_session()** -> **workspace_key()** (calls) [community 1150 -> 871]
+- **get_session()** -> **backend_movieRepository.test::get** (calls) [community 1150 -> 464]
+- **web_browser_server_async.py** -> **store_session()** (contains) [community 1150 -> 871]
+- **web_browser_server_async.py** -> **remove_session()** (contains) [community 1150 -> 871]
+- **remove_session()** -> **backend_movieRepository.test::get** (calls) [community 871 -> 464]
+- **web_browser_server_async.py** -> **get_or_create_session()** (contains) [community 1150 -> 871]
+- **get_or_create_session()** -> **resolve_workspace_root()** (calls) [community 871 -> 960]
+- **get_or_create_session()** -> **backend_movieRepository.test::get** (calls) [community 871 -> 464]
+- **get_or_create_session()** -> **WebBrowserSession** (calls) [community 871 -> 969]
+- **web_browser_server_async.py** -> **session_or_error()** (contains) [community 1150 -> 969]
+- **session_or_error()** -> **resolve_workspace_root()** (calls) [community 969 -> 960]
+- **session_or_error()** -> **get_session()** (calls) [community 969 -> 871]
+- **web_browser_server_async.py** -> **close_all_sessions()** (contains) [community 1150 -> 989]
+- **close_all_sessions()** -> **close()** (calls) [community 989 -> 968]
+- **web_browser_server_async.py** -> **close_all_sessions_sync()** (contains) [community 1150 -> 989]
+- **close_all_sessions_sync()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 989 -> 484]
+- **web_browser_server_async.py** -> **web_session_status()** (contains) [community 1150 -> 960]
+- **web_session_status()** -> **get_session()** (calls) [community 960 -> 871]
+- **web_session_status()** -> **Summary** (calls) [community 960 -> 1100]
+- **web_browser_server_async.py** -> **web_open_url()** (contains) [community 1150 -> 969]
+- **web_open_url()** -> **get_or_create_session()** (calls) [community 969 -> 871]
+- **web_open_url()** -> **normalize_url()** (calls) [community 969 -> 871]
+- **web_browser_server_async.py** -> **web_search()** (contains) [community 1150 -> 988]
+- **web_search()** -> **get_or_create_session()** (calls) [community 988 -> 871]
+- **web_search()** -> **max** (calls) [community 988 -> 440]
+- **web_search()** -> **min** (calls) [community 988 -> 398]
+- **web_search()** -> **quote_plus** (calls) [community 988 -> 464]
+- **web_search()** -> **append** (calls) [community 988 -> 871]
+- **web_search()** -> **len** (calls) [community 988 -> 1047]
+- **web_search()** -> **fetch_bing_search_results()** (calls) [community 988 -> 464]
+- **web_search()** -> **append** (calls) [community 988 -> 871]
+- **web_search()** -> **len** (calls) [community 988 -> 1047]
+- **web_search()** -> **title** (calls) [community 988 -> 969]
+- **web_search()** -> **format_json_block()** (calls) [community 988 -> 1019]
+- **web_browser_server_async.py** -> **web_page_info()** (contains) [community 1150 -> 969]
+- **web_page_info()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_page_info()** -> **format_json_block()** (calls) [community 969 -> 1019]
+- **web_page_text()** -> **session_or_error()** (calls) [community 1150 -> 969]
+- **web_page_text()** -> **isinstance** (calls) [community 1150 -> 895]
+- **web_page_text()** -> **page_text()** (calls) [community 1150 -> 969]
+- **web_page_text()** -> **truncate_text()** (calls) [community 1150 -> 895]
+- **web_page_html()** -> **session_or_error()** (calls) [community 1150 -> 969]
+- **web_page_html()** -> **isinstance** (calls) [community 1150 -> 895]
+- **web_page_html()** -> **page_html()** (calls) [community 1150 -> 969]
+- **web_page_html()** -> **truncate_text()** (calls) [community 1150 -> 895]
+- **web_browser_server_async.py** -> **web_click()** (contains) [community 1150 -> 969]
+- **web_click()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_click_text()** (contains) [community 1150 -> 969]
+- **web_click_text()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_fill()** (contains) [community 1150 -> 969]
+- **web_fill()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_type()** (contains) [community 1150 -> 969]
+- **web_type()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_press()** (contains) [community 1150 -> 969]
+- **web_press()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_scroll()** (contains) [community 1150 -> 969]
+- **web_scroll()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_wait_for_selector()** (contains) [community 1150 -> 969]
+- **web_wait_for_selector()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_wait_for_text()** (contains) [community 1150 -> 969]
+- **web_wait_for_text()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_extract_links()** (contains) [community 1150 -> 1019]
+- **web_extract_links()** -> **session_or_error()** (calls) [community 1019 -> 969]
+- **web_extract_links()** -> **isinstance** (calls) [community 1019 -> 895]
+- **web_extract_links()** -> **extract_links()** (calls) [community 1019 -> 464]
+- **web_browser_server_async.py** -> **web_screenshot()** (contains) [community 1150 -> 969]
+- **web_screenshot()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_back()** (contains) [community 1150 -> 969]
+- **web_back()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_forward()** (contains) [community 1150 -> 969]
+- **web_forward()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_reload()** (contains) [community 1150 -> 969]
+- **web_reload()** -> **isinstance** (calls) [community 969 -> 895]
+- **web_browser_server_async.py** -> **web_close()** (contains) [community 1150 -> 871]
+- **web_close()** -> **resolve_workspace_root()** (calls) [community 871 -> 960]
+- **web_close()** -> **close()** (calls) [community 871 -> 968]
+- **workspace_git_server.py** -> **os** (imports) [community 1038 -> 871]
+- **workspace_git_server.py** -> **re** (imports) [community 1038 -> 340]
+- **workspace_git_server.py** -> **subprocess** (imports) [community 1038 -> 895]
+- **workspace_git_server.py** -> **pathlib** (imports) [community 1038 -> 1149]
+- **resolve_git_command()** -> **which** (calls) [community 1038 -> 1392]
+- **resolve_git_command()** -> **runtimeerror** (calls) [community 1038 -> 871]
+- **format_command()** -> **list2cmdline** (calls) [community 1038 -> 951]
+- **format_command()** -> **join** (calls) [community 1038 -> 871]
+- **workspace_git_server.py** -> **resolve_workspace_root()** (contains) [community 1038 -> 1043]
+- **resolve_workspace_root()** -> **expanduser** (calls) [community 1043 -> 895]
+- **resolve_workspace_root()** -> **exists** (calls) [community 1043 -> 871]
+- **workspace_git_server.py** -> **resolve_workspace_path()** (contains) [community 1038 -> 1043]
+- **resolve_workspace_path()** -> **is_absolute** (calls) [community 1043 -> 895]
+- **resolve_workspace_path()** -> **relative_to** (calls) [community 1043 -> 1040]
+- **resolve_workspace_path()** -> **valueerror** (calls) [community 1043 -> 871]
+- **workspace_git_server.py** -> **is_ignored_path()** (contains) [community 1038 -> 1047]
+- **is_ignored_path()** -> **any** (calls) [community 1047 -> 1000]
+- **workspace_git_server.py** -> **run_command()** (contains) [community 1038 -> 871]
+- **run_command()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 871 -> 484]
+- **ensure_git_repo()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 1038 -> 484]
+- **ensure_git_repo()** -> **runtimeerror** (calls) [community 1038 -> 871]
+- **ensure_git_repo()** -> **resolve** (calls) [community 1038 -> 1043]
+- **ensure_git_repo()** -> **path** (calls) [community 1038 -> 1043]
+- **ensure_git_repo()** -> **strip** (calls) [community 1038 -> 871]
+- **has_git_commit()** -> **backend_neo4jService::Neo4jService::run** (calls) [community 1038 -> 484]
+- **workspace_git_server.py** -> **map_path_to_git_path()** (contains) [community 1038 -> 1040]
+- **map_path_to_git_path()** -> **path** (calls) [community 1040 -> 1043]
+- **map_path_to_git_path()** -> **is_absolute** (calls) [community 1040 -> 895]
+- **map_path_to_git_path()** -> **resolve** (calls) [community 1040 -> 1043]
+- **map_path_to_git_path()** -> **path** (calls) [community 1040 -> 1043]
+- **map_path_to_git_path()** -> **str** (calls) [community 1040 -> 895]
+- **map_path_to_git_path()** -> **str** (calls) [community 1040 -> 895]
+- **map_path_to_git_path()** -> **valueerror** (calls) [community 1040 -> 871]
+- **workspace_git_server.py** -> **workspace_find_files()** (contains) [community 1038 -> 1047]
+- **workspace_find_files()** -> **resolve_workspace_root()** (calls) [community 1047 -> 960]
+- **workspace_find_files()** -> **relative_to** (calls) [community 1047 -> 1040]
+- **workspace_find_files()** -> **append** (calls) [community 1047 -> 871]
+- **workspace_find_files()** -> **replace** (calls) [community 1047 -> 857]
+- **workspace_find_files()** -> **str** (calls) [community 1047 -> 895]
+- **workspace_find_files()** -> **extend** (calls) [community 1047 -> 895]
+- **workspace_find_files()** -> **append** (calls) [community 1047 -> 871]
+- **workspace_find_files()** -> **join** (calls) [community 1047 -> 871]
+- **workspace_git_server.py** -> **workspace_read_file()** (contains) [community 1038 -> 1046]
+- **workspace_read_file()** -> **resolve_workspace_root()** (calls) [community 1046 -> 960]
+- **workspace_read_file()** -> **resolve_workspace_path()** (calls) [community 1046 -> 1043]
+- **workspace_read_file()** -> **exists** (calls) [community 1046 -> 871]
+- **workspace_read_file()** -> **filenotfounderror** (calls) [community 1046 -> 1043]
+- **workspace_read_file()** -> **min** (calls) [community 1046 -> 398]
+- **workspace_read_file()** -> **len** (calls) [community 1046 -> 1047]
+- **workspace_read_file()** -> **relative_to** (calls) [community 1046 -> 1040]
+- **workspace_read_file()** -> **append** (calls) [community 1046 -> 871]
+- **workspace_read_file()** -> **append** (calls) [community 1046 -> 871]
+- **workspace_read_file()** -> **join** (calls) [community 1046 -> 871]
+- **workspace_git_server.py** -> **workspace_search_text()** (contains) [community 1038 -> 1047]
+- **workspace_search_text()** -> **resolve_workspace_root()** (calls) [community 1047 -> 960]
+- **workspace_search_text()** -> **relative_to** (calls) [community 1047 -> 1040]
+- **workspace_search_text()** -> **enumerate** (calls) [community 1047 -> 1046]
+- **workspace_search_text()** -> **rstrip** (calls) [community 1047 -> 876]
+- **workspace_search_text()** -> **append** (calls) [community 1047 -> 871]
+- **workspace_search_text()** -> **replace** (calls) [community 1047 -> 857]
+- **workspace_search_text()** -> **str** (calls) [community 1047 -> 895]
+- **workspace_search_text()** -> **extend** (calls) [community 1047 -> 895]
+- **workspace_search_text()** -> **append** (calls) [community 1047 -> 871]
+- **workspace_search_text()** -> **join** (calls) [community 1047 -> 871]
+- **git_status()** -> **resolve_workspace_root()** (calls) [community 1038 -> 960]
+- **git_status()** -> **run_command()** (calls) [community 1038 -> 871]
+- **git_diff()** -> **resolve_workspace_root()** (calls) [community 1038 -> 960]
+- **git_diff()** -> **map_path_to_git_path()** (calls) [community 1038 -> 1040]
+- **git_diff()** -> **extend** (calls) [community 1038 -> 895]
+- **git_diff()** -> **run_command()** (calls) [community 1038 -> 871]
+- **git_diff()** -> **append** (calls) [community 1038 -> 871]
+- **git_diff()** -> **extend** (calls) [community 1038 -> 895]
+- **git_diff()** -> **map_path_to_git_path()** (calls) [community 1038 -> 1040]
+- **git_diff()** -> **extend** (calls) [community 1038 -> 895]
+- **git_diff()** -> **run_command()** (calls) [community 1038 -> 871]
+- **git_log()** -> **resolve_workspace_root()** (calls) [community 1038 -> 960]
+- **git_log()** -> **max** (calls) [community 1038 -> 440]
+- **git_log()** -> **min** (calls) [community 1038 -> 398]
+- **git_log()** -> **run_command()** (calls) [community 1038 -> 871]
+- **git_blame()** -> **resolve_workspace_root()** (calls) [community 1038 -> 960]
+- **git_blame()** -> **map_path_to_git_path()** (calls) [community 1038 -> 1040]
+- **git_blame()** -> **max** (calls) [community 1038 -> 440]
+- **git_blame()** -> **extend** (calls) [community 1038 -> 895]
+- **git_blame()** -> **extend** (calls) [community 1038 -> 895]
+- **git_blame()** -> **run_command()** (calls) [community 1038 -> 871]
+- **generated_plugin_registrant.cc** -> **RegisterPlugins(flutter::PluginRegistry* registry)()** (contains) [community 712 -> 1196]
+- **flutter_window.cpp** -> **flutter_window_h** (imports) [community 1218 -> 1225]
+- **flutter_window.cpp** -> **flutter_generated_plugin_registrant_h** (imports) [community 1218 -> 1228]
+- **flutter_window.cpp** -> **FlutterWindow::OnCreate()()** (contains) [community 1218 -> 1222]
+- **FlutterWindow::OnCreate()()** -> **runner_win32_window::Win32Window::GetClientArea()** (calls) [community 1222 -> 1251]
+- **flutter_window.cpp** -> **FlutterWindow::OnDestroy()()** (contains) [community 1218 -> 1396]
+- **flutter_window.cpp** -> **FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
+                              WPARAM const wparam,
+                              LPARAM const lparam) noexcept()** (contains) [community 1218 -> 1221]
+- **FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
+                              WPARAM const wparam,
+                              LPARAM const lparam) noexcept()** -> **flutter_controller___engine** (calls) [community 1221 -> 1222]
+- **flutter_window.cpp** -> **flutter_dart_project_h** (imports) [community 1218 -> 1225]
+- **flutter_window.cpp** -> **flutter_flutter_view_controller_h** (imports) [community 1218 -> 1225]
+- **flutter_window.cpp** -> **memory** (imports) [community 1218 -> 1243]
+- **main.cc** -> **windows_h** (imports) [community 1225 -> 1419]
+- **main.cc** -> **utils_h** (imports) [community 1225 -> 1419]
+- **main.cc** -> **wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
+                      _In_ wchar_t *command_line, _In_ int show_command)()** (contains) [community 1225 -> 1227]
+- **wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
+                      _In_ wchar_t *command_line, _In_ int show_command)()** -> **runner_utils::CreateAndAttachConsole()** (calls) [community 1227 -> 1240]
+- **wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
+                      _In_ wchar_t *command_line, _In_ int show_command)()** -> **runner_utils::GetCommandLineArguments()** (calls) [community 1227 -> 1241]
+- **utils.cpp** -> **flutter_windows_h** (imports) [community 1419 -> 1243]
+- **utils.cpp** -> **runner_utils::CreateAndAttachConsole()** (contains) [community 1419 -> 1240]
+- **utils.cpp** -> **runner_utils::GetCommandLineArguments()** (contains) [community 1419 -> 1241]
+- **utils.cpp** -> **Utf8FromUtf16(const wchar_t* utf16_string)()** (contains) [community 1419 -> 1242]
+- **utils.cpp** -> **string** (imports) [community 1419 -> 398]
+- **win32_window.cpp** -> **win32_window_h** (imports) [community 1243 -> 1218]
+- **win32_window.cpp** -> **EnableFullDpiSupportIfAvailable(HWND hwnd)()** (contains) [community 1243 -> 1247]
+- **win32_window.cpp** -> *** WindowClassRegistrar::GetWindowClass()()** (contains) [community 1243 -> 1246]
+- **win32_window.cpp** -> **WindowClassRegistrar::UnregisterWindowClass()()** (contains) [community 1243 -> 1365]
+- **win32_window.cpp** -> **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** (contains) [community 1243 -> 1267]
+- **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** -> **Win32Window::Destroy()()** (calls) [community 1267 -> 1243]
+- **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** -> **windowclassregistrar__getinstance** (calls) [community 1267 -> 1243]
+- **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** -> **getmodulehandle** (calls) [community 1267 -> 1246]
+- **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** -> **updatetheme** (calls) [community 1267 -> 1253]
+- **Win32Window::Create(const std::wstring& title,
+                         const Point& origin,
+                         const Size& size)()** -> **FlutterWindow::OnCreate()()** (calls) [community 1267 -> 1222]
+- **win32_window.cpp** -> **Win32Window::WndProc(HWND const window,
+                                      UINT const message,
+                                      WPARAM const wparam,
+                                      LPARAM const lparam) noexcept()** (contains) [community 1243 -> 1261]
+- **win32_window.cpp** -> **Win32Window::MessageHandler(HWND hwnd,
+                            UINT const message,
+                            WPARAM const wparam,
+                            LPARAM const lparam) noexcept()** (contains) [community 1243 -> 1253]
+- **Win32Window::MessageHandler(HWND hwnd,
+                            UINT const message,
+                            WPARAM const wparam,
+                            LPARAM const lparam) noexcept()** -> **Win32Window::Destroy()()** (calls) [community 1253 -> 1243]
+- **Win32Window::MessageHandler(HWND hwnd,
+                            UINT const message,
+                            WPARAM const wparam,
+                            LPARAM const lparam) noexcept()** -> **runner_win32_window::Win32Window::GetClientArea()** (calls) [community 1253 -> 1251]
+- **Win32Window::MessageHandler(HWND hwnd,
+                            UINT const message,
+                            WPARAM const wparam,
+                            LPARAM const lparam) noexcept()** -> **setfocus** (calls) [community 1253 -> 1293]
+- **Win32Window::MessageHandler(HWND hwnd,
+                            UINT const message,
+                            WPARAM const wparam,
+                            LPARAM const lparam) noexcept()** -> **defwindowproc** (calls) [community 1253 -> 1261]
+- **Win32Window::Destroy()()** -> **FlutterWindow::OnDestroy()()** (calls) [community 1243 -> 1396]
+- **win32_window.cpp** -> *** Win32Window::GetThisFromHandle(HWND const window) noexcept()** (contains) [community 1243 -> 1245]
+- **win32_window.cpp** -> **Win32Window::SetChildContent(HWND content)()** (contains) [community 1243 -> 1293]
+- **Win32Window::SetChildContent(HWND content)()** -> **runner_win32_window::Win32Window::GetClientArea()** (calls) [community 1293 -> 1251]
+- **Win32Window::SetChildContent(HWND content)()** -> **movewindow** (calls) [community 1293 -> 1253]
+- **win32_window.cpp** -> **runner_win32_window::Win32Window::GetClientArea()** (contains) [community 1243 -> 1251]
+- **win32_window.cpp** -> **Win32Window::UpdateTheme(HWND const window)()** (contains) [community 1243 -> 659]
+- **win32_window.cpp** -> **windows_h** (imports) [community 1243 -> 1419]
+- **win32_window.cpp** -> **string** (imports) [community 1243 -> 398]
 
 ## Suggested Questions
-_Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FlutterMachineSession` connect `Community 19` to `Community 16`, `Community 13`, `Community 12`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **What connects `neo4jService`, `bcrypt`, `{ sign, signRefresh }` to the rest of the system?**
-  _336 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
-- **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
-- **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
-- **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
-- **Should `Community 4` be split into smaller, more focused modules?**
-  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
+- Why does flutter_call_service_extension() have so many connections?
+- Why does backend_movieRepository.test::get have so many connections?
+- Why does isinstance have so many connections?
+- Why does flutter_runtime_server.py have so many connections?
+- Why does backend_neo4jService::Neo4jService::run have so many connections?
+- What connects the 237 different communities?

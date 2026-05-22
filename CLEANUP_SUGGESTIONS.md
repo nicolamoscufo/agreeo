@@ -25,3 +25,4 @@ Currently, `selectWinner` is being evaluated in Dart via `_shortlistService.sele
 
 ### 4. Remove Mock Dependencies
 The mock seeding has been removed from the controller; profile population now relies on backend snapshot loading. Keep an eye on offline flows — if you need a local offline demo mode, add a small, explicit feature-flagged stub.
+9

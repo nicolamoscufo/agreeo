@@ -26,3 +26,12 @@ Intent auto-detection, hybrid ranking, session memory, auto-expanding budget.
 ### Multi-Repo
 `run_pipeline` auto-queries all indexed repos. Use `repos: ["alias"]` to scope. Run `index_status` to see aliases.
 <!-- /vexp -->
+
+## Graphify MCP
+
+Use the `graphify` MCP server for codebase graph queries when you need relationships, paths, or a full rebuild of the local knowledge graph.
+
+- `graphify_run` builds the graph for the workspace.
+- `graphify_update` refreshes it incrementally after code changes.
+- `graphify_query`, `graphify_explain`, `graphify_path`, and `graphify_stats` are the main inspection tools.
+- Graph artifacts live under `.graphify/` and stay out of git.
