@@ -95,11 +95,11 @@ Run the backend from `backend/` with the Neo4j and TMDB environment variables se
 npm start
 ```
 
-Run the backend from `backend/` with the Neo4j and TMDB environment variables set:
+### Azure test deployment
 
-```bash
-npm start
-```
+For an Azure for Students test deployment, use the VM + Docker Compose path documented in:
+
+- `deploy/azure/README.md`
 
 
 netstat -ano | findstr :3000
