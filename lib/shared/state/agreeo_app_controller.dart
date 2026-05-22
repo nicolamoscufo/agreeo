@@ -860,6 +860,11 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
   Future<void> refreshHomeFeed({int page = 1}) async {
     await _refreshDiscoveryFeeds(page: page);
+    if (state.recommendedIds.isNotEmpty) {
+      final shuffled = List<String>.from(state.recommendedIds)..shuffle();
+      state = state.copyWith(recommendedIds: shuffled);
+      await _persist();
+    }
   }
 
   Future<void> _ensureDailySuggestionBuffer({bool force = false}) async {

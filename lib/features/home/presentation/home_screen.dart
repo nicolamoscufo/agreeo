@@ -55,7 +55,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
 
     _isRefreshingHome = true;
     try {
-      _currentPage++;
+      _currentPage = 1;
       await ref
           .read(agreeoAppControllerProvider.notifier)
           .refreshHomeFeed(page: _currentPage);
@@ -109,14 +109,8 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
     final unwatchedWatchlist = state.movieStates.values
         .where((s) => s.inWatchlist && !s.watched)
         .length;
-    final recommendedCount = state.recommendedForYou.length;
 
     final parts = <String>[];
-    if (recommendedCount > 0) {
-      parts.add(
-        '$recommendedCount new recommendation${recommendedCount == 1 ? '' : 's'}',
-      );
-    }
     if (unwatchedWatchlist > 0) {
       parts.add('$unwatchedWatchlist unwatched in your watchlist');
     }
@@ -363,13 +357,10 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                 )
               else ...<Widget>[
                 _CollectionSection(
-                  icon: Icons.auto_awesome_rounded,
+                  icon: Icons.favorite_rounded,
                   iconColor: AgreeoColors.kernelGold,
                   title: 'Recommended for you',
-                  subtitle: _appendCount(
-                    'Your best current matches, ranked from your onboarding and feedback signals.',
-                    recommended.length,
-                  ),
+                  subtitle: 'Your best current matches, ranked from your onboarding and feedback signals.',
                   movies: recommended,
                 ),
                 const SizedBox(height: 22),

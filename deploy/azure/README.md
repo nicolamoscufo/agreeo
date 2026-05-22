@@ -216,3 +216,6 @@ Usa `down -v` solo se vuoi eliminare anche i dati del database.
 ## Note per demo pubblica
 
 Per una demo rapida basta `http://<vm-public-ip>`. Prima di condividere l'app pubblicamente, aggiungi dominio e HTTPS con Caddy o Nginx. In quel caso aggiorna `BACKEND_BASE_URL` con l'URL HTTPS del backend e ricostruisci il frontend.
+
+app_agreeo
+Agreeoapp123!

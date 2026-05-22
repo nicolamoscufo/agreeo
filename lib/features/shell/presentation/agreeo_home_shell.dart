@@ -113,9 +113,10 @@ class _AgreeoHomeShellState extends ConsumerState<AgreeoHomeShell> {
 
     return Scaffold(
       extendBody: true,
+      backgroundColor: currentIndex == 0 ? AgreeoColors.trueBlack : null,
       appBar: showAppBar
           ? AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: currentIndex == 0 ? AgreeoColors.trueBlack : Colors.transparent,
               elevation: 0,
               title: Text(
                 'Agreeo',

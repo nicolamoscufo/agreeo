@@ -24,34 +24,7 @@ function parseTmdbIds(value) {
   return tmdbIds;
 }
 
-const TMDB_GENRE_IDS_BY_NAME = {
-  action: 28,
-  adventure: 12,
-  animation: 16,
-  comedy: 35,
-  crime: 80,
-  documentary: 99,
-  drama: 18,
-  family: 10751,
-  fantasy: 14,
-  history: 36,
-  horror: 27,
-  music: 10402,
-  mystery: 9648,
-  romance: 10749,
-  'science fiction': 878,
-  'sci-fi': 878,
-  'tv movie': 10770,
-  thriller: 53,
-  war: 10752,
-  western: 37,
-  'slice of life': 18,
-};
-
-const TMDB_GENRE_NAMES_BY_ID = Object.fromEntries(
-  Object.entries(TMDB_GENRE_IDS_BY_NAME).map(([name, id]) => [id, name])
-);
-TMDB_GENRE_NAMES_BY_ID[18] = 'drama';
+const { TMDB_GENRE_IDS_BY_NAME, TMDB_GENRE_NAMES_BY_ID } = require('./genreUtils');
 
 
 function parseStringList(value) {
@@ -372,12 +345,14 @@ async function hydrateRecommendationEntries(
     const batchHydrated = await Promise.all(
       batch.map(async (entry) => {
         try {
-          const tmdbMovie = await tmdbFetch(`/movie/${entry.tmdbId}`);
+          const [tmdbMovie, neoMovie] = await Promise.all([
+            tmdbFetch(`/movie/${entry.tmdbId}`),
+            findMovieByTmdbId(entry.tmdbId),
+          ]);
           if (!tmdbMovie || typeof tmdbMovie !== 'object' || !Number.isInteger(tmdbMovie.id)) {
             return null;
           }
 
-          const neoMovie = await findMovieByTmdbId(entry.tmdbId);
           const movie = {
             ...mapTmdbMovie(tmdbMovie, {
               ...(neoMovie || {}),

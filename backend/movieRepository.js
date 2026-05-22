@@ -332,9 +332,7 @@ async function saveSelectedFavorites(uid, movies) {
     ? movies.filter((movie) => movie && Number.isInteger(movie.tmdbId))
     : [];
 
-  for (const movie of selectedMovies) {
-    await mergeTmdbMovie(movie);
-  }
+  await Promise.all(selectedMovies.map((movie) => mergeTmdbMovie(movie)));
 
   const result = await neo4jService.run(
     `
@@ -872,15 +870,15 @@ async function getTopPositiveGenreSignals(uid, limit = 5) {
     MATCH (me:AppUser {uid: $uid})-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(movie:Movie)
     OPTIONAL MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
     OPTIONAL MATCH (movie)-[:IN_GENRE]->(movieGenre:Genre)
-    WITH
+    WITH signal, movie, [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
+    UNWIND genreNames AS genreName
+    WITH genreName,
       CASE type(signal)
         WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, 4.0)
         WHEN 'LIKED' THEN 3.0
         WHEN 'WATCHLISTED' THEN 1.25
         ELSE 1.0
-      END AS signalWeight,
-      [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
-    UNWIND genreNames AS genreName
+      END AS signalWeight
     RETURN genreName AS name, sum(signalWeight) AS score
     ORDER BY score DESC, name ASC
     LIMIT ${safeLimit}
@@ -901,7 +899,7 @@ async function getTopNegativeGenreSignals(uid, limit = 5) {
     MATCH (me:AppUser {uid: $uid})-[:DISLIKED]->(movie:Movie)
     OPTIONAL MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
     OPTIONAL MATCH (movie)-[:IN_GENRE]->(movieGenre:Genre)
-    WITH [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
+    WITH movie, [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS genreNames
     UNWIND genreNames AS genreName
     RETURN genreName AS name, count(*) AS score
     ORDER BY score DESC, name ASC

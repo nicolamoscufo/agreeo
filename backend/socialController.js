@@ -244,11 +244,12 @@ exports.createMovieNight = async (req, res) => {
 
     const hostName = await socialRepository.getUserDisplayName(uid);
 
-    // Save notification & emit for each invited friend
+    // Save notification & emit for each invited friend in parallel
     const pendingParticipants = event.participants.filter(p => p.status === 'pending');
-    for (const friend of pendingParticipants) {
+    await Promise.all(pendingParticipants.map(async (friend) => {
+      const friendId = friend.userId || friend.id;
       await socialRepository.createNotification(
-        friend.userId || friend.id,
+        friendId,
         'movie_night_invite',
         'Movie Night Invitation',
         `${hostName} invited you to "${event.name}".`,
@@ -256,11 +257,11 @@ exports.createMovieNight = async (req, res) => {
         { hostId: uid, hostName, eventName: event.name }
       );
 
-      socketService.emitToUser(friend.userId || friend.id, 'movie_night_invite', {
+      socketService.emitToUser(friendId, 'movie_night_invite', {
         event,
         hostName
       });
-    }
+    }));
 
     return res.status(201).json({ event });
   } catch (error) {
@@ -295,7 +296,7 @@ exports.updateMovieNight = async (req, res) => {
 
     if (isVotingStarted) {
       const joinedParticipants = event.participants.filter(p => p.userId !== uid);
-      for (const participant of joinedParticipants) {
+      await Promise.all(joinedParticipants.map(async (participant) => {
         await socialRepository.createNotification(
           participant.userId,
           'movie_night_voting',
@@ -305,7 +306,7 @@ exports.updateMovieNight = async (req, res) => {
           { eventName: event.name }
         );
         socketService.emitToUser(participant.userId, 'movie_night_voting_started', { event });
-      }
+      }));
     }
 
     // Emit movie_night_updated to all other participants
@@ -331,8 +332,8 @@ exports.inviteFriends = async (req, res) => {
 
     const hostName = await socialRepository.getUserDisplayName(uid);
 
-    // Save notification & emit for newly invited friends
-    for (const friendId of friendIds) {
+    // Save notification & emit for newly invited friends in parallel
+    await Promise.all(friendIds.map(async (friendId) => {
       await socialRepository.createNotification(
         friendId,
         'movie_night_invite',
@@ -346,7 +347,7 @@ exports.inviteFriends = async (req, res) => {
         event,
         hostName
       });
-    }
+    }));
 
     // Emit movie_night_updated to already joined participants
     const joinedUids = event.participants
@@ -451,16 +452,16 @@ exports.submitVote = async (req, res) => {
       const tiedCount = event._tiedMovieCount || event.shortlist.length;
       const round = event.round || 2;
 
-      for (const participant of event.participants) {
-        await socialRepository.createNotification(
+      await Promise.all(event.participants.map((participant) =>
+        socialRepository.createNotification(
           participant.userId,
           'movie_night_tie_breaker',
           'Tie-Breaker!',
           `${tiedCount} movies tied in "${event.name}"! Vote again in round ${round}.`,
           event.id,
           { eventName: event.name, round, tiedCount }
-        );
-      }
+        )
+      ));
       // Clean internal flags before sending to clients
       delete event._tieBreaker;
       delete event._tiedMovieCount;
@@ -469,7 +470,7 @@ exports.submitVote = async (req, res) => {
       const winnerCandidate = event.shortlist.find(c => `tmdb-${c.movie.tmdbId}` === event.winnerMovieId);
       const winnerTitle = winnerCandidate ? winnerCandidate.movie.title : 'Selected Movie';
 
-      for (const participant of event.participants) {
+      await Promise.all(event.participants.map(async (participant) => {
         await socialRepository.createNotification(
           participant.userId,
           'movie_night_completed',
@@ -479,7 +480,7 @@ exports.submitVote = async (req, res) => {
           { eventName: event.name, winnerMovieId: event.winnerMovieId, winnerTitle }
         );
         socketService.emitToUser(participant.userId, 'movie_night_completed', { event, winnerTitle });
-      }
+      }));
     } else {
       socketService.emitToUsers(allUids, 'movie_night_updated', { event });
     }

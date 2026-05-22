@@ -610,23 +610,111 @@ async function leaveMovieNight(uid, eventId) {
   return result.records.length > 0;
 }
 
+function assembleMovieNightData(event, participants, shortlist, votes) {
+  // Enrich shortlist with computed vote scores
+  const enrichedShortlist = shortlist.map((candidate) => {
+    const movieId = `tmdb-${candidate.movie.tmdbId}`;
+    const movieVotes = votes.filter((v) => v.movieId === movieId);
+    const voteSc = movieVotes.reduce((sum, v) => sum + voteScore(v.vote), 0);
+    return {
+      ...candidate,
+      voteScore: voteSc,
+      finalScore: voteSc,
+      likesCount: movieVotes.filter((v) => v.vote === 'like').length,
+      dislikesCount: movieVotes.filter((v) => v.vote === 'dislike').length,
+    };
+  });
+
+  return {
+    ...event,
+    participants,
+    shortlist: enrichedShortlist,
+    votes,
+    votedUserIds: completedVoterIds(participants, enrichedShortlist, votes)
+  };
+}
+
 async function listMovieNights(uid) {
   const result = await neo4jService.run(
     `
-    MATCH (:AppUser {uid: $uid})-[:PARTICIPATES_IN]->(event:MovieNight)
-    RETURN event.id AS eventId
+    MATCH (me:AppUser {uid: $uid})-[:PARTICIPATES_IN]->(event:MovieNight)
+    OPTIONAL MATCH (host:AppUser)-[:HOSTS]->(event)
+    WITH event, host
     ORDER BY event.updatedAt DESC
     LIMIT 50
+    RETURN {
+      id: event.id,
+      name: event.name,
+      hostUserId: host.uid,
+      dateTime: event.dateTime,
+      constraints: {
+        includedGenres: coalesce(event.includedGenres, []),
+        excludedGenres: coalesce(event.excludedGenres, []),
+        maxDurationMinutes: event.maxDurationMinutes,
+        minimumRating: event.minimumRating,
+        language: event.language
+      },
+      inviteLink: coalesce(event.inviteLink, ''),
+      status: coalesce(event.status, 'waiting'),
+      winnerMovieId: event.winnerMovieId,
+      round: coalesce(event.round, 1),
+      createdAt: toString(event.createdAt),
+      updatedAt: toString(event.updatedAt)
+    } AS event,
+    [(user:AppUser)-[part:PARTICIPATES_IN]->(event) | {
+      userId: user.uid,
+      name: coalesce(user.displayName, user.email, 'Agreeo user'),
+      avatarUrl: coalesce(user.avatarUrl, ''),
+      status: coalesce(part.status, 'pending'),
+      isHost: coalesce(part.isHost, false)
+    }] AS participants,
+    [(event)-[candidate:HAS_CANDIDATE]->(m:Movie) WHERE event.status = 'completed' OR candidate.eliminated IS NULL OR NOT candidate.eliminated | {
+      movie: ${movieMapCypher('m')},
+      compatibilityScore: coalesce(candidate.compatibilityScore, 0.0),
+      explanationTags: coalesce(candidate.explanationTags, []),
+      scoreBreakdownJson: coalesce(candidate.scoreBreakdownJson, '{}')
+    }] AS shortlist,
+    [(vUser:AppUser)-[vote:VOTED_IN]->(vMovie:Movie) WHERE vote.eventId = event.id | {
+      eventId: vote.eventId,
+      userId: vUser.uid,
+      movieId: 'tmdb-' + toString(vMovie.tmdbId),
+      vote: vote.vote,
+      createdAt: toString(coalesce(vote.updatedAt, vote.createdAt))
+    }] AS votes
     `,
     { uid }
   );
 
-  const events = [];
-  for (const record of result.records) {
-    const event = await getMovieNight(uid, record.get('eventId'));
-    if (event) events.push(event);
-  }
-  return events;
+  return result.records.map((record) => {
+    const event = native(record.get('event'));
+    const rawParticipants = native(record.get('participants')) || [];
+    const rawShortlist = native(record.get('shortlist')) || [];
+    const rawVotes = native(record.get('votes')) || [];
+
+    // Sort participants: isHost DESC, name ASC case-insensitive
+    const participants = rawParticipants.sort((left, right) => {
+      const leftHost = left.isHost === true ? 1 : 0;
+      const rightHost = right.isHost === true ? 1 : 0;
+      if (leftHost !== rightHost) {
+        return rightHost - leftHost;
+      }
+      return left.name.toLowerCase().localeCompare(right.name.toLowerCase());
+    });
+
+    // Normalize and sort shortlist
+    const shortlist = rawShortlist.map((candidate) => normalizeCandidate(candidate))
+      .sort((left, right) => {
+        if (left.compatibilityScore !== right.compatibilityScore) {
+          return right.compatibilityScore - left.compatibilityScore;
+        }
+        return left.movie.title.localeCompare(right.movie.title);
+      });
+
+    // Sort votes
+    const votes = rawVotes.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+    return assembleMovieNightData(event, participants, shortlist, votes);
+  });
 }
 
 async function getMovieNight(uid, eventId) {
@@ -666,21 +754,7 @@ async function getMovieNight(uid, eventId) {
     loadVotes(eventId),
   ]);
 
-  // Enrich shortlist with computed vote scores
-  const enrichedShortlist = shortlist.map((candidate) => {
-    const movieId = `tmdb-${candidate.movie.tmdbId}`;
-    const movieVotes = votes.filter((v) => v.movieId === movieId);
-    const voteSc = movieVotes.reduce((sum, v) => sum + voteScore(v.vote), 0);
-    return {
-      ...candidate,
-      voteScore: voteSc,
-      finalScore: voteSc,
-      likesCount: movieVotes.filter((v) => v.vote === 'like').length,
-      dislikesCount: movieVotes.filter((v) => v.vote === 'dislike').length,
-    };
-  });
-
-  return { ...event, participants, shortlist: enrichedShortlist, votes, votedUserIds: completedVoterIds(participants, shortlist, votes) };
+  return assembleMovieNightData(event, participants, shortlist, votes);
 }
 
 function completedVoterIds(participants, shortlist, votes) {
@@ -939,40 +1013,7 @@ async function clearVotesOnly(eventId) {
   );
 }
 
-const TMDB_GENRE_IDS_BY_NAME = {
-  action: 28,
-  adventure: 12,
-  animation: 16,
-  comedy: 35,
-  crime: 80,
-  documentary: 99,
-  drama: 18,
-  family: 10751,
-  fantasy: 14,
-  history: 36,
-  horror: 27,
-  music: 10402,
-  mystery: 9648,
-  romance: 10749,
-  science_fiction: 878,
-  'science fiction': 878,
-  'sci-fi': 878,
-  tv_movie: 10770,
-  'tv movie': 10770,
-  thriller: 53,
-  war: 10752,
-  western: 37,
-};
-
-const TMDB_GENRE_NAMES_BY_ID = Object.fromEntries(
-  Object.entries(TMDB_GENRE_IDS_BY_NAME).map(([name, id]) => [id, name])
-);
-
-function mapGenreNameToId(name) {
-  if (!name) return null;
-  const clean = String(name).trim().toLowerCase();
-  return TMDB_GENRE_IDS_BY_NAME[clean] || null;
-}
+const { TMDB_GENRE_IDS_BY_NAME, TMDB_GENRE_NAMES_BY_ID, mapGenreNameToId } = require('./genreUtils');
 
 async function loadCandidateMovies(constraints, limit = 150) {
   try {
