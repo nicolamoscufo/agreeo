@@ -30,7 +30,9 @@ class Neo4jConfig {
     return Neo4jConfig(
       uri: configuredUri.isNotEmpty ? configuredUri : 'http://$host:7474',
       username: configuredUsername.isNotEmpty ? configuredUsername : 'neo4j',
-      password: configuredPassword.isNotEmpty ? configuredPassword : 'password',
+      password: configuredPassword.isNotEmpty
+          ? configuredPassword
+          : 'password123',
       database: configuredDatabase.isNotEmpty ? configuredDatabase : 'neo4j',
     );
   }

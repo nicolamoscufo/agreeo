@@ -108,7 +108,7 @@ class BackendCatalogMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getMockShortMovies() async {
+  Future<List<Movie>> getShortMovies() async {
     final catalog = await getCatalog();
     return catalog
         .where((movie) => movie.runtime <= 110)

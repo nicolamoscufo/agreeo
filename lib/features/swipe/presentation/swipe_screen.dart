@@ -20,7 +20,9 @@ enum SwipeDirection { left, right, up, down }
 
 class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   bool _queueRefillScheduled = false;
-  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(0.0);
+  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(
+    0.0,
+  );
 
   @override
   void initState() {
@@ -57,7 +59,6 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   }
 
   Future<void> _handleSwiped(String movieId, SwipeDirection direction) async {
-    _dragProgressNotifier.value = 0.0;
     final controller = ref.read(agreeoAppControllerProvider.notifier);
     Future<String> Function() action;
 
@@ -80,10 +81,19 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
       await action();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      _resetDragProgressAfterFrame();
     }
+  }
+
+  void _resetDragProgressAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _dragProgressNotifier.value = 0.0;
+    });
   }
 
   @override
@@ -112,9 +122,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
                     AgreeoColors.kernelGold.withValues(alpha: 0.06),
                   ],
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -213,15 +221,18 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
             Positioned.fill(
               child: ValueListenableBuilder<double>(
                 valueListenable: _dragProgressNotifier,
-                child: _ImmersiveMovieCard(
-                  movie: nextMovie,
-                  isBackground: true,
-                  actions: const _SwipeCardFooterSkeleton(),
-                ),
-                builder: (context, dragProgress, child) {
+                builder: (context, dragProgress, _) {
+                  final easedProgress = Curves.easeOutCubic.transform(
+                    dragProgress,
+                  );
                   return Transform.scale(
-                    scale: 0.94 + (dragProgress * 0.04),
-                    child: child,
+                    scale: 0.985 + (easedProgress * 0.015),
+                    child: _ImmersiveMovieCard(
+                      movie: nextMovie,
+                      isBackground: true,
+                      backgroundProgress: easedProgress,
+                      actions: const _SwipeCardFooterSkeleton(),
+                    ),
                   );
                 },
               ),
@@ -229,47 +240,32 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
 
           // Current Movie
           Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.08),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
+            child: SwipeableCard(
+              key: ValueKey<String>(currentMovie.id),
+              movie: currentMovie,
+              canUndo: state.undoStack.isNotEmpty,
+              onDragProgress: (progress) {
+                _dragProgressNotifier.value = progress;
+              },
+              onSwiped: (direction) =>
+                  _handleSwiped(currentMovie.id, direction),
+              onUndo: () async {
+                HapticFeedback.lightImpact();
+                final messenger = ScaffoldMessenger.of(context);
+                final message = await ref
+                    .read(agreeoAppControllerProvider.notifier)
+                    .undoLastAction();
+                if (!mounted) return;
+                messenger.showSnackBar(SnackBar(content: Text(message)));
+              },
+              onInfoTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        AgreeoMovieDetailsScreen(movieId: currentMovie.id),
                   ),
                 );
               },
-              child: SwipeableCard(
-                key: ValueKey<String>(currentMovie.id),
-                movie: currentMovie,
-                canUndo: state.undoStack.isNotEmpty,
-                onDragProgress: (progress) {
-                  _dragProgressNotifier.value = progress;
-                },
-                onSwiped: (direction) => _handleSwiped(currentMovie.id, direction),
-                onUndo: () async {
-                  HapticFeedback.lightImpact();
-                  final messenger = ScaffoldMessenger.of(context);
-                  final message = await ref
-                      .read(agreeoAppControllerProvider.notifier)
-                      .undoLastAction();
-                  if (!mounted) return;
-                  messenger.showSnackBar(SnackBar(content: Text(message)));
-                },
-                onInfoTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AgreeoMovieDetailsScreen(movieId: currentMovie.id),
-                    ),
-                  );
-                },
-              ),
             ),
           ),
 
@@ -389,21 +385,24 @@ class _SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _swipeController;
   Animation<Offset>? _swipeAnimation;
-  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(Offset.zero);
+  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(
+    Offset.zero,
+  );
   bool _isSubmittingSwipe = false;
 
   @override
   void initState() {
     super.initState();
-    _swipeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-    )..addListener(() {
-        if (_swipeAnimation != null) {
-          _dragOffsetNotifier.value = _swipeAnimation!.value;
-          _notifyDragProgress();
-        }
-      });
+    _swipeController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 240),
+        )..addListener(() {
+          if (_swipeAnimation != null) {
+            _dragOffsetNotifier.value = _swipeAnimation!.value;
+            _notifyDragProgress();
+          }
+        });
   }
 
   @override
@@ -418,19 +417,26 @@ class _SwipeableCardState extends State<SwipeableCard>
     final dragOffset = _dragOffsetNotifier.value;
     final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
     final size = MediaQuery.sizeOf(context);
-    final progress = (isHorizontalDominant
-            ? (dragOffset.dx.abs() / (size.width * 0.45))
-            : (dragOffset.dy.abs() / (size.height * 0.25)))
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final progress =
+        (isHorizontalDominant
+                ? (dragOffset.dx.abs() / (size.width * 0.45))
+                : (dragOffset.dy.abs() / (size.height * 0.25)))
+            .clamp(0.0, 1.0)
+            .toDouble();
     widget.onDragProgress(progress);
   }
 
-  Future<void> _animateDragTo(Offset target) async {
+  Future<void> _animateDragTo(
+    Offset target, {
+    Duration duration = const Duration(milliseconds: 260),
+    Curve curve = Curves.easeOutCubic,
+  }) async {
     _swipeController.stop();
-    _swipeAnimation = Tween<Offset>(begin: _dragOffsetNotifier.value, end: target).animate(
-      CurvedAnimation(parent: _swipeController, curve: Curves.easeOutCubic),
-    );
+    _swipeController.duration = duration;
+    _swipeAnimation = Tween<Offset>(
+      begin: _dragOffsetNotifier.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _swipeController, curve: curve));
     await _swipeController.forward(from: 0);
   }
 
@@ -454,7 +460,11 @@ class _SwipeableCardState extends State<SwipeableCard>
         break;
     }
     HapticFeedback.mediumImpact();
-    await _animateDragTo(target);
+    await _animateDragTo(
+      target,
+      duration: const Duration(milliseconds: 310),
+      curve: Curves.easeOutQuart,
+    );
     widget.onSwiped(direction);
   }
 
@@ -470,25 +480,38 @@ class _SwipeableCardState extends State<SwipeableCard>
       final shouldVote =
           dragOffset.dx.abs() > size.width * 0.28 || velocityX.abs() > 650;
       if (!shouldVote) {
-        await _animateDragTo(Offset.zero);
+        await _animateDragTo(
+          Offset.zero,
+          duration: const Duration(milliseconds: 210),
+        );
         return;
       }
       final swipeLike = velocityX.abs() > dragOffset.dx.abs()
           ? velocityX > 0
           : dragOffset.dx > 0;
-      
+
       final direction = swipeLike ? SwipeDirection.right : SwipeDirection.left;
-      final target = Offset((swipeLike ? 1 : -1) * (size.width + 260), dragOffset.dy);
-      
+      final target = Offset(
+        (swipeLike ? 1 : -1) * (size.width + 260),
+        dragOffset.dy,
+      );
+
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
-      await _animateDragTo(target);
+      await _animateDragTo(
+        target,
+        duration: const Duration(milliseconds: 310),
+        curve: Curves.easeOutQuart,
+      );
       widget.onSwiped(direction);
     } else {
       final shouldVote =
           dragOffset.dy.abs() > size.height * 0.18 || velocityY.abs() > 650;
       if (!shouldVote) {
-        await _animateDragTo(Offset.zero);
+        await _animateDragTo(
+          Offset.zero,
+          duration: const Duration(milliseconds: 210),
+        );
         return;
       }
       final swipeUp = velocityY.abs() > dragOffset.dy.abs()
@@ -496,11 +519,18 @@ class _SwipeableCardState extends State<SwipeableCard>
           : dragOffset.dy < 0;
 
       final direction = swipeUp ? SwipeDirection.up : SwipeDirection.down;
-      final target = Offset(dragOffset.dx, (swipeUp ? -1 : 1) * (size.height + 260));
-      
+      final target = Offset(
+        dragOffset.dx,
+        (swipeUp ? -1 : 1) * (size.height + 260),
+      );
+
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
-      await _animateDragTo(target);
+      await _animateDragTo(
+        target,
+        duration: const Duration(milliseconds: 310),
+        curve: Curves.easeOutQuart,
+      );
       widget.onSwiped(direction);
     }
   }
@@ -530,17 +560,26 @@ class _SwipeableCardState extends State<SwipeableCard>
             },
       onPanEnd: (details) => _handlePanEnd(details),
       onPanCancel: () {
-        _animateDragTo(Offset.zero);
+        _animateDragTo(
+          Offset.zero,
+          duration: const Duration(milliseconds: 210),
+        );
       },
       child: ValueListenableBuilder<Offset>(
         valueListenable: _dragOffsetNotifier,
         child: movieCard,
         builder: (context, dragOffset, child) {
           final width = MediaQuery.sizeOf(context).width;
-          final rotation = (dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() * 0.18;
-          
-          final hProgress = (dragOffset.dx.abs() / (width * 0.42)).clamp(0.0, 1.0).toDouble();
-          final vProgress = (dragOffset.dy.abs() / (MediaQuery.sizeOf(context).height * 0.22)).clamp(0.0, 1.0).toDouble();
+          final rotation =
+              (dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() * 0.18;
+
+          final hProgress = (dragOffset.dx.abs() / (width * 0.42))
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final vProgress =
+              (dragOffset.dy.abs() / (MediaQuery.sizeOf(context).height * 0.22))
+                  .clamp(0.0, 1.0)
+                  .toDouble();
           final isHoriz = dragOffset.dx.abs() >= dragOffset.dy.abs();
           final overlayProgress = isHoriz ? hProgress : vProgress;
 
@@ -572,17 +611,26 @@ class _ImmersiveMovieCard extends StatelessWidget {
     required this.movie,
     required this.actions,
     this.isBackground = false,
+    this.backgroundProgress = 0,
     this.onInfoTap,
   });
 
   final Movie movie;
   final Widget actions;
   final bool isBackground;
+  final double backgroundProgress;
   final VoidCallback? onInfoTap;
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = _preferredImageUrl(movie);
+    final expansionProgress = isBackground
+        ? backgroundProgress.clamp(0.0, 1.0).toDouble()
+        : 1.0;
+    double expandPadding(double background, double foreground) {
+      return background + ((foreground - background) * expansionProgress);
+    }
+
     final metadata = <String>[
       if (movie.releaseYear > 0) movie.releaseYear.toString(),
       if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
@@ -590,10 +638,10 @@ class _ImmersiveMovieCard extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isBackground ? 26 : 16,
-        isBackground ? 36 : 18,
-        isBackground ? 26 : 16,
-        isBackground ? 120 : 18,
+        expandPadding(26, 16),
+        expandPadding(24, 18),
+        expandPadding(26, 16),
+        expandPadding(48, 18),
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -652,8 +700,9 @@ class _ImmersiveMovieCard extends StatelessWidget {
                                 color: Colors.black.withValues(alpha: 0.45),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: AgreeoColors.kernelGold
-                                      .withValues(alpha: 0.3),
+                                  color: AgreeoColors.kernelGold.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               child: Row(
@@ -730,29 +779,40 @@ class _ImmersiveMovieCard extends StatelessWidget {
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: movie.genres.take(3).map((genre) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      color: Colors.white.withValues(alpha: 0.12),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.1),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      genre,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.9),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(growable: false),
+                                children: movie.genres
+                                    .take(3)
+                                    .map((genre) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          genre,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.9,
+                                            ),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      );
+                                    })
+                                    .toList(growable: false),
                               ),
                             ],
                             if (movie.overview.isNotEmpty) ...<Widget>[
@@ -901,8 +961,8 @@ class _SwipeCardActions extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isSmallPhone = constraints.maxWidth < 340;
-        final baseSize = isSmallPhone ? 48.0 : 56.0;
-        final mainSize = isSmallPhone ? 56.0 : 68.0;
+        final baseSize = isSmallPhone ? 44.0 : 52.0;
+        final mainSize = isSmallPhone ? 52.0 : 62.0;
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -921,7 +981,9 @@ class _SwipeCardActions extends StatelessWidget {
               semanticLabel: 'Dislike',
               size: mainSize,
               onTap: onDislike,
-              backgroundColor: AgreeoColors.popcornWhite.withValues(alpha: 0.12),
+              backgroundColor: AgreeoColors.popcornWhite.withValues(
+                alpha: 0.12,
+              ),
               iconColor: AgreeoColors.popcornWhite,
             ),
             _SwipeCardActionButton(
@@ -929,7 +991,9 @@ class _SwipeCardActions extends StatelessWidget {
               semanticLabel: 'Already seen',
               size: baseSize,
               onTap: onSeen,
-              backgroundColor: AgreeoColors.popcornWhite.withValues(alpha: 0.12),
+              backgroundColor: AgreeoColors.popcornWhite.withValues(
+                alpha: 0.12,
+              ),
               iconColor: AgreeoColors.popcornWhite,
             ),
             _SwipeCardActionButton(
@@ -937,7 +1001,9 @@ class _SwipeCardActions extends StatelessWidget {
               semanticLabel: 'Like',
               size: mainSize,
               onTap: onLike,
-              backgroundColor: AgreeoColors.cinematicRed.withValues(alpha: 0.15),
+              backgroundColor: AgreeoColors.cinematicRed.withValues(
+                alpha: 0.15,
+              ),
               iconColor: AgreeoColors.cinematicRed,
             ),
             _SwipeCardActionButton(
@@ -965,8 +1031,8 @@ class _SwipeCardFooterSkeleton extends StatelessWidget {
       children: List<Widget>.generate(5, (index) {
         final isMain = index == 1 || index == 3;
         return Container(
-          width: isMain ? 68 : 56,
-          height: isMain ? 68 : 56,
+          width: isMain ? 62 : 52,
+          height: isMain ? 62 : 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: Colors.white.withValues(alpha: 0.14),
@@ -1015,11 +1081,7 @@ class _SwipeCardActionButton extends StatelessWidget {
               child: SizedBox(
                 width: size,
                 height: size,
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: size * 0.45,
-                ),
+                child: Icon(icon, color: iconColor, size: size * 0.45),
               ),
             ),
           ),

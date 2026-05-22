@@ -5,7 +5,7 @@ import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/shared/components/filter_bottom_sheet.dart';
 import 'package:agreeo/shared/components/movie_widgets.dart';
 import 'package:agreeo/shared/components/primitives.dart';
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
+import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/home_refresh_provider.dart';
@@ -31,7 +31,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   Future<List<Movie>>? _searchFuture;
   int _recommendedVisibleCount = _sectionBatchSize;
   int _trendingVisibleCount = _sectionBatchSize;
-  int _friendsVisibleCount = _sectionBatchSize;
   bool _isRefreshingHome = false;
   int _currentPage = 1;
 
@@ -114,7 +113,9 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
 
     final parts = <String>[];
     if (recommendedCount > 0) {
-      parts.add('$recommendedCount new recommendation${recommendedCount == 1 ? '' : 's'}');
+      parts.add(
+        '$recommendedCount new recommendation${recommendedCount == 1 ? '' : 's'}',
+      );
     }
     if (unwatchedWatchlist > 0) {
       parts.add('$unwatchedWatchlist unwatched in your watchlist');
@@ -140,7 +141,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
         _activeQuickFilter = 'Any';
         _recommendedVisibleCount = _sectionBatchSize;
         _trendingVisibleCount = _sectionBatchSize;
-        _friendsVisibleCount = _sectionBatchSize;
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -161,7 +161,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
 
     List<Movie> recommended = const <Movie>[];
     List<Movie> trending = const <Movie>[];
-    List<Movie> friends = const <Movie>[];
     List<Movie> filteredCatalog = const <Movie>[];
 
     if (!hasRemoteSearch) {
@@ -173,10 +172,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
         state.trendingMovies,
         query,
       ).take(_trendingVisibleCount).toList(growable: false);
-      friends = _applyFilters(
-        state.moviesByIds(mockPopularWithFriendsIds),
-        query,
-      ).take(_friendsVisibleCount).toList(growable: false);
       filteredCatalog = _applyFilters(state.catalog, query);
     }
 
@@ -388,17 +383,6 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                   ),
                   movies: trending,
                 ),
-                const SizedBox(height: 22),
-                _CollectionSection(
-                  icon: Icons.people_rounded,
-                  iconColor: AgreeoColors.cinematicRed,
-                  title: 'Popular with your friends',
-                  subtitle: _appendCount(
-                    'A social placeholder for titles your circle keeps circling back to.',
-                    friends.length,
-                  ),
-                  movies: friends,
-                ),
               ],
             ],
           ),
@@ -486,7 +470,9 @@ class _CollectionSection extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (iconColor ?? colorScheme.primary).withValues(alpha: 0.14),
+                color: (iconColor ?? colorScheme.primary).withValues(
+                  alpha: 0.14,
+                ),
               ),
               child: Icon(
                 icon,

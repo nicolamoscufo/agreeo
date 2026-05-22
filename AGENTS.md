@@ -82,6 +82,31 @@ Intent auto-detection, hybrid ranking, session memory, auto-expanding budget.
 `run_pipeline` auto-queries all indexed repos. Use `repos: ["alias"]` to scope. Run `index_status` to see aliases.
 <!-- /vexp -->
 
+## graphify <!-- graphify knowledge graph -->
+
+A knowledge graph of the entire codebase is available as an MCP server. Agents can use it
+to answer structural questions, find shortest paths between concepts, and discover
+cross-module relationships without searching files one by one.
+
+### Available MCP tools (via @graphify)
+- `query_graph` — BFS/DFS traversals from a starting concept
+- `get_node` — inspect a specific node's attributes
+- `get_neighbors` — immediate neighbors of a node
+- `get_community` — all nodes in a community
+- `god_nodes` — most connected hub nodes
+- `graph_stats` — summary statistics
+- `shortest_path` — shortest path between two concepts
+
+### When to use
+- **First**: Check graphify first when asked about architecture or relationships.
+  One query can replace 5-10 file reads.
+- **Cross-module questions**: "What connects X to Y?" → `shortest_path`
+- **Impact analysis**: "What does module Z touch?" → `get_neighbors` / BFS on Z
+- **Orientation**: "What are the core abstractions?" → `god_nodes`
+
+The graph lives at `.graphify/graph.json`. To regenerate after significant changes,
+run `/graphify . --update`.
+
 ## Graphify MCP
 
 Use the `graphify` MCP server when graph traversal is a better fit than plain text search.

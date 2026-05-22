@@ -1,4 +1,4 @@
-package com.example.agreeo
+package com.agreeo.app
 
 import io.flutter.embedding.android.FlutterActivity
 

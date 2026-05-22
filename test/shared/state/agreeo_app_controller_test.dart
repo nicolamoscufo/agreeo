@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:agreeo/services/backend_movie_service.dart';
 import 'package:agreeo/services/real_time_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
-import 'package:agreeo/shared/services/mock_auth_service.dart';
+import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:agreeo/shared/services/user_movie_state_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
@@ -81,7 +81,7 @@ class _FakeMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getMockShortMovies() {
+  Future<List<Movie>> getShortMovies() {
     throw UnimplementedError();
   }
 
@@ -94,6 +94,22 @@ class _FakeMovieService implements MovieService {
   Future<Map<String, dynamic>> getRecommendationDebugStats() async {
     return <String, dynamic>{};
   }
+}
+
+class _StoredLoginAuthService extends BackendAuthSessionService {
+  _StoredLoginAuthService({
+    required this.session,
+    required this.onboardingCompleted,
+  });
+
+  final AgreeoUserSession? session;
+  final bool onboardingCompleted;
+
+  @override
+  Future<AgreeoUserSession?> restoreSession() async => session;
+
+  @override
+  Future<bool> isOnboardingCompleted() async => onboardingCompleted;
 }
 
 Movie _movie(String id) {
@@ -154,7 +170,7 @@ void main() {
         _FakeMovieService(const <Movie>[], <List<Movie>>[
           <Movie>[freshMovie],
         ]),
-        MockAuthService(),
+        BackendAuthSessionService(),
         LocalUserMovieStateService(),
         BackendMovieService(),
       );
@@ -182,7 +198,7 @@ void main() {
         <Movie>[firstMovie],
         <Movie>[secondMovie],
       ]),
-      MockAuthService(),
+      BackendAuthSessionService(),
       LocalUserMovieStateService(),
       BackendMovieService(),
     );
@@ -213,5 +229,35 @@ void main() {
 
     expect(controller.state.dailySuggestionIds, contains(firstMovie.id));
     expect(controller.state.dailySuggestionIds, contains(secondMovie.id));
+  });
+
+  test('bootstrap restores login from persisted auth tokens', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final restoredSession = AgreeoUserSession(
+      id: 'user-1',
+      displayName: 'Restored User',
+      email: 'restored@example.com',
+      bio: 'Bio',
+      joinedAt: DateTime(2026, 4, 11),
+    );
+
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      _StoredLoginAuthService(
+        session: restoredSession,
+        onboardingCompleted: true,
+      ),
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.session?.id, restoredSession.id);
+    expect(controller.state.onboardingComplete, isTrue);
   });
 }

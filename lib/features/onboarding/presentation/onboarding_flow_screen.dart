@@ -1,5 +1,5 @@
 import 'package:agreeo/shared/components/movie_widgets.dart';
-import 'package:agreeo/shared/mock_data/mock_movies.dart';
+import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
@@ -66,7 +66,8 @@ class _AgreeoOnboardingFlowScreenState
         : true; // Step 2 is always enabled to allow completion
 
     return Scaffold(
-      backgroundColor: AgreeoColors.anthraciteBlack, // Cinema Popcorn dark background
+      backgroundColor:
+          AgreeoColors.anthraciteBlack, // Cinema Popcorn dark background
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -80,21 +81,25 @@ class _AgreeoOnboardingFlowScreenState
                 children: [
                   Text(
                     'Agreeo',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.transparent,
-                      letterSpacing: -0.5,
-                      shadows: [
-                        Shadow(color: AgreeoColors.cinematicRed, blurRadius: 10),
-                      ],
-                      decoration: TextDecoration.none,
-                    ).copyWith(
-                      foreground: Paint()
-                        ..style = PaintingStyle.stroke
-                        ..strokeWidth = 1.5
-                        ..color = AgreeoColors.cinematicRed,
-                    ),
+                    style:
+                        const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.transparent,
+                          letterSpacing: -0.5,
+                          shadows: [
+                            Shadow(
+                              color: AgreeoColors.cinematicRed,
+                              blurRadius: 10,
+                            ),
+                          ],
+                          decoration: TextDecoration.none,
+                        ).copyWith(
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 1.5
+                            ..color = AgreeoColors.cinematicRed,
+                        ),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -125,7 +130,10 @@ class _AgreeoOnboardingFlowScreenState
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(999),
                               gradient: const LinearGradient(
-                                colors: [AgreeoColors.cinematicRed, AgreeoColors.kernelGold],
+                                colors: [
+                                  AgreeoColors.cinematicRed,
+                                  AgreeoColors.kernelGold,
+                                ],
                               ),
                             ),
                           ),
@@ -240,7 +248,10 @@ class _AgreeoOnboardingFlowScreenState
                     borderRadius: BorderRadius.circular(16),
                     gradient: isButtonEnabled
                         ? const LinearGradient(
-                            colors: [AgreeoColors.cinematicRed, AgreeoColors.kernelGold],
+                            colors: [
+                              AgreeoColors.cinematicRed,
+                              AgreeoColors.kernelGold,
+                            ],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           )
@@ -271,7 +282,9 @@ class _AgreeoOnboardingFlowScreenState
                                   }
                                 : () async {
                                     await ref
-                                        .read(agreeoAppControllerProvider.notifier)
+                                        .read(
+                                          agreeoAppControllerProvider.notifier,
+                                        )
                                         .finishOnboarding();
                                   }
                           : null,
@@ -279,7 +292,9 @@ class _AgreeoOnboardingFlowScreenState
                         child: Text(
                           _pageIndex == 0 ? 'Continue' : 'Get Started',
                           style: TextStyle(
-                            color: isButtonEnabled ? Colors.white : Colors.white38,
+                            color: isButtonEnabled
+                                ? Colors.white
+                                : Colors.white38,
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
@@ -408,10 +423,12 @@ class _OnboardingGenreChip extends StatelessWidget {
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: AgreeoColors.cinematicRed.withValues(alpha: 0.25),
+                        color: AgreeoColors.cinematicRed.withValues(
+                          alpha: 0.25,
+                        ),
                         blurRadius: 8,
                         spreadRadius: 1,
-                      )
+                      ),
                     ]
                   : null,
             ),
@@ -429,7 +446,9 @@ class _OnboardingGenreChip extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: selected ? Colors.white : Colors.white.withValues(alpha: 0.75),
+                    color: selected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.75),
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -483,7 +502,10 @@ class _FavoriteMoviesStep extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Search for movies...',
               hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-              prefixIcon: const Icon(Icons.search_rounded, color: AgreeoColors.kernelGold),
+              prefixIcon: const Icon(
+                Icons.search_rounded,
+                color: AgreeoColors.kernelGold,
+              ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -520,7 +542,9 @@ class _FavoriteMoviesStep extends StatelessWidget {
               child: Text(
                 '$selectedCount selected',
                 style: TextStyle(
-                  color: selectedCount > 0 ? AgreeoColors.kernelGold : Colors.white70,
+                  color: selectedCount > 0
+                      ? AgreeoColors.kernelGold
+                      : Colors.white70,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),

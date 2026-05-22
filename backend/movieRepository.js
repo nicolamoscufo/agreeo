@@ -231,6 +231,14 @@ async function setMovieRuntime(tmdbId, runtime) {
   return true;
 }
 async function likeMovie(uid, movie) {
+  await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[old:DISLIKED]->(m:Movie {tmdbId: $tmdbId})
+    DELETE old
+    `,
+    { uid, tmdbId: movie.tmdbId }
+  );
+
   await mergeTmdbMovie(movie);
   const result = await neo4jService.run(
     `
@@ -249,7 +257,7 @@ async function likeMovie(uid, movie) {
 async function dislikeMovie(uid, movie) {
   await neo4jService.run(
     `
-    MATCH (u:AppUser {uid: $uid})-[old:LIKED]->(m:Movie {tmdbId: $tmdbId})
+    MATCH (u:AppUser {uid: $uid})-[old:LIKED|WATCHLISTED]->(m:Movie {tmdbId: $tmdbId})
     DELETE old
     `,
     { uid, tmdbId: movie.tmdbId }
@@ -272,6 +280,14 @@ async function dislikeMovie(uid, movie) {
 }
 
 async function watchlistMovie(uid, movie) {
+  await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[old:DISLIKED|ALREADY_SEEN]->(m:Movie {tmdbId: $tmdbId})
+    DELETE old
+    `,
+    { uid, tmdbId: movie.tmdbId }
+  );
+
   await mergeTmdbMovie(movie);
   const result = await neo4jService.run(
     `
@@ -288,6 +304,14 @@ async function watchlistMovie(uid, movie) {
 }
 
 async function markMovieAsSeen(uid, movie) {
+  await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[old:WATCHLISTED]->(m:Movie {tmdbId: $tmdbId})
+    DELETE old
+    `,
+    { uid, tmdbId: movie.tmdbId }
+  );
+
   await mergeTmdbMovie(movie);
   const result = await neo4jService.run(
     `
@@ -428,6 +452,7 @@ async function getUserLibrary(uid) {
         overview: m.overview,
         posterPath: m.posterPath,
         backdropPath: m.backdropPath,
+        runtime: m.runtime,
         posterUrl: m.posterUrl,
         backdropUrl: m.backdropUrl,
         releaseDate: m.releaseDate,
@@ -447,6 +472,7 @@ async function getUserLibrary(uid) {
         overview: m.overview,
         posterPath: m.posterPath,
         backdropPath: m.backdropPath,
+        runtime: m.runtime,
         posterUrl: m.posterUrl,
         backdropUrl: m.backdropUrl,
         releaseDate: m.releaseDate,
@@ -466,6 +492,7 @@ async function getUserLibrary(uid) {
         overview: m.overview,
         posterPath: m.posterPath,
         backdropPath: m.backdropPath,
+        runtime: m.runtime,
         posterUrl: m.posterUrl,
         backdropUrl: m.backdropUrl,
         releaseDate: m.releaseDate,

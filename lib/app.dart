@@ -62,7 +62,40 @@ class _AgreeoAppState extends ConsumerState<AgreeoApp> {
       themeMode: ThemeMode.dark,
       theme: buildAgreeoTheme(Brightness.light),
       darkTheme: buildAgreeoTheme(Brightness.dark),
+      builder: (context, child) => _CompactPhoneUi(child: child),
       home: const AgreeoBootstrapGate(),
+    );
+  }
+}
+
+class _CompactPhoneUi extends StatelessWidget {
+  const _CompactPhoneUi({required this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final shortestSide = mediaQuery.size.shortestSide;
+    if (shortestSide >= 430) {
+      return child ?? const SizedBox.shrink();
+    }
+
+    const compactScale = 0.92;
+    final textScale = (mediaQuery.textScaler.scale(1) * compactScale)
+        .clamp(0.88, 1.0)
+        .toDouble();
+    final scaledChild = MediaQuery(
+      data: mediaQuery.copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child ?? const SizedBox.shrink(),
+    );
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: scaledChild,
     );
   }
 }

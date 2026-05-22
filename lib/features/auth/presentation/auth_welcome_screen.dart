@@ -1,4 +1,4 @@
-import 'package:agreeo/shared/services/mock_auth_service.dart';
+import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:flutter/material.dart';
@@ -66,7 +66,7 @@ class _AgreeoAuthWelcomeScreenState
           password: _passwordController.text,
         );
       }
-    } on MockAuthException catch (error) {
+    } on BackendAuthException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -159,7 +159,10 @@ class _AgreeoAuthWelcomeScreenState
                               color: Colors.white,
                               fontSize: 16,
                             ),
-                            decoration: _buildInputDecoration('Name', prefixIcon: Icons.person_outline),
+                            decoration: _buildInputDecoration(
+                              'Name',
+                              prefixIcon: Icons.person_outline,
+                            ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Enter your name';
@@ -178,7 +181,10 @@ class _AgreeoAuthWelcomeScreenState
                             color: Colors.white,
                             fontSize: 16,
                           ),
-                          decoration: _buildInputDecoration('Email', prefixIcon: Icons.email_outlined),
+                          decoration: _buildInputDecoration(
+                            'Email',
+                            prefixIcon: Icons.email_outlined,
+                          ),
                           validator: (value) {
                             if (value == null ||
                                 value.trim().isEmpty ||
@@ -198,8 +204,11 @@ class _AgreeoAuthWelcomeScreenState
                             color: Colors.white,
                             fontSize: 16,
                           ),
-                          decoration: _buildInputDecoration('Password', prefixIcon: Icons.lock_outline)
-                              .copyWith(
+                          decoration:
+                              _buildInputDecoration(
+                                'Password',
+                                prefixIcon: Icons.lock_outline,
+                              ).copyWith(
                                 suffixIcon: IconButton(
                                   onPressed: () {
                                     setState(() {
@@ -231,13 +240,18 @@ class _AgreeoAuthWelcomeScreenState
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(28),
                             gradient: const LinearGradient(
-                              colors: [AgreeoColors.cinematicRed, AgreeoColors.kernelGold],
+                              colors: [
+                                AgreeoColors.cinematicRed,
+                                AgreeoColors.kernelGold,
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AgreeoColors.cinematicRed.withValues(alpha: 0.4),
+                                color: AgreeoColors.cinematicRed.withValues(
+                                  alpha: 0.4,
+                                ),
                                 blurRadius: 20,
                                 spreadRadius: 2,
                                 offset: const Offset(0, 4),
@@ -316,7 +330,9 @@ class _AgreeoAuthWelcomeScreenState
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.white54, fontSize: 16),
-      prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: Colors.white54) : null,
+      prefixIcon: prefixIcon != null
+          ? Icon(prefixIcon, color: Colors.white54)
+          : null,
       filled: true,
       fillColor: AgreeoColors.darkSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -336,7 +352,10 @@ class _AgreeoAuthWelcomeScreenState
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AgreeoColors.cinematicRed, width: 1.5),
+        borderSide: const BorderSide(
+          color: AgreeoColors.cinematicRed,
+          width: 1.5,
+        ),
       ),
     );
   }
