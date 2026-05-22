@@ -154,7 +154,9 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -180,9 +182,23 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
   ) {
     final movies = _sortedMovies(_moviesForTab(state, tab), state);
     if (movies.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 18, bottom: 120),
-        child: _emptyForTab(tab),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(0, 18, 0, 32),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: (constraints.maxHeight - 50)
+                    .clamp(0.0, double.infinity)
+                    .toDouble(),
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: _emptyForTab(tab),
+              ),
+            ),
+          );
+        },
       );
     }
 
@@ -588,10 +604,12 @@ class _LibraryMovieCard extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 6,
                           children: badges
-                              .map((b) => _MiniPillBadge(
-                                    label: b.label,
-                                    color: b.color,
-                                  ))
+                              .map(
+                                (b) => _MiniPillBadge(
+                                  label: b.label,
+                                  color: b.color,
+                                ),
+                              )
                               .toList(),
                         ),
                       ],

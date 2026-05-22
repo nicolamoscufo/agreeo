@@ -440,8 +440,21 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   Future<void> _syncLibraryFromBackend() async {
     if (!state.isAuthenticated) return;
     try {
-      final library = await _backendMovieService.getLibrary();
+      var library = await _backendMovieService.getLibrary();
+      final pushedMissingStates = await _pushMissingLocalStatesToBackend(
+        library,
+      );
+      if (pushedMissingStates) {
+        library = await _backendMovieService.getLibrary();
+      }
+
       final newStates = Map<String, UserMovieState>.from(state.movieStates);
+      final libraryMovies = <Movie>[
+        ...library.liked,
+        ...library.disliked,
+        ...library.watchlist,
+        ...library.alreadySeen,
+      ].where((movie) => movie.id.isNotEmpty).toList(growable: false);
 
       for (final movie in library.liked) {
         if (movie.id.isNotEmpty) {
@@ -479,13 +492,67 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         }
       }
 
-      state = state.copyWith(movieStates: newStates);
+      state = state.copyWith(
+        catalog: _mergeCatalogMovies(state.catalog, [libraryMovies]),
+        movieStates: newStates,
+      );
       await _persist();
     } catch (e) {
       debugPrint(
         '[AgreeoAppController] Failed to sync library from backend: $e',
       );
     }
+  }
+
+  Future<bool> _pushMissingLocalStatesToBackend(UserLibrary library) async {
+    if (!state.isAuthenticated || state.movieStates.isEmpty) return false;
+
+    final backendLikedIds = library.liked.map((movie) => movie.id).toSet();
+    final backendDislikedIds = library.disliked
+        .map((movie) => movie.id)
+        .toSet();
+    final backendWatchlistIds = library.watchlist
+        .map((movie) => movie.id)
+        .toSet();
+    final backendSeenIds = library.alreadySeen.map((movie) => movie.id).toSet();
+    var pushedAny = false;
+
+    for (final userMovieState in state.movieStates.values) {
+      final movie = state.movieById(userMovieState.movieId);
+      if (movie?.tmdbId == null) {
+        continue;
+      }
+
+      try {
+        if (userMovieState.preference == MoviePreference.liked &&
+            !backendLikedIds.contains(userMovieState.movieId)) {
+          await _backendMovieService.likeMovie(movie!);
+          pushedAny = true;
+        } else if (userMovieState.preference == MoviePreference.disliked &&
+            !backendDislikedIds.contains(userMovieState.movieId)) {
+          await _backendMovieService.dislikeMovie(movie!);
+          pushedAny = true;
+        }
+
+        if (userMovieState.inWatchlist &&
+            !backendWatchlistIds.contains(userMovieState.movieId)) {
+          await _backendMovieService.addToWatchlist(movie!);
+          pushedAny = true;
+        }
+
+        if (userMovieState.watched &&
+            !backendSeenIds.contains(userMovieState.movieId)) {
+          await _backendMovieService.markAsSeen(movie!);
+          pushedAny = true;
+        }
+      } catch (e) {
+        debugPrint(
+          '[AgreeoAppController] Failed to push local movie state ${userMovieState.movieId}: $e',
+        );
+      }
+    }
+
+    return pushedAny;
   }
 
   Future<void> updateOnboardingGenres(List<String> genres) async {
@@ -890,6 +957,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       movieStates: mutation.states,
       undoStack: mutation.undoStack,
     );
+    await _persist();
 
     _syncBackendMovieState(
       mutation.movieId,

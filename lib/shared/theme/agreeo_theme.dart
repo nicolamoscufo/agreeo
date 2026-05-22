@@ -76,7 +76,7 @@ ThemeData buildAgreeoTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
     chipTheme: ChipThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -88,21 +88,21 @@ ThemeData buildAgreeoTheme(Brightness brightness) {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        // FIX CRITICO: Cambiato Size.fromHeight in Size(0, 56)
+        // FIX CRITICO: Cambiato Size.fromHeight in Size(0, 52)
         // Questo impedisce al bottone di espandersi all'infinito e far crashare le Row.
-        minimumSize: const Size(0, 56),
+        minimumSize: const Size(0, 52),
         backgroundColor: cinematicRed,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         // FIX CRITICO: Anche qui, rimuoviamo l'espansione infinita
-        minimumSize: const Size(0, 56),
+        minimumSize: const Size(0, 52),
         foregroundColor: popcornWhite,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         side: BorderSide(color: popcornWhite.withValues(alpha: 0.5)),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
