@@ -79,5 +79,6 @@ graphify.db
 graphify-*.json
 graphify-output/
 graphify-outputs/
+graphify-out/
 graphify_tmp/
 graphify-temp/
