@@ -867,6 +867,11 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     }
   }
 
+  Future<void> syncLibrary() async {
+    await _syncLibraryFromBackend();
+  }
+
+
   Future<void> _ensureDailySuggestionBuffer({bool force = false}) async {
     if (!state.isAuthenticated ||
         !state.onboardingComplete ||

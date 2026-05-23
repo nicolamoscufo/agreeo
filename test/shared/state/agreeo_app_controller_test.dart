@@ -94,6 +94,19 @@ class _FakeMovieService implements MovieService {
   Future<Map<String, dynamic>> getRecommendationDebugStats() async {
     return <String, dynamic>{};
   }
+
+  @override
+  Future<Movie> getRandomMovie() async {
+    return catalog.isNotEmpty ? catalog.first : _movie('tmdb-fake');
+  }
+
+  @override
+  Future<List<Movie>> getMoviesByMood({
+    required String feeling,
+    required String wantToFeel,
+  }) async {
+    return const <Movie>[];
+  }
 }
 
 class _StoredLoginAuthService extends BackendAuthSessionService {

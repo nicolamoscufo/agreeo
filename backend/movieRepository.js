@@ -21,30 +21,58 @@ function normalizeMovieRecord(record) {
     return null;
   }
 
-  return {
-    tmdbId: toNativeNumber(record.get('tmdbId')),
-    title: record.get('title') || '',
-    originalTitle: record.get('originalTitle') || '',
-    overview: record.get('overview') || '',
-    posterPath: record.get('posterPath') || null,
-    backdropPath: record.get('backdropPath') || null,
-    posterUrl: (record.get('posterPath') && (!record.get('posterUrl') || !(record.get('posterUrl') || '').startsWith('http')))
-      ? `https://image.tmdb.org/t/p/w780${record.get('posterPath')}`
-      : (record.get('posterUrl') || ''),
-    backdropUrl: (record.get('backdropPath') && (!record.get('backdropUrl') || !(record.get('backdropUrl') || '').startsWith('http')))
-      ? `https://image.tmdb.org/t/p/w1280${record.get('backdropPath')}`
-      : (record.get('backdropUrl') || ''),
-    releaseDate: record.get('releaseDate') || '',
-    runtime: record.get('runtime') == null ? null : toNativeNumber(record.get('runtime')),
-    director: record.get('director') || '',
-    voteAverage: record.get('voteAverage') == null ? null : Number(record.get('voteAverage')),
+  function safeGet(key) {
+    try {
+      if (Array.isArray(record.keys) && record.keys.indexOf(key) === -1) return undefined;
+      return record.get(key);
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  const movie = {
+    tmdbId: toNativeNumber(safeGet('tmdbId')),
+    title: safeGet('title') || '',
+    originalTitle: safeGet('originalTitle') || '',
+    overview: safeGet('overview') || '',
+    posterPath: safeGet('posterPath') || null,
+    backdropPath: safeGet('backdropPath') || null,
+    posterUrl: (safeGet('posterPath') && (!safeGet('posterUrl') || !(safeGet('posterUrl') || '').startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w780${safeGet('posterPath')}`
+      : (safeGet('posterUrl') || ''),
+    backdropUrl: (safeGet('backdropPath') && (!safeGet('backdropUrl') || !(safeGet('backdropUrl') || '').startsWith('http')))
+      ? `https://image.tmdb.org/t/p/w1280${safeGet('backdropPath')}`
+      : (safeGet('backdropUrl') || ''),
+    releaseDate: safeGet('releaseDate') || '',
+    runtime: safeGet('runtime') == null ? null : toNativeNumber(safeGet('runtime')),
+    director: safeGet('director') || '',
+    voteAverage: safeGet('voteAverage') == null ? null : Number(safeGet('voteAverage')),
     movieLensAvgRating:
-      record.get('movieLensAvgRating') == null ? null : Number(record.get('movieLensAvgRating')),
+      safeGet('movieLensAvgRating') == null ? null : Number(safeGet('movieLensAvgRating')),
     movieLensRatingCount:
-      record.get('movieLensRatingCount') == null
+      safeGet('movieLensRatingCount') == null
         ? 0
-        : toNativeNumber(record.get('movieLensRatingCount')),
+        : toNativeNumber(safeGet('movieLensRatingCount')),
+    genres: safeGet('genres') || [],
+    tmdbHydrated: safeGet('tmdbHydrated') === true,
   };
+
+  const tagRelevanceScoreVal = safeGet('tagRelevanceScore');
+  if (tagRelevanceScoreVal !== undefined) {
+    movie.tagRelevanceScore = toNativeNumber(tagRelevanceScoreVal);
+  }
+
+  const matchedTagsVal = safeGet('matchedTags');
+  if (matchedTagsVal !== undefined) {
+    movie.matchedTags = Array.isArray(matchedTagsVal)
+      ? matchedTagsVal.map(mt => ({
+          tag: mt.tag,
+          frequency: toNativeNumber(mt.frequency)
+        }))
+      : matchedTagsVal;
+  }
+
+  return movie;
 }
 
 async function mergeTmdbMovie(movie) {
@@ -64,7 +92,9 @@ async function mergeTmdbMovie(movie) {
       m.director = $director,
       m.voteAverage = $voteAverage,
       m.movieLensAvgRating = $movieLensAvgRating,
-      m.movieLensRatingCount = $movieLensRatingCount
+      m.movieLensRatingCount = $movieLensRatingCount,
+      m.genres = $genres,
+      m.tmdbHydrated = $tmdbHydrated
     `,
     {
       tmdbId: movie.tmdbId,
@@ -83,6 +113,8 @@ async function mergeTmdbMovie(movie) {
         movie.movieLensAvgRating == null ? null : Number(movie.movieLensAvgRating),
       movieLensRatingCount:
         movie.movieLensRatingCount == null ? 0 : toNativeNumber(movie.movieLensRatingCount),
+      genres: Array.isArray(movie.genres) ? movie.genres : [],
+      tmdbHydrated: movie.tmdbHydrated === true || (Array.isArray(movie.genres) && movie.genres.length > 0) || false,
     }
   );
 }
@@ -114,7 +146,9 @@ async function findMoviesByTmdbIds(tmdbIds) {
       m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
-      m.movieLensRatingCount AS movieLensRatingCount
+      m.movieLensRatingCount AS movieLensRatingCount,
+      m.genres AS genres,
+      m.tmdbHydrated AS tmdbHydrated
     ORDER BY m.tmdbId ASC
     `,
     { tmdbIds: ids }
@@ -202,7 +236,9 @@ async function findMovieByTmdbId(tmdbId) {
       m.director AS director,
       m.voteAverage AS voteAverage,
       m.movieLensAvgRating AS movieLensAvgRating,
-      m.movieLensRatingCount AS movieLensRatingCount
+      m.movieLensRatingCount AS movieLensRatingCount,
+      m.genres AS genres,
+      m.tmdbHydrated AS tmdbHydrated
     LIMIT 1
     `,
     { tmdbId }
@@ -437,6 +473,8 @@ async function getUserLibrary(uid) {
         voteAverage: m.voteAverage,
         movieLensAvgRating: m.movieLensAvgRating,
         movieLensRatingCount: m.movieLensRatingCount,
+        genres: coalesce(m.genres, []),
+        tmdbHydrated: coalesce(m.tmdbHydrated, false),
         createdAt: toString(r.createdAt)
       }) AS liked
     }
@@ -457,6 +495,8 @@ async function getUserLibrary(uid) {
         voteAverage: m.voteAverage,
         movieLensAvgRating: m.movieLensAvgRating,
         movieLensRatingCount: m.movieLensRatingCount,
+        genres: coalesce(m.genres, []),
+        tmdbHydrated: coalesce(m.tmdbHydrated, false),
         createdAt: toString(r.createdAt)
       }) AS disliked
     }
@@ -477,6 +517,8 @@ async function getUserLibrary(uid) {
         voteAverage: m.voteAverage,
         movieLensAvgRating: m.movieLensAvgRating,
         movieLensRatingCount: m.movieLensRatingCount,
+        genres: coalesce(m.genres, []),
+        tmdbHydrated: coalesce(m.tmdbHydrated, false),
         createdAt: toString(r.createdAt)
       }) AS watchlist
     }
@@ -497,6 +539,8 @@ async function getUserLibrary(uid) {
         voteAverage: m.voteAverage,
         movieLensAvgRating: m.movieLensAvgRating,
         movieLensRatingCount: m.movieLensRatingCount,
+        genres: coalesce(m.genres, []),
+        tmdbHydrated: coalesce(m.tmdbHydrated, false),
         createdAt: toString(r.createdAt)
       }) AS alreadySeen
     }
@@ -521,21 +565,29 @@ async function getUserLibrary(uid) {
       ...entry,
       tmdbId: toNativeNumber(entry.tmdbId),
       movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
+      genres: Array.isArray(entry.genres) ? entry.genres : [],
+      tmdbHydrated: entry.tmdbHydrated === true,
     })),
     disliked: record.get('disliked').map((entry) => ({
       ...entry,
       tmdbId: toNativeNumber(entry.tmdbId),
       movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
+      genres: Array.isArray(entry.genres) ? entry.genres : [],
+      tmdbHydrated: entry.tmdbHydrated === true,
     })),
     watchlist: record.get('watchlist').map((entry) => ({
       ...entry,
       tmdbId: toNativeNumber(entry.tmdbId),
       movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
+      genres: Array.isArray(entry.genres) ? entry.genres : [],
+      tmdbHydrated: entry.tmdbHydrated === true,
     })),
     alreadySeen: record.get('alreadySeen').map((entry) => ({
       ...entry,
       tmdbId: toNativeNumber(entry.tmdbId),
       movieLensRatingCount: entry.movieLensRatingCount == null ? 0 : toNativeNumber(entry.movieLensRatingCount),
+      genres: Array.isArray(entry.genres) ? entry.genres : [],
+      tmdbHydrated: entry.tmdbHydrated === true,
     })),
   };
 }
@@ -1015,6 +1067,63 @@ async function getCandidatePoolStats(uid) {
   };
 }
 
+async function findMoviesBySemanticTags(tagsWithWeights, uid) {
+  if (!tagsWithWeights || tagsWithWeights.length === 0) {
+    return [];
+  }
+
+  const tags = tagsWithWeights.map(t => t.tag);
+  const tagWeights = {};
+  tagsWithWeights.forEach(t => {
+    tagWeights[t.tag] = t.similarity;
+  });
+
+  const result = await neo4jService.run(
+    `
+    MATCH (ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)
+    MATCH (ml)-[h:HAS_TAG]->(t:Tag)
+    WHERE t.name IN $tags
+    WITH ml, m, t.name AS tag, h.frequency AS tagFrequency
+    WITH ml, m, sum(tagFrequency * (toFloat($tagWeights[tag]) ^ 3)) AS rawScore, collect({ tag: tag, frequency: tagFrequency }) AS matchedTags
+    WITH m, rawScore / sqrt(toFloat(coalesce(ml.totalTagCount, 1.0))) AS tagRelevanceScore, matchedTags
+    WHERE tagRelevanceScore > 0
+
+    OPTIONAL MATCH (me:AppUser {uid: $uid})
+    WITH m, tagRelevanceScore, matchedTags, me
+    WHERE me IS NULL OR NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
+
+    RETURN
+      m.tmdbId AS tmdbId,
+      m.title AS title,
+      m.originalTitle AS originalTitle,
+      m.overview AS overview,
+      m.posterPath AS posterPath,
+      m.backdropPath AS backdropPath,
+      m.posterUrl AS posterUrl,
+      m.backdropUrl AS backdropUrl,
+      m.releaseDate AS releaseDate,
+      m.runtime AS runtime,
+      m.director AS director,
+      m.voteAverage AS voteAverage,
+      m.movieLensAvgRating AS movieLensAvgRating,
+      m.movieLensRatingCount AS movieLensRatingCount,
+      m.genres AS genres,
+      m.tmdbHydrated AS tmdbHydrated,
+      tagRelevanceScore,
+      matchedTags
+    ORDER BY tagRelevanceScore DESC, m.movieLensAvgRating DESC, m.movieLensRatingCount DESC
+    LIMIT 30
+    `,
+    {
+      tags,
+      tagWeights,
+      uid: uid || null,
+    }
+  );
+
+  return result.records.map((record) => normalizeMovieRecord(record)).filter(Boolean);
+}
+
 module.exports = {
   findMovieByTmdbId,
   findMoviesByTmdbIds,
@@ -1041,4 +1150,5 @@ module.exports = {
   getTopPositiveMovies,
   getTopNegativeMovies,
   getCandidatePoolStats,
+  findMoviesBySemanticTags,
 };

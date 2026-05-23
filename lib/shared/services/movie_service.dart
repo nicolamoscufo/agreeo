@@ -22,4 +22,11 @@ abstract class MovieService {
   Future<List<Movie>> getShortMovies();
 
   Future<Map<String, dynamic>> getRecommendationDebugStats();
+
+  Future<Movie> getRandomMovie();
+
+  Future<List<Movie>> getMoviesByMood({
+    required String feeling,
+    required String wantToFeel,
+  });
 }

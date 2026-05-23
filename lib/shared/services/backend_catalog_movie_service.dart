@@ -120,6 +120,27 @@ class BackendCatalogMovieService implements MovieService {
     return _backendMovieService.getRecommendationDebugStats();
   }
 
+  @override
+  Future<Movie> getRandomMovie() {
+    return _backendMovieService.getRandomMovie();
+  }
+
+  @override
+  Future<List<Movie>> getMoviesByMood({
+    required String feeling,
+    required String wantToFeel,
+  }) async {
+    try {
+      return await _backendMovieService.getMoviesByMood(
+        feeling: feeling,
+        wantToFeel: wantToFeel,
+      );
+    } catch (error) {
+      debugPrint('[BackendCatalogMovieService] getMoviesByMood failed: $error');
+      return const <Movie>[];
+    }
+  }
+
   int? _parseTmdbId(String movieId) {
     final rawId = movieId.startsWith('tmdb-') ? movieId.substring(5) : movieId;
     return int.tryParse(rawId);

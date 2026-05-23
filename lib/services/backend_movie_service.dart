@@ -59,6 +59,15 @@ class BackendMovieService {
     return _decodeMovieList(body['results']);
   }
 
+  Future<Movie> getRandomMovie() async {
+    final response = await _client.get(
+      Uri.parse('${_config.baseUrl}/movies/random'),
+    );
+    _ensureSuccess(response);
+    final body = _decodeMap(response.body);
+    return _decodeMovie(body);
+  }
+
   Future<List<Movie>> getRecommendations({int page = 1}) async {
     final uri = Uri.parse(
       '${_config.baseUrl}/movies/recommendations',
@@ -218,6 +227,28 @@ class BackendMovieService {
     );
     final body = _decodeMap(response.body);
     return body;
+  }
+
+  Future<List<Movie>> getMoviesByMood({
+    required String feeling,
+    required String wantToFeel,
+  }) async {
+    final queryParameters = <String, String>{};
+    if (feeling.trim().isNotEmpty) {
+      queryParameters['feeling'] = feeling.trim();
+    }
+    if (wantToFeel.trim().isNotEmpty) {
+      queryParameters['wantToFeel'] = wantToFeel.trim();
+    }
+
+    final path = Uri(
+      path: '/movies/mood-search',
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+
+    final response = await _authorizedRequest('GET', path);
+    final body = _decodeMap(response.body);
+    return _decodeMovieList(body['results']);
   }
 
   Future<http.Response> _authorizedRequest(String method, String path) async {

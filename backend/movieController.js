@@ -3,6 +3,8 @@ const movieRepository = require('./movieRepository');
 const neo4jService = require('./neo4jService');
 const socketService = require('./socketService');
 const socialRepository = require('./socialRepository');
+const embeddingService = require('./embeddingService');
+
 
 function parseTmdbId(value) {
   const tmdbId = Number.parseInt(value, 10);
@@ -314,6 +316,7 @@ async function hydrateRecommendations(
     batchSize = 6, // Aumentato per velocizzare le chiamate a TMDB
     tmdbFetch = tmdbGet,
     findMovieByTmdbId = movieRepository.findMovieByTmdbId,
+    mergeTmdbMovie = movieRepository.mergeTmdbMovie,
     logger = console,
   } = {}
 ) {
@@ -322,6 +325,7 @@ async function hydrateRecommendations(
     batchSize,
     tmdbFetch,
     findMovieByTmdbId,
+    mergeTmdbMovie,
     logger,
   });
   return hydratedEntries.map((entry) => entry.movie);
@@ -334,6 +338,7 @@ async function hydrateRecommendationEntries(
     batchSize = 6,
     tmdbFetch = tmdbGet,
     findMovieByTmdbId = movieRepository.findMovieByTmdbId,
+    mergeTmdbMovie = movieRepository.mergeTmdbMovie,
     logger = console,
   } = {}
 ) {
@@ -345,20 +350,44 @@ async function hydrateRecommendationEntries(
     const batchHydrated = await Promise.all(
       batch.map(async (entry) => {
         try {
-          const [tmdbMovie, neoMovie] = await Promise.all([
-            tmdbFetch(`/movie/${entry.tmdbId}`),
-            findMovieByTmdbId(entry.tmdbId),
-          ]);
-          if (!tmdbMovie || typeof tmdbMovie !== 'object' || !Number.isInteger(tmdbMovie.id)) {
-            return null;
-          }
+          const neoMovie = await findMovieByTmdbId(entry.tmdbId);
+          let movieData;
 
-          const movie = {
-            ...mapTmdbMovie(tmdbMovie, {
+          if (neoMovie && neoMovie.tmdbHydrated) {
+            movieData = {
+              ...neoMovie,
+              genreIds: Array.isArray(neoMovie.genres)
+                ? neoMovie.genres
+                    .map((name) => TMDB_GENRE_IDS_BY_NAME[String(name).toLowerCase()])
+                    .filter((id) => Number.isInteger(id))
+                : [],
+              movieLens: {
+                avgRating: entry.globalAvg ?? neoMovie.movieLensAvgRating ?? null,
+                ratingCount: entry.ratingCount ?? neoMovie.movieLensRatingCount ?? 0,
+              },
+            };
+          } else {
+            const tmdbMovie = await tmdbFetch(`/movie/${entry.tmdbId}`);
+            if (!tmdbMovie || typeof tmdbMovie !== 'object' || !Number.isInteger(tmdbMovie.id)) {
+              return null;
+            }
+
+            const mapped = mapTmdbMovie(tmdbMovie, {
               ...(neoMovie || {}),
               movieLensAvgRating: entry.globalAvg ?? neoMovie?.movieLensAvgRating ?? null,
               movieLensRatingCount: entry.ratingCount ?? neoMovie?.movieLensRatingCount ?? 0,
-            }),
+            });
+
+            // Write back to Neo4j to cache hydrated movie
+            mapped.tmdbHydrated = true;
+            await mergeTmdbMovie(mapped);
+            movieData = mapped;
+          }
+
+          const movie = {
+            ...movieData,
+            tagRelevanceScore: entry.tagRelevanceScore,
+            matchedTags: entry.matchedTags,
             recommendation: {
               source: entry.source || 'personalized',
               similarUsers: entry.similarUsers,
@@ -519,6 +548,19 @@ function mapRepositoryMovieToResponse(movie) {
 }
 
 function mapInteractionMovie(tmdbMovie) {
+  const genreIds = Array.isArray(tmdbMovie.genre_ids)
+    ? tmdbMovie.genre_ids.filter((id) => Number.isInteger(id))
+    : Array.isArray(tmdbMovie.genres)
+      ? tmdbMovie.genres.map((genre) => genre?.id).filter((id) => Number.isInteger(id))
+      : [];
+
+  const genres = Array.isArray(tmdbMovie.genres)
+    ? tmdbMovie.genres.map((genre) => genre?.name).filter((name) => typeof name === 'string' && name.trim() !== '')
+    : genreIds
+        .map((id) => TMDB_GENRE_NAMES_BY_ID[id])
+        .filter((name) => typeof name === 'string' && name.trim() !== '')
+        .map((name) => name.replace(/\b\w/g, (char) => char.toUpperCase()));
+
   return {
     tmdbId: tmdbMovie.id,
     title: tmdbMovie.title || tmdbMovie.name || '',
@@ -532,6 +574,7 @@ function mapInteractionMovie(tmdbMovie) {
     runtime: Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null,
     voteAverage: tmdbMovie.vote_average == null ? null : Number(Number(tmdbMovie.vote_average).toFixed(1)),
     director: extractDirector(tmdbMovie.credits),
+    genres,
   };
 }
 
@@ -782,6 +825,30 @@ exports.popular = async (req, res) => {
     return handleError(res, error, 'Failed to load trending movies');
   }
 };
+
+exports.random = async (req, res) => {
+  try {
+    const randomPage = Math.floor(Math.random() * 500) + 1;
+    const response = await tmdbGet('/discover/movie', {
+      language: 'en-US',
+      page: randomPage,
+      include_adult: false,
+      'vote_count.gte': 100,
+      'vote_average.gte': 5.0,
+    });
+    const results = Array.isArray(response.results) ? response.results : [];
+    if (results.length === 0) {
+      throw new Error('No random movie results found on page ' + randomPage);
+    }
+    const randomIndex = Math.floor(Math.random() * results.length);
+    const randomMovie = results[randomIndex];
+    const enriched = await enrichMovies([randomMovie]);
+    return res.json(enriched[0]);
+  } catch (error) {
+    return handleError(res, error, 'Failed to load random movie');
+  }
+};
+
 
 exports.recommendations = async (req, res) => {
   try {
@@ -1066,13 +1133,81 @@ exports.removeSeen = async (req, res) => {
   }
 };
 
+async function hydrateLibraryIfNeeded(library) {
+  const unhydrated = [];
+  const listKeys = ['liked', 'disliked', 'watchlist', 'alreadySeen'];
+
+  for (const key of listKeys) {
+    const list = library[key] || [];
+    for (const movie of list) {
+      if (movie && movie.tmdbId && !movie.tmdbHydrated) {
+        unhydrated.push(movie);
+      }
+    }
+  }
+
+  if (unhydrated.length === 0) {
+    return library;
+  }
+
+  const batchSize = 6;
+  const hydratedMoviesMap = new Map();
+
+  for (let i = 0; i < unhydrated.length; i += batchSize) {
+    const batch = unhydrated.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (movie) => {
+        try {
+          const tmdbMovie = await tmdbGet(`/movie/${movie.tmdbId}`, { append_to_response: 'credits' });
+          if (tmdbMovie && tmdbMovie.id) {
+            const mapped = mapInteractionMovie(tmdbMovie);
+            mapped.tmdbHydrated = true;
+            const fullMovie = {
+              ...mapped,
+              movieLensAvgRating: movie.movieLensAvgRating ?? null,
+              movieLensRatingCount: movie.movieLensRatingCount ?? 0,
+            };
+            await movieRepository.mergeTmdbMovie(fullMovie);
+            hydratedMoviesMap.set(movie.tmdbId, fullMovie);
+          }
+        } catch (error) {
+          console.warn(`Failed to hydrate library movie ${movie.tmdbId} from TMDB:`, error.message);
+        }
+      })
+    );
+  }
+
+  const updatedLibrary = {};
+  for (const key of listKeys) {
+    updatedLibrary[key] = (library[key] || []).map((movie) => {
+      if (movie && hydratedMoviesMap.has(movie.tmdbId)) {
+        const hydrated = hydratedMoviesMap.get(movie.tmdbId);
+        return {
+          ...movie,
+          ...hydrated,
+          genres: hydrated.genres || [],
+          tmdbHydrated: true,
+          createdAt: movie.createdAt,
+        };
+      }
+      return {
+        ...movie,
+        genres: Array.isArray(movie.genres) ? movie.genres : [],
+      };
+    });
+  }
+
+  return updatedLibrary;
+}
+
 exports.library = async (req, res) => {
   const uid = requestUid(req);
   if (!uid) return res.status(401).json({ error: 'Missing user context' });
 
   try {
     const library = await movieRepository.getUserLibrary(uid);
-    return res.json(library);
+    const hydratedLibrary = await hydrateLibraryIfNeeded(library);
+    return res.json(hydratedLibrary);
   } catch (error) {
     return handleError(res, error, 'Failed to load user library');
   }
@@ -1240,7 +1375,138 @@ exports.recommendationDebugStats = async (req, res) => {
   }
 };
 
+const POSITIVE_MOODS = new Set([
+  'happy', 'uplifted', 'relaxed', 'loved', 'energized', 'thrilled',
+  'calm', 'peaceful', 'joyful', 'cheerful'
+]);
+
+const NEGATIVE_SUBSTRINGS = [
+  'depress', 'sad', 'uncomfort', 'tension', 'somber', 'insomnia',
+  'melancholy', 'unsettl', 'scary', 'horror', 'disturb', 'creepy',
+  'tragic', 'violent', 'violence', 'gory', 'gore', 'fucked up',
+  'spooky', 'dread', 'scare'
+];
+
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+exports.moodSearch = async (req, res) => {
+  try {
+    const uid = req.user?.uid || req.user?.sub;
+    const { feeling, wantToFeel } = req.query;
+
+    const feelingText = typeof feeling === 'string' ? feeling.trim() : '';
+    const wantToFeelText = typeof wantToFeel === 'string' ? wantToFeel.trim() : '';
+
+    if (!feelingText && !wantToFeelText) {
+      return res.status(400).json({ error: 'Please provide feeling or wantToFeel query parameter.' });
+    }
+
+    // Refinement: Use wantToFeel primarily to avoid negative emotion contamination, fallback to feeling.
+    const searchPrompt = wantToFeelText || feelingText;
+
+    console.log(`\n========================================`);
+    console.log(`[MoodSearch] INCOMING REQUEST`);
+    console.log(`  User: ${uid || 'anonymous'}`);
+    console.log(`  Feeling query: "${feelingText || '<none>'}"`);
+    console.log(`  Want to feel query: "${wantToFeelText || '<none>'}"`);
+    console.log(`  Selected Search Vibe: "${searchPrompt}"`);
+
+    const isTargetPositive = POSITIVE_MOODS.has(searchPrompt.toLowerCase());
+
+    // Increased pool limit to 25 to allow sufficient tags after filtering.
+    // Increased threshold from 0.3 to 0.35 to filter out weak tag synonyms.
+    const rawSimilarTags = await embeddingService.findSimilarTags(searchPrompt, 25, 0.35);
+
+    if (rawSimilarTags.length === 0) {
+      console.log(`[MoodSearch] No semantically matching tags found above threshold.`);
+      console.log(`========================================\n`);
+      return res.json({ results: [] });
+    }
+
+    // Apply filtering layers: Valence and Escape filters
+    const feelingEmbedding = feelingText ? await embeddingService.getEmbedding(feelingText) : null;
+    const filteredTags = [];
+
+    console.log(`[MoodSearch] Filtering matched tags:`);
+    for (const t of rawSimilarTags) {
+      // 1. Valence tag filtering: filter negative tags out if target is positive
+      if (isTargetPositive) {
+        const lowercaseTag = t.tag.toLowerCase();
+        const matchedNegSub = NEGATIVE_SUBSTRINGS.find(sub => lowercaseTag.includes(sub));
+        if (matchedNegSub) {
+          console.log(`  - [Valence Filter] Filtered out tag: "${t.tag}" due to negative content matching "${matchedNegSub}"`);
+          continue;
+        }
+      }
+
+      // 2. Escape tag filtering: filter out tags closer to the negative starting state than target state
+      if (feelingEmbedding) {
+        const tagEmb = t.embedding || await embeddingService.getEmbedding(t.tag, 'passage');
+        const simToFeeling = cosineSimilarity(feelingEmbedding, tagEmb);
+        if (simToFeeling > t.similarity) {
+          console.log(`  - [Escape Filter] Filtered out tag: "${t.tag}" (similarity to feeling "${feelingText}" is ${simToFeeling.toFixed(4)}, which is greater than similarity to target ${t.similarity.toFixed(4)})`);
+          continue;
+        }
+      }
+
+      console.log(`  - [Kept Tag] "${t.tag}" (similarity: ${t.similarity.toFixed(4)})`);
+      filteredTags.push(t);
+    }
+
+    const similarTags = filteredTags.slice(0, 15);
+
+    if (similarTags.length === 0) {
+      console.log(`[MoodSearch] All tags were filtered out by Valence and Escape filters.`);
+      console.log(`========================================\n`);
+      return res.json({ results: [] });
+    }
+
+    console.log(`[MoodSearch] Final Selected Tags (top 15):`);
+    similarTags.forEach(t => {
+      console.log(`  - "${t.tag}" (similarity: ${t.similarity.toFixed(4)})`);
+    });
+
+    const rawMovies = await movieRepository.findMoviesBySemanticTags(similarTags, uid);
+    console.log(`[MoodSearch] Neo4j matched ${rawMovies.length} movies.`);
+
+    // Tag the source as 'mood' so that hydrateRecommendations preserves it.
+    const rawMoviesWithSource = rawMovies.map((m) => ({ ...m, source: 'mood' }));
+    const hydratedMovies = await hydrateRecommendations(rawMoviesWithSource, { limit: 15 });
+
+    console.log(`[MoodSearch] Top Ranked Results:`);
+    hydratedMovies.forEach((m, idx) => {
+      console.log(`  ${idx + 1}. "${m.title}" (Score: ${m.tagRelevanceScore?.toFixed(4) || '0.0000'}, Rating: ${m.movieLens?.avgRating || 'null'}, Count: ${m.movieLens?.ratingCount || 0})`);
+      if (Array.isArray(m.matchedTags)) {
+        m.matchedTags.forEach(mt => {
+          console.log(`      * Tag: "${mt.tag}" (freq: ${mt.frequency || 1})`);
+        });
+      }
+    });
+    console.log(`========================================\n`);
+
+    return res.json({
+      results: hydratedMovies,
+    });
+  } catch (error) {
+    console.error(`[MoodSearch] Error during search:`, error);
+    return handleError(res, error, 'Failed to search movies by mood');
+  }
+};
+
 exports.diversifyRecommendations = diversifyRecommendations;
 exports.normalizeRecommendationTitle = normalizeRecommendationTitle;
 exports.hydrateRecommendations = hydrateRecommendations;
 exports.hydrateRecommendationEntries = hydrateRecommendationEntries;
+exports.mapInteractionMovie = mapInteractionMovie;
+

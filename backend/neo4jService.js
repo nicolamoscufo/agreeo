@@ -43,6 +43,18 @@ class Neo4jService {
     }
   }
 
+  async executeWrite(actions) {
+    const session = this.session();
+
+    try {
+      return await session.writeTransaction(async (tx) => {
+        return await actions(tx);
+      });
+    } finally {
+      await session.close();
+    }
+  }
+
   async createConstraints() {
     await this.run(`
       CREATE CONSTRAINT app_user_uid IF NOT EXISTS
@@ -78,6 +90,21 @@ class Neo4jService {
       CREATE CONSTRAINT genre_name IF NOT EXISTS
       FOR (g:Genre)
       REQUIRE g.name IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT tag_name IF NOT EXISTS
+      FOR (t:Tag)
+      REQUIRE t.name IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE VECTOR INDEX tag_embeddings IF NOT EXISTS
+      FOR (t:Tag) ON (t.embedding)
+      OPTIONS {indexConfig: {
+        \`vector.dimensions\`: 384,
+        \`vector.similarity_function\`: 'cosine'
+      }}
     `);
 
     await this.run(`

@@ -181,211 +181,219 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen>
     _LibraryTab tab,
   ) {
     final movies = _sortedMovies(_moviesForTab(state, tab), state);
-    if (movies.isEmpty) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(0, 18, 0, 32),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: (constraints.maxHeight - 50)
-                    .clamp(0.0, double.infinity)
-                    .toDouble(),
-              ),
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: _emptyForTab(tab),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
     final controller = ref.read(agreeoAppControllerProvider.notifier);
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(0, 10, 0, 140),
-      itemBuilder: (_, index) {
-        final movie = movies[index];
-        final userState = state.userMovieStateFor(movie.id);
-
-        return _LibraryMovieCard(
-          movie: movie,
-          userState: userState,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
+    if (movies.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => controller.syncLibrary(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(0, 18, 0, 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: (constraints.maxHeight - 50)
+                      .clamp(0.0, double.infinity)
+                      .toDouble(),
+                ),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: _emptyForTab(tab),
+                ),
               ),
             );
           },
-          actions: switch (tab) {
-            _LibraryTab.watchlist => <Widget>[
-              _actionChip(
-                label: 'Remove',
-                icon: Icons.bookmark_remove_outlined,
-                color: AgreeoColors.cinematicRed,
-                onTap: () => _showUndoAction(
-                  () => controller.removeFromWatchlist(movie.id),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => controller.syncLibrary(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(0, 10, 0, 140),
+        itemBuilder: (_, index) {
+          final movie = movies[index];
+          final userState = state.userMovieStateFor(movie.id);
+
+          return _LibraryMovieCard(
+            movie: movie,
+            userState: userState,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
                 ),
-              ),
-              _actionChip(
-                label: 'Seen',
-                icon: Icons.visibility_outlined,
-                color: AgreeoColors.popcornWhite,
-                onTap: () =>
-                    _showUndoAction(() => controller.markAsWatched(movie.id)),
-              ),
-              _actionChip(
-                label: 'Like',
-                icon: Icons.thumb_up_alt_outlined,
-                color: AgreeoColors.kernelGold,
-                onTap: () =>
-                    _showUndoAction(() => controller.likeMovie(movie.id)),
-              ),
-              _actionChip(
-                label: 'Dislike',
-                icon: Icons.thumb_down_alt_outlined,
-                color: const Color(0xFF6B7280),
-                onTap: () =>
-                    _showUndoAction(() => controller.dislikeMovie(movie.id)),
-              ),
-            ],
-            _LibraryTab.liked => <Widget>[
-              _actionChip(
-                label: 'Remove like',
-                icon: Icons.heart_broken_outlined,
-                color: AgreeoColors.cinematicRed,
-                onTap: () =>
-                    _showUndoAction(() => controller.clearPreference(movie.id)),
-              ),
-              _actionChip(
-                label: userState.inWatchlist ? 'Saved' : 'Watchlist',
-                icon: Icons.bookmark_outline_rounded,
-                color: AgreeoColors.kernelGold,
-                onTap: () => _showUndoAction(
-                  userState.inWatchlist
-                      ? () => controller.removeFromWatchlist(movie.id)
-                      : () => controller.addToWatchlist(movie.id),
+              );
+            },
+            actions: switch (tab) {
+              _LibraryTab.watchlist => <Widget>[
+                _actionChip(
+                  label: 'Remove',
+                  icon: Icons.bookmark_remove_outlined,
+                  color: AgreeoColors.cinematicRed,
+                  onTap: () => _showUndoAction(
+                    () => controller.removeFromWatchlist(movie.id),
+                  ),
                 ),
-              ),
-              _actionChip(
-                label: userState.watched ? 'Watched' : 'Seen',
-                icon: Icons.visibility_outlined,
-                color: AgreeoColors.popcornWhite,
-                onTap: () => _showUndoAction(
-                  userState.watched
-                      ? () => controller.removeFromWatched(movie.id)
-                      : () => controller.markAsWatched(movie.id),
+                _actionChip(
+                  label: 'Seen',
+                  icon: Icons.visibility_outlined,
+                  color: AgreeoColors.popcornWhite,
+                  onTap: () =>
+                      _showUndoAction(() => controller.markAsWatched(movie.id)),
                 ),
-              ),
-              _actionChip(
-                label: 'Rate / Review',
-                icon: Icons.rate_review_outlined,
-                color: AgreeoColors.kernelGold,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          AgreeoMovieDetailsScreen(movieId: movie.id),
-                    ),
-                  );
-                },
-              ),
-            ],
-            _LibraryTab.watched => <Widget>[
-              _actionChip(
-                label: userState.preference == MoviePreference.liked
-                    ? 'Liked'
-                    : 'Like',
-                icon: Icons.thumb_up_alt_outlined,
-                color: AgreeoColors.kernelGold,
-                onTap: () => _showUndoAction(
-                  userState.preference == MoviePreference.liked
-                      ? () => controller.clearPreference(movie.id)
-                      : () => controller.likeMovie(movie.id),
+                _actionChip(
+                  label: 'Like',
+                  icon: Icons.thumb_up_alt_outlined,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () =>
+                      _showUndoAction(() => controller.likeMovie(movie.id)),
                 ),
-              ),
-              _actionChip(
-                label: userState.preference == MoviePreference.disliked
-                    ? 'Hidden'
-                    : 'Dislike',
-                icon: Icons.thumb_down_alt_outlined,
-                color: const Color(0xFF6B7280),
-                onTap: () => _showUndoAction(
-                  userState.preference == MoviePreference.disliked
-                      ? () => controller.clearPreference(movie.id)
-                      : () => controller.dislikeMovie(movie.id),
+                _actionChip(
+                  label: 'Dislike',
+                  icon: Icons.thumb_down_alt_outlined,
+                  color: const Color(0xFF6B7280),
+                  onTap: () =>
+                      _showUndoAction(() => controller.dislikeMovie(movie.id)),
                 ),
-              ),
-              _actionChip(
-                label: 'Rate again',
-                icon: Icons.star_outline_rounded,
-                color: AgreeoColors.kernelGold,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          AgreeoMovieDetailsScreen(movieId: movie.id),
-                    ),
-                  );
-                },
-              ),
-              _actionChip(
-                label: 'Edit review',
-                icon: Icons.edit_note_rounded,
-                color: AgreeoColors.popcornWhite,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          AgreeoMovieDetailsScreen(movieId: movie.id),
-                    ),
-                  );
-                },
-              ),
-              _actionChip(
-                label: 'Remove watched',
-                icon: Icons.remove_red_eye_outlined,
-                color: AgreeoColors.cinematicRed,
-                onTap: () => _showUndoAction(
-                  () => controller.removeFromWatched(movie.id),
+              ],
+              _LibraryTab.liked => <Widget>[
+                _actionChip(
+                  label: 'Remove like',
+                  icon: Icons.heart_broken_outlined,
+                  color: AgreeoColors.cinematicRed,
+                  onTap: () =>
+                      _showUndoAction(() => controller.clearPreference(movie.id)),
                 ),
-              ),
-            ],
-            _LibraryTab.hidden => <Widget>[
-              _actionChip(
-                label: 'Undo dislike',
-                icon: Icons.undo_rounded,
-                color: AgreeoColors.kernelGold,
-                onTap: () =>
-                    _showUndoAction(() => controller.clearPreference(movie.id)),
-              ),
-              _actionChip(
-                label: 'Move to Watchlist',
-                icon: Icons.bookmark_add_outlined,
-                color: AgreeoColors.kernelGold,
-                onTap: () =>
-                    _showUndoAction(() => controller.addToWatchlist(movie.id)),
-              ),
-              _actionChip(
-                label: userState.watched ? 'Watched' : 'Mark watched',
-                icon: Icons.visibility_outlined,
-                color: AgreeoColors.popcornWhite,
-                onTap: () => _showUndoAction(
-                  userState.watched
-                      ? () => controller.removeFromWatched(movie.id)
-                      : () => controller.markAsWatched(movie.id),
+                _actionChip(
+                  label: userState.inWatchlist ? 'Saved' : 'Watchlist',
+                  icon: Icons.bookmark_outline_rounded,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () => _showUndoAction(
+                    userState.inWatchlist
+                        ? () => controller.removeFromWatchlist(movie.id)
+                        : () => controller.addToWatchlist(movie.id),
+                  ),
                 ),
-              ),
-            ],
-          },
-        );
-      },
-      separatorBuilder: (context, index) => const SizedBox(height: 14),
-      itemCount: movies.length,
+                _actionChip(
+                  label: userState.watched ? 'Watched' : 'Seen',
+                  icon: Icons.visibility_outlined,
+                  color: AgreeoColors.popcornWhite,
+                  onTap: () => _showUndoAction(
+                    userState.watched
+                        ? () => controller.removeFromWatched(movie.id)
+                        : () => controller.markAsWatched(movie.id),
+                  ),
+                ),
+                _actionChip(
+                  label: 'Rate / Review',
+                  icon: Icons.rate_review_outlined,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AgreeoMovieDetailsScreen(movieId: movie.id),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              _LibraryTab.watched => <Widget>[
+                _actionChip(
+                  label: userState.preference == MoviePreference.liked
+                      ? 'Liked'
+                      : 'Like',
+                  icon: Icons.thumb_up_alt_outlined,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () => _showUndoAction(
+                    userState.preference == MoviePreference.liked
+                        ? () => controller.clearPreference(movie.id)
+                        : () => controller.likeMovie(movie.id),
+                  ),
+                ),
+                _actionChip(
+                  label: userState.preference == MoviePreference.disliked
+                      ? 'Hidden'
+                      : 'Dislike',
+                  icon: Icons.thumb_down_alt_outlined,
+                  color: const Color(0xFF6B7280),
+                  onTap: () => _showUndoAction(
+                    userState.preference == MoviePreference.disliked
+                        ? () => controller.clearPreference(movie.id)
+                        : () => controller.dislikeMovie(movie.id),
+                  ),
+                ),
+                _actionChip(
+                  label: 'Rate again',
+                  icon: Icons.star_outline_rounded,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AgreeoMovieDetailsScreen(movieId: movie.id),
+                      ),
+                    );
+                  },
+                ),
+                _actionChip(
+                  label: 'Edit review',
+                  icon: Icons.edit_note_rounded,
+                  color: AgreeoColors.popcornWhite,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AgreeoMovieDetailsScreen(movieId: movie.id),
+                      ),
+                    );
+                  },
+                ),
+                _actionChip(
+                  label: 'Remove watched',
+                  icon: Icons.remove_red_eye_outlined,
+                  color: AgreeoColors.cinematicRed,
+                  onTap: () => _showUndoAction(
+                    () => controller.removeFromWatched(movie.id),
+                  ),
+                ),
+              ],
+              _LibraryTab.hidden => <Widget>[
+                _actionChip(
+                  label: 'Undo dislike',
+                  icon: Icons.undo_rounded,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () =>
+                      _showUndoAction(() => controller.clearPreference(movie.id)),
+                ),
+                _actionChip(
+                  label: 'Move to Watchlist',
+                  icon: Icons.bookmark_add_outlined,
+                  color: AgreeoColors.kernelGold,
+                  onTap: () =>
+                      _showUndoAction(() => controller.addToWatchlist(movie.id)),
+                ),
+                _actionChip(
+                  label: userState.watched ? 'Watched' : 'Mark watched',
+                  icon: Icons.visibility_outlined,
+                  color: AgreeoColors.popcornWhite,
+                  onTap: () => _showUndoAction(
+                    userState.watched
+                        ? () => controller.removeFromWatched(movie.id)
+                        : () => controller.markAsWatched(movie.id),
+                  ),
+                ),
+              ],
+            },
+          );
+        },
+        separatorBuilder: (context, index) => const SizedBox(height: 14),
+        itemCount: movies.length,
+      ),
     );
   }
 

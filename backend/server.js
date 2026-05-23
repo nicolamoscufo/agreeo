@@ -27,9 +27,11 @@ app.post('/auth/register', authController.register);
 app.post('/auth/login', authController.login);
 
 app.get('/movies/popular', movieController.popular);
+app.get('/movies/random', movieController.random);
 app.get('/movies/recommendations', movieController.recommendations);
 app.get('/movies/daily-suggestions', movieController.dailySuggestions);
 app.get('/movies/search', movieController.search);
+app.get('/movies/mood-search', verifyMiddleware, movieController.moodSearch);
 app.get('/movies/:tmdbId', movieController.details);
 
 app.post('/auth/refresh', (req, res) => {

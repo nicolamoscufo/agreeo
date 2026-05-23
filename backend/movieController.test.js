@@ -35,6 +35,7 @@ test('hydrateRecommendations preserves order and skips stale TMDB ids', async ()
         movieLensAvgRating: 3.3,
         movieLensRatingCount: 50,
       }),
+      mergeTmdbMovie: async () => {},
       logger: { warn: (message) => warned.push(message) },
     }
   );
@@ -72,6 +73,7 @@ test('hydrateRecommendations stops once the limit is reached', async () => {
         };
       },
       findMovieByTmdbId: async (tmdbId) => ({ tmdbId }),
+      mergeTmdbMovie: async () => {},
       logger: { warn: () => {} },
     }
   );

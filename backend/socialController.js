@@ -1,5 +1,8 @@
 const socialRepository = require('./socialRepository');
 const socketService = require('./socketService');
+const { tmdbGet } = require('./tmdbClient');
+const movieRepository = require('./movieRepository');
+const { mapInteractionMovie } = require('./movieController');
 
 function requestUid(req) {
   return req.user && (req.user.uid || req.user.sub);
@@ -209,6 +212,101 @@ exports.blockFriend = async (req, res) => {
   }
 };
 
+async function hydrateFriendProfileMovies(profile) {
+  if (!profile) return profile;
+
+  const unhydrated = [];
+
+  // 1. Scan watchedMovies
+  const watchedMovies = profile.watchedMovies || [];
+  for (const m of watchedMovies) {
+    if (m && m.tmdbId && !m.tmdbHydrated) {
+      unhydrated.push(m);
+    }
+  }
+
+  // 2. Scan watchlist
+  const watchlist = profile.watchlist || [];
+  for (const m of watchlist) {
+    if (m && m.tmdbId && !m.tmdbHydrated) {
+      unhydrated.push(m);
+    }
+  }
+
+  // 3. Scan reviews
+  const reviews = profile.reviews || [];
+  for (const r of reviews) {
+    if (r && r.movie && r.movie.tmdbId && !r.movie.tmdbHydrated) {
+      unhydrated.push(r.movie);
+    }
+  }
+
+  if (unhydrated.length === 0) {
+    return profile;
+  }
+
+  const batchSize = 6;
+  const hydratedMoviesMap = new Map();
+
+  for (let i = 0; i < unhydrated.length; i += batchSize) {
+    const batch = unhydrated.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (movie) => {
+        try {
+          if (hydratedMoviesMap.has(movie.tmdbId)) return;
+
+          const tmdbMovie = await tmdbGet(`/movie/${movie.tmdbId}`, { append_to_response: 'credits' });
+          if (tmdbMovie && tmdbMovie.id) {
+            const mapped = mapInteractionMovie(tmdbMovie);
+            mapped.tmdbHydrated = true;
+            const fullMovie = {
+              ...mapped,
+              movieLensAvgRating: movie.movieLens?.avgRating ?? null,
+              movieLensRatingCount: movie.movieLens?.ratingCount ?? 0,
+            };
+            await movieRepository.mergeTmdbMovie(fullMovie);
+            hydratedMoviesMap.set(movie.tmdbId, fullMovie);
+          }
+        } catch (error) {
+          console.warn(`Failed to hydrate friend profile movie ${movie.tmdbId} from TMDB:`, error.message);
+        }
+      })
+    );
+  }
+
+  const mapMovieIfNeeded = (movie) => {
+    if (movie && hydratedMoviesMap.has(movie.tmdbId)) {
+      const hydrated = hydratedMoviesMap.get(movie.tmdbId);
+      return {
+        ...movie,
+        ...hydrated,
+        genres: hydrated.genres || [],
+        tmdbHydrated: true,
+      };
+    }
+    return movie;
+  };
+
+  const updatedWatchedMovies = watchedMovies.map(mapMovieIfNeeded);
+  const updatedWatchlist = watchlist.map(mapMovieIfNeeded);
+  const updatedReviews = reviews.map((r) => {
+    if (r && r.movie) {
+      return {
+        ...r,
+        movie: mapMovieIfNeeded(r.movie),
+      };
+    }
+    return r;
+  });
+
+  return {
+    ...profile,
+    watchedMovies: updatedWatchedMovies,
+    watchlist: updatedWatchlist,
+    reviews: updatedReviews,
+  };
+}
+
 exports.friendProfile = async (req, res) => {
   const uid = requireUid(req, res);
   if (!uid) return;
@@ -216,7 +314,8 @@ exports.friendProfile = async (req, res) => {
   try {
     const profile = await socialRepository.getFriendProfile(uid, req.params.id);
     if (!profile) return res.status(404).json({ error: 'Friend profile not found' });
-    return res.json({ profile });
+    const hydratedProfile = await hydrateFriendProfileMovies(profile);
+    return res.json({ profile: hydratedProfile });
   } catch (error) {
     return handleError(res, error, 'Failed to load friend profile');
   }
