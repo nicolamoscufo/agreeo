@@ -214,17 +214,17 @@ class _RecommendationDebugScreenState
             title: 'Fase 2: Assegnazione dei Punteggi',
             description:
                 'I candidati rimanenti vengono valutati attraverso due logiche a seconda della sorgente:\n\n'
-                '💡 **A. Punteggio Personalizzato (Collaborativo)**\n'
-                'Trova nel grafo altri utenti con gusti sovrapponibili ai tuoi. Più film avete in comune, più la loro valutazione positiva influenza il film consigliato. I tuoi segnali hanno pesi diversi:\n'
-                '   - Preferiti selezionati: **+4.0**\n'
-                '   - Film piaciuti (Like): **+3.0**\n'
-                '   - Film in Watchlist: **+1.25**\n'
-                '   - *Penalità Generi*: **-1.5** per ciascun genere in cui hai accumulato 2 o più Dislike.\n\n'
+                '💡 **A. Punteggio Personalizzato (Collaborativo & Semantico)**\n'
+                'Combina due motori di raccomandazione ibridi:\n'
+                '  • **Collaborativo (Grafo Neo4j)**: Trova altri utenti con interessi simili. Pesi dei tuoi segnali:\n'
+                '     - Preferiti: **+4.0** | Likes: **+3.0** | Watchlist: **+1.25**\n'
+                '     - *Penalità Generi*: Sottrae un punteggio dinamico proporzionale al numero e al rapporto di dislike (es. da **-1.5** fino a **-15.0+** per generi con molti dislike).\n'
+                '  • **Semantico (Tag Embeddings)**: Calcola un **Vettore del Gusto Utente** aggregando i vettori dei tag (384 dimensioni) dei tuoi film swippati. Cerca nel database Neo4j tramite un indice vettoriale (`tag_embeddings`) i film con tag e atmosfere più affini ai tuoi gusti.\n\n'
                 '🚀 **B. Punteggio Esplorativo**\n'
                 'Cerca film popolari al di fuori della tua cerchia solita per testare nuove direzioni:\n'
                 '   - Corrispondenza generi familiari: **+15.0** per genere.\n'
                 '   - Popolarità globale: **10.0 * Media + log(Voti)**.\n'
-                '   - Generi non esplorati (Novità): **+40.0**.\n'
+                '   - Generi non esplorati (Nuovi Generi): **+40.0**.\n'
                 '   - Generi sgraditi: **-25.0**.',
           ),
           const SizedBox(height: 16),
@@ -347,6 +347,9 @@ class _RecommendationDebugScreenState
           final popularityScore = entry['popularityScore'] ?? 0.0;
           final explorationBonus = entry['explorationBonus'] ?? 0.0;
           final negativePenalty = entry['negativePenalty'] ?? 0.0;
+          final tagRelevanceScore = entry['tagRelevanceScore'] ?? 0.0;
+          final tagScore = tagRelevanceScore is num ? tagRelevanceScore.toDouble() * 10.0 : 0.0;
+          final matchedTags = _listOfMaps(entry['matchedTags']);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -439,6 +442,60 @@ class _RecommendationDebugScreenState
                         icon: Icons.warning_amber_rounded,
                         isPositive: false,
                       ),
+                      _buildScoreDetailRow(
+                        context,
+                        label: 'Affinità Tag Semantici (Embeddings)',
+                        value: tagScore,
+                        icon: Icons.local_offer_outlined,
+                        isPositive: true,
+                      ),
+                      if (matchedTags.isNotEmpty) ...[
+                        const Divider(height: 16),
+                        const Text(
+                          'TAG SEMANTICI CORRISPONDENTI',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: matchedTags.map((mt) {
+                            final tagName = mt['tag'] ?? '';
+                            final frequency = mt['frequency'] ?? 1;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.4),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                '#$tagName (x$frequency)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                       const Divider(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -610,6 +667,36 @@ class _RecommendationDebugScreenState
                   label: 'Generi Negativi Principali (e dislike)',
                   entries: _listOfMaps(recommendationSignals['topNegativeGenres'])
                       .map((entry) => '${entry['name']} (${entry['score']})')
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _DebugCard(
+            title: 'Tag Semantici (Embeddings)',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _TokenWrap(
+                  label: 'Tag Positivi Principali (e peso)',
+                  entries: _listOfMaps(recommendationSignals['topPositiveTags'])
+                      .map((entry) {
+                        final score = entry['score'];
+                        final displayScore = score is num ? score.toStringAsFixed(1) : '0.0';
+                        return '${entry['name']} ($displayScore)';
+                      })
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                _TokenWrap(
+                  label: 'Tag Negativi Principali (e peso)',
+                  entries: _listOfMaps(recommendationSignals['topNegativeTags'])
+                      .map((entry) {
+                        final score = entry['score'];
+                        final displayScore = score is num ? score.toStringAsFixed(1) : '0.0';
+                        return '${entry['name']} ($displayScore)';
+                      })
                       .toList(),
                 ),
               ],

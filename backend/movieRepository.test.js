@@ -112,7 +112,7 @@ test('getRecommendations excludes selected favorites from personalized recommend
 
   await movieRepository.getRecommendations('user-1');
 
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.match(calls[0].query, /LIKED\|SELECTED_FAVORITE\|WATCHLISTED/);
   assert.match(
     calls[0].query,
@@ -143,7 +143,7 @@ test('getRecommendations ranks candidates by weighted collaborative score', asyn
   assert.match(personalizedQuery, /\* \(toFloat\(r1\.rating\) - 3\.0\)/);
   assert.match(personalizedQuery, /1\.0 \/ sqrt\(log\(toFloat\(coalesce\(seed\.movieLensRatingCount, seedMl\.movieLensRatingCount, 0\)\) \+ 10\.0\)\)/);
   assert.match(personalizedQuery, /count\(DISTINCT seed\) AS overlapCount/);
-  assert.match(personalizedQuery, /sum\(similarityScore \* \(toFloat\(r2\.rating\) - 3\.0\)\) AS collaborativeScore/);
+  assert.match(personalizedQuery, /coalesce\(sum\(similarityScore\), 1\.0\)\) \* log\(toFloat\(count\(DISTINCT similar\)\) \+ 1\.0\) \* 10\.0\) AS collaborativeScore/);
   assert.match(personalizedQuery, /collaborativeScore - negativePenalty AS finalScore/);
   assert.match(personalizedQuery, /ORDER BY\s+finalScore DESC/);
   assert.match(personalizedQuery, /LIMIT 80/);
@@ -198,7 +198,7 @@ test('getRecommendations does not query a cold-start fallback', async (t) => {
 
   await movieRepository.getRecommendations('user-1');
 
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.doesNotMatch(calls[0].query, /coalesce\(m\.movieLensRatingCount, 0\) >= \$minFallbackRatingCount/);
 });
 
@@ -280,4 +280,207 @@ test('diversifyRecommendations still dedupes when genre data is missing', async 
   );
 
   assert.deepEqual(diversified.map((movie) => movie.tmdbId), [10, 12]);
+});
+
+test('getSemanticTagRecommendationCandidates queries user history, calculates taste vector and runs tag index vector search', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    if (calls.length === 1) {
+      // 1. Swiped tags query
+      return {
+        records: [
+          record({
+            embedding: new Array(384).fill(0.1),
+            relType: 'LIKED',
+            frequency: 2,
+          }),
+          record({
+            embedding: new Array(384).fill(-0.2),
+            relType: 'DISLIKED',
+            frequency: 1,
+          }),
+        ],
+      };
+    }
+    // 2. Vector search query
+    return {
+      records: [
+        record({
+          tmdbId: 101,
+          title: 'Semantic Match 1',
+          tagRelevanceScore: 0.8,
+          matchedTags: [{ tag: 'space', frequency: 5 }],
+          globalAvg: 4.2,
+          ratingCount: 1500,
+        }),
+      ],
+    };
+  };
+
+  const candidates = await movieRepository.getSemanticTagRecommendationCandidates('user-1', 10);
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].tmdbId, 101);
+  assert.equal(candidates[0].title, 'Semantic Match 1');
+  assert.equal(candidates[0].source, 'semantic-tag');
+  
+  // Verify calls
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].query, /MATCH \(u:AppUser \{uid: \$uid\}\)-\[r:LIKED\|SELECTED_FAVORITE\|WATCHLISTED\|DISLIKED\]->\(m:Movie\)/);
+  assert.match(calls[1].query, /CALL db\.index\.vector\.queryNodes\('tag_embeddings', toInteger\(\$topK\), \$userTasteVector\)/);
+  
+  // Taste vector verification
+  // LIKED: 0.1 * 3.0 (liked weight) * 2 (frequency) = 0.6
+  // DISLIKED: -0.2 * -3.0 (disliked weight) * 1 (frequency) = 0.6
+  // Sum = 1.2
+  // TotalWeight = (3 * 2) + (-3 * 1) = 6 - 3 = 3.
+  // Vector dimension value = 1.2 / 3 = 0.4.
+  const computedTasteVector = calls[1].params.userTasteVector;
+  assert.equal(computedTasteVector.length, 384);
+  assert.ok(Math.abs(computedTasteVector[0] - 0.4) < 0.0001);
+  assert.equal(calls[1].params.limit, 10);
+});
+
+test('getRecommendationCandidates combines collaborative and semantic candidates as a hybrid pool', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    if (query.includes('personalized')) {
+      // Collaborative filtering query
+      return {
+        records: [
+          record({
+            tmdbId: 100,
+            title: 'Movie A',
+            similarUsers: 5,
+            avgSimilarRating: 4.5,
+            collaborativeScore: 10.0,
+            genreScore: 0.0,
+            popularityScore: 2.0,
+            negativePenalty: 0.0,
+            explorationBonus: 0.0,
+            finalScore: 10.0,
+            globalAvg: 4.0,
+            ratingCount: 500,
+            source: 'personalized',
+          }),
+          record({
+            tmdbId: 200,
+            title: 'Movie B',
+            similarUsers: 2,
+            avgSimilarRating: 4.0,
+            collaborativeScore: 5.0,
+            genreScore: 0.0,
+            popularityScore: 1.5,
+            negativePenalty: 0.0,
+            explorationBonus: 0.0,
+            finalScore: 5.0,
+            globalAvg: 3.8,
+            ratingCount: 200,
+            source: 'personalized',
+          }),
+        ],
+      };
+    } else if (query.includes('MATCH (u:AppUser {uid: $uid})-[r:LIKED')) {
+      // Swiped tags query
+      return {
+        records: [
+          record({
+            embedding: new Array(384).fill(0.1),
+            relType: 'LIKED',
+            frequency: 1,
+          }),
+        ],
+      };
+    } else if (query.includes('queryNodes')) {
+      // Vector search query
+      return {
+        records: [
+          record({
+            tmdbId: 200,
+            title: 'Movie B',
+            tagRelevanceScore: 0.8, // raw tag score. in JS it gets multiplied by 10 => 8.0 finalScore
+            matchedTags: [{ tag: 'space', frequency: 3 }],
+            globalAvg: 3.8,
+            ratingCount: 200,
+          }),
+          record({
+            tmdbId: 300,
+            title: 'Movie C',
+            tagRelevanceScore: 1.2, // raw tag score. in JS it gets multiplied by 10 => 12.0 finalScore
+            matchedTags: [{ tag: 'time', frequency: 2 }],
+            globalAvg: 4.1,
+            ratingCount: 100,
+          }),
+        ],
+      };
+    }
+    return { records: [] };
+  };
+
+  const response = await movieRepository.getRecommendationCandidates('user-1');
+  const candidates = response.candidates;
+
+  // Expected combined & sorted candidates:
+  // 1. Movie B (hybrid): 5.0 (personalized) + 8.0 (semantic) = 13.0
+  // 2. Movie C (semantic): 12.0
+  // 3. Movie A (personalized): 10.0
+  assert.equal(candidates.length, 3);
+  assert.deepEqual(candidates.map(c => c.tmdbId), [200, 300, 100]);
+  
+  const movieB = candidates[0];
+  assert.equal(movieB.finalScore, 13.0);
+  assert.equal(movieB.source, 'hybrid');
+  assert.match(movieB.reason, /High collaborative overlap.*Also matches themes you like/);
+});
+
+test('getTopPositiveTagSignals and getTopNegativeTagSignals query and compute tag weights', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return {
+      records: [
+        record({
+          name: 'sci-fi',
+          score: 12.5,
+        }),
+      ],
+    };
+  };
+
+  const posSignals = await movieRepository.getTopPositiveTagSignals('user-1', 5);
+  const negSignals = await movieRepository.getTopNegativeTagSignals('user-1', 5);
+
+  assert.equal(posSignals.length, 1);
+  assert.equal(posSignals[0].name, 'sci-fi');
+  assert.equal(posSignals[0].score, 12.5);
+
+  assert.equal(negSignals.length, 1);
+  assert.equal(negSignals[0].name, 'sci-fi');
+  assert.equal(negSignals[0].score, 12.5);
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].query, /LIKED\|SELECTED_FAVORITE\|WATCHLISTED/);
+  assert.match(calls[0].query, /LIMIT 5/);
+  assert.match(calls[1].query, /DISLIKED/);
+  assert.match(calls[1].query, /LIMIT 5/);
 });

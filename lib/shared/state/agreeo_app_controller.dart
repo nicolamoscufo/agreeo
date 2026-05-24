@@ -230,7 +230,7 @@ class AgreeoAppState {
 
 class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   static const int swipeQueueRefillThreshold = 8;
-  static const int dailySuggestionBatchSize = 60;
+  static const int dailySuggestionBatchSize = 15;
 
   AgreeoAppController(
     this._ref,

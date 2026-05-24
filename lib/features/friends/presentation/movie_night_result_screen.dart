@@ -375,7 +375,9 @@ class _FullLeaderboard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
-                    '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}',
+                    rank.candidate.eliminated
+                        ? '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}  \u00b7  Eliminated'
+                        : '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,

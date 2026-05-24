@@ -674,7 +674,8 @@ async function listMovieNights(uid) {
       movie: ${movieMapCypher('m')},
       compatibilityScore: coalesce(candidate.compatibilityScore, 0.0),
       explanationTags: coalesce(candidate.explanationTags, []),
-      scoreBreakdownJson: coalesce(candidate.scoreBreakdownJson, '{}')
+      scoreBreakdownJson: coalesce(candidate.scoreBreakdownJson, '{}'),
+      eliminated: coalesce(candidate.eliminated, false)
     }] AS shortlist,
     [(vUser:AppUser)-[vote:VOTED_IN]->(vMovie:Movie) WHERE vote.eventId = event.id | {
       eventId: vote.eventId,
@@ -800,7 +801,8 @@ async function loadShortlist(eventId, tx = null) {
       movie: ${movieMapCypher('m')},
       compatibilityScore: coalesce(candidate.compatibilityScore, 0.0),
       explanationTags: coalesce(candidate.explanationTags, []),
-      scoreBreakdownJson: coalesce(candidate.scoreBreakdownJson, '{}')
+      scoreBreakdownJson: coalesce(candidate.scoreBreakdownJson, '{}'),
+      eliminated: coalesce(candidate.eliminated, false)
     } AS candidate
     ORDER BY candidate.compatibilityScore DESC, m.title ASC
     `,
@@ -822,6 +824,7 @@ function normalizeCandidate(raw) {
     compatibilityScore: toFiniteNumber(candidate.compatibilityScore),
     explanationTags: Array.isArray(candidate.explanationTags) ? candidate.explanationTags : [],
     scoreBreakdown,
+    eliminated: candidate.eliminated === true,
   };
 }
 
@@ -929,7 +932,63 @@ async function generateShortlist(uid, eventId) {
   if (!event) return null;
   const constraints = normalizeConstraints(event.constraints);
   const joinedParticipants = event.participants.filter((participant) => participant.status === 'joined');
-  const movies = await loadCandidateMovies(constraints, 150);
+
+  // Calculate Group Taste Vector based on tag embeddings of movies swiped by joined participants
+  const userIds = joinedParticipants.map((p) => p.userId);
+  let groupTasteVector = null;
+  if (userIds.length > 0) {
+    const groupTagsResult = await neo4jService.run(
+      `
+      MATCH (u:AppUser)
+      WHERE u.uid IN $userIds
+      MATCH (u)-[r:LIKED|SELECTED_FAVORITE|WATCHLISTED|DISLIKED]->(m:Movie)
+      MATCH (m)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)
+      WHERE t.embedding IS NOT NULL
+      RETURN t.embedding AS embedding, type(r) AS relType, coalesce(h.frequency, 1) AS frequency
+      `,
+      { userIds }
+    );
+
+    if (groupTagsResult.records.length > 0) {
+      const sumVector = new Array(384).fill(0);
+      let totalWeight = 0;
+
+      for (const record of groupTagsResult.records) {
+        const embedding = record.get('embedding');
+        if (!Array.isArray(embedding) || embedding.length !== 384) continue;
+
+        const relType = record.get('relType');
+        const frequency = toNativeNumber(record.get('frequency')) || 1;
+
+        let relWeight = 1.0;
+        if (relType === 'SELECTED_FAVORITE') {
+          relWeight = 4.0;
+        } else if (relType === 'LIKED') {
+          relWeight = 3.0;
+        } else if (relType === 'WATCHLISTED') {
+          relWeight = 1.5;
+        } else if (relType === 'DISLIKED') {
+          relWeight = -3.0;
+        }
+
+        const weight = relWeight * frequency;
+
+        for (let i = 0; i < 384; i++) {
+          sumVector[i] += embedding[i] * weight;
+        }
+        totalWeight += weight;
+      }
+
+      if (totalWeight > 0) {
+        for (let i = 0; i < 384; i++) {
+          sumVector[i] /= totalWeight;
+        }
+        groupTasteVector = sumVector;
+      }
+    }
+  }
+
+  const movies = await loadCandidateMovies(constraints, 150, groupTasteVector);
   const states = await loadUserMovieStates(
     joinedParticipants.map((participant) => participant.userId),
     movies.map((movie) => movie.tmdbId).filter((tmdbId) => Number.isInteger(tmdbId))
@@ -1033,7 +1092,7 @@ async function clearVotesOnly(eventId) {
 
 const { TMDB_GENRE_IDS_BY_NAME, TMDB_GENRE_NAMES_BY_ID, mapGenreNameToId } = require('./genreUtils');
 
-async function loadCandidateMovies(constraints, limit = 150) {
+async function loadCandidateMovies(constraints, limit = 150, groupTasteVector = null) {
   try {
     const params = {
       language: 'en-US',
@@ -1119,38 +1178,86 @@ async function loadCandidateMovies(constraints, limit = 150) {
   }
 
   const safeLimit = toPositiveInteger(limit, 150, 500);
-  const result = await neo4jService.run(
-    `
-    MATCH (m:Movie)
-    WHERE m.tmdbId IS NOT NULL
-    OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(:MovieLensMovie)-[:IN_GENRE]->(genre:Genre)
-    WITH m, [g IN coalesce(m.genres, []) WHERE g IS NOT NULL] + collect(DISTINCT genre.name) AS rawGenres
-    WITH m, [g IN rawGenres WHERE g IS NOT NULL] AS genres
-    WHERE ($maxDurationMinutes IS NULL OR coalesce(m.runtime, 0) = 0 OR coalesce(m.runtime, 0) <= $maxDurationMinutes)
-      AND ($minimumRating IS NULL OR coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) >= $minimumRating)
-      AND (size($includedGenres) = 0 OR any(g IN genres WHERE g IN $includedGenres))
-      AND none(g IN genres WHERE g IN $excludedGenres)
-    RETURN {
-      tmdbId: m.tmdbId,
-      title: coalesce(m.title, ''),
-      originalTitle: coalesce(m.originalTitle, m.title, ''),
-      overview: coalesce(m.overview, ''),
-      posterPath: m.posterPath,
-      backdropPath: m.backdropPath,
-      posterUrl: coalesce(m.posterUrl, ''),
-      backdropUrl: coalesce(m.backdropUrl, ''),
-      releaseDate: coalesce(m.releaseDate, ''),
-      runtime: coalesce(m.runtime, 0),
-      voteAverage: coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0),
-      genres: genres,
-      movieLensAvgRating: m.movieLensAvgRating,
-      movieLensRatingCount: coalesce(m.movieLensRatingCount, 0)
-    } AS movie
-    ORDER BY coalesce(m.movieLensRatingCount, 0) DESC, coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) DESC, m.title ASC
-    LIMIT ${safeLimit}
-    `,
-    constraints
-  );
+  let result;
+  if (groupTasteVector) {
+    result = await neo4jService.run(
+      `
+      CALL db.index.vector.queryNodes('tag_embeddings', toInteger($topK), $groupTasteVector)
+      YIELD node AS tagNode, score AS similarity
+      MATCH (tagNode)<-[h:HAS_TAG]-(ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)
+      
+      WITH m, ml, tagNode.name AS tag, h.frequency AS tagFrequency, similarity
+      WITH m, ml, tag, tagFrequency, (2.0 * similarity - 1.0) AS stdSimilarity
+      WHERE stdSimilarity >= $similarityThreshold
+      
+      WITH m, ml, [g IN coalesce(m.genres, []) WHERE g IS NOT NULL] + collect(DISTINCT tag) AS rawGenres, sum(tagFrequency * (stdSimilarity ^ 3)) AS tagScore
+      WITH m, ml, [g IN rawGenres WHERE g IS NOT NULL] AS genres, tagScore
+      
+      WHERE ($maxDurationMinutes IS NULL OR coalesce(m.runtime, 0) = 0 OR coalesce(m.runtime, 0) <= $maxDurationMinutes)
+        AND ($minimumRating IS NULL OR coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) >= $minimumRating)
+        AND (size($includedGenres) = 0 OR any(g IN genres WHERE g IN $includedGenres))
+        AND none(g IN genres WHERE g IN $excludedGenres)
+        
+      RETURN {
+        tmdbId: m.tmdbId,
+        title: coalesce(m.title, ''),
+        originalTitle: coalesce(m.originalTitle, m.title, ''),
+        overview: coalesce(m.overview, ''),
+        posterPath: m.posterPath,
+        backdropPath: m.backdropPath,
+        posterUrl: coalesce(m.posterUrl, ''),
+        backdropUrl: coalesce(m.backdropUrl, ''),
+        releaseDate: coalesce(m.releaseDate, ''),
+        runtime: coalesce(m.runtime, 0),
+        voteAverage: coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0),
+        genres: genres,
+        movieLensAvgRating: m.movieLensAvgRating,
+        movieLensRatingCount: coalesce(m.movieLensRatingCount, 0)
+      } AS movie
+      ORDER BY tagScore DESC, coalesce(m.movieLensRatingCount, 0) DESC, m.title ASC
+      LIMIT ${safeLimit}
+      `,
+      {
+        ...constraints,
+        groupTasteVector,
+        topK: 25,
+        similarityThreshold: 0.35,
+      }
+    );
+  } else {
+    result = await neo4jService.run(
+      `
+      MATCH (m:Movie)
+      WHERE m.tmdbId IS NOT NULL
+      OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(:MovieLensMovie)-[:IN_GENRE]->(genre:Genre)
+      WITH m, [g IN coalesce(m.genres, []) WHERE g IS NOT NULL] + collect(DISTINCT genre.name) AS rawGenres
+      WITH m, [g IN rawGenres WHERE g IS NOT NULL] AS genres
+      WHERE ($maxDurationMinutes IS NULL OR coalesce(m.runtime, 0) = 0 OR coalesce(m.runtime, 0) <= $maxDurationMinutes)
+        AND ($minimumRating IS NULL OR coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) >= $minimumRating)
+        AND (size($includedGenres) = 0 OR any(g IN genres WHERE g IN $includedGenres))
+        AND none(g IN genres WHERE g IN $excludedGenres)
+      RETURN {
+        tmdbId: m.tmdbId,
+        title: coalesce(m.title, ''),
+        originalTitle: coalesce(m.originalTitle, m.title, ''),
+        overview: coalesce(m.overview, ''),
+        posterPath: m.posterPath,
+        backdropPath: m.backdropPath,
+        posterUrl: coalesce(m.posterUrl, ''),
+        backdropUrl: coalesce(m.backdropUrl, ''),
+        releaseDate: coalesce(m.releaseDate, ''),
+        runtime: coalesce(m.runtime, 0),
+        voteAverage: coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0),
+        genres: genres,
+        movieLensAvgRating: m.movieLensAvgRating,
+        movieLensRatingCount: coalesce(m.movieLensRatingCount, 0)
+      } AS movie
+      ORDER BY coalesce(m.movieLensRatingCount, 0) DESC, coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) DESC, m.title ASC
+      LIMIT ${safeLimit}
+      `,
+      constraints
+    );
+  }
   return result.records.map((record) => normalizeMovie(record.get('movie')));
 }
 

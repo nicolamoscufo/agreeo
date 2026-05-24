@@ -1281,6 +1281,8 @@ exports.recommendationDebugStats = async (req, res) => {
       candidatePoolStats,
       forYouData,
       dailySuggestionData,
+      positiveTags,
+      negativeTags,
     ] = await Promise.all([
       movieRepository.getRecommendationUserProfile(uid),
       movieRepository.getTopPositiveGenreSignals(uid),
@@ -1290,6 +1292,8 @@ exports.recommendationDebugStats = async (req, res) => {
       movieRepository.getCandidatePoolStats(uid),
       loadForYouRecommendations(uid, { limit: 12 }),
       loadDailySuggestions(uid, { limit: 20 }),
+      movieRepository.getTopPositiveTagSignals(uid, 15),
+      movieRepository.getTopNegativeTagSignals(uid, 15),
     ]);
 
     const positiveGenreNames = new Set(positiveGenres.map((entry) => entry.name));
@@ -1311,6 +1315,8 @@ exports.recommendationDebugStats = async (req, res) => {
         collaborativeScore: toFiniteNumber(recommendation.collaborativeScore),
         negativePenalty: toFiniteNumber(recommendation.negativePenalty),
         explorationBonus: toFiniteNumber(recommendation.explorationBonus),
+        tagRelevanceScore: toFiniteNumber(movie.tagRelevanceScore),
+        matchedTags: Array.isArray(movie.matchedTags) ? movie.matchedTags : [],
         reason: recommendation.reason || buildForYouReason(recommendation),
       };
     });
@@ -1332,6 +1338,8 @@ exports.recommendationDebugStats = async (req, res) => {
       recommendationSignals: {
         topPositiveGenres: positiveGenres,
         topNegativeGenres: negativeGenres,
+        topPositiveTags: positiveTags,
+        topNegativeTags: negativeTags,
         influentialPositiveMovies: positiveMovies,
         penalizedNegativeMovies: negativeMovies,
         usesCollaborativeFiltering: true,

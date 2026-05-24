@@ -114,6 +114,9 @@ List<MovieNightCandidateRank> movieNightRanking(MovieNightEvent event) {
       .toList(growable: false);
 
   ranked.sort((left, right) {
+    if (left.candidate.eliminated != right.candidate.eliminated) {
+      return left.candidate.eliminated ? 1 : -1;
+    }
     final scoreCompare = right.finalScore.compareTo(left.finalScore);
     if (scoreCompare != 0) return scoreCompare;
     final likeCompare = right.likes.compareTo(left.likes);

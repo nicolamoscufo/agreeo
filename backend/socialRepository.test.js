@@ -212,3 +212,181 @@ test('blockFriend deletes friendship and creates BLOCKED relationship', async (t
   assert.match(calls[0].query, /MERGE \(me\)-\[blocked:BLOCKED\]->\(target\)/);
   assert.deepEqual(calls[0].params, { uid: 'user-1', friendId: 'friend-4' });
 });
+
+test('generateShortlist calculates group taste vector and queries candidate movies using vector index', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    if (query.includes('MATCH (:AppUser {uid: $uid})-[:PARTICIPATES_IN]->(event:MovieNight')) {
+      // 1. getMovieNight event query
+      return {
+        records: [
+          record({
+            event: {
+              id: 'mn-1',
+              name: 'Sci-Fi Vibe Night',
+              hostUserId: 'host-1',
+              dateTime: null,
+              constraints: {
+                includedGenres: [],
+                excludedGenres: [],
+                maxDurationMinutes: 180,
+                minimumRating: 7.0,
+                language: null,
+              },
+              inviteLink: '',
+              status: 'waiting',
+              winnerMovieId: null,
+              round: 1,
+              createdAt: '2024-01-01',
+              updatedAt: '2024-01-01',
+            },
+          }),
+        ],
+      };
+    } else if (query.includes('MATCH (user:AppUser)-[part:PARTICIPATES_IN]->(:MovieNight')) {
+      // loadParticipants
+      return {
+        records: [
+          record({
+            participant: {
+              userId: 'host-1',
+              name: 'Host One',
+              avatarUrl: '',
+              status: 'joined',
+              isHost: true,
+            },
+          }),
+          record({
+            participant: {
+              userId: 'user-2',
+              name: 'User Two',
+              avatarUrl: '',
+              status: 'joined',
+              isHost: false,
+            },
+          }),
+        ],
+      };
+    } else if (query.includes('MATCH (event:MovieNight {id: $eventId})-[candidate:HAS_CANDIDATE]->(m:Movie)')) {
+      // loadShortlist
+      return {
+        records: [
+          record({
+            candidate: {
+              movie: {
+                tmdbId: 501,
+                title: 'Interstellar',
+                originalTitle: 'Interstellar',
+                overview: 'Awesome space movie',
+                posterPath: '/path.jpg',
+                backdropPath: '/back.jpg',
+                posterUrl: 'http://posters/path.jpg',
+                backdropUrl: 'http://backdrops/back.jpg',
+                releaseDate: '2014-11-07',
+                runtime: 169,
+                voteAverage: 8.4,
+                genres: ['Sci-Fi', 'Adventure'],
+                movieLensAvgRating: 4.1,
+                movieLensRatingCount: 3000,
+              },
+              compatibilityScore: 10.0,
+              explanationTags: ['High rating'],
+              scoreBreakdownJson: '{}',
+            },
+          }),
+        ],
+      };
+    } else if (query.includes('MATCH (user:AppUser)-[vote:VOTED_IN]->(m:Movie)')) {
+      // loadVotes
+      return { records: [] };
+    } else if (query.includes('MATCH (u:AppUser)\n      WHERE u.uid IN $userIds')) {
+      // 2. group taste vector tags query
+      return {
+        records: [
+          record({
+            embedding: new Array(384).fill(0.2),
+            relType: 'LIKED',
+            frequency: 1,
+          }),
+        ],
+      };
+    } else if (query.includes('queryNodes')) {
+      // 3. vector search query for candidates
+      return {
+        records: [
+          record({
+            movie: {
+              tmdbId: 501,
+              title: 'Interstellar',
+              originalTitle: 'Interstellar',
+              overview: 'Awesome space movie',
+              posterPath: '/path.jpg',
+              backdropPath: '/back.jpg',
+              posterUrl: 'http://posters/path.jpg',
+              backdropUrl: 'http://backdrops/back.jpg',
+              releaseDate: '2014-11-07',
+              runtime: 169,
+              voteAverage: 8.4,
+              genres: ['Sci-Fi', 'Adventure'],
+              movieLensAvgRating: 4.1,
+              movieLensRatingCount: 3000,
+            },
+          }),
+        ],
+      };
+    } else if (query.includes('MATCH (u:AppUser)\n    WHERE u.uid IN $userIds\n    MATCH (m:Movie)')) {
+      // 4. loadUserMovieStates
+      return {
+        records: [
+          record({
+            userId: 'host-1',
+            tmdbId: 501,
+            liked: true,
+            disliked: false,
+            inWatchlist: false,
+            watched: true,
+            rating: 5,
+          }),
+          record({
+            userId: 'user-2',
+            tmdbId: 501,
+            liked: false,
+            disliked: false,
+            inWatchlist: true,
+            watched: false,
+            rating: null,
+          }),
+        ],
+      };
+    } else if (query.includes('UNWIND $candidates AS candidate')) {
+      // save candidates shortlist relation
+      return { records: [] };
+    } else if (query.includes('OPTIONAL MATCH (:AppUser)-[vote:VOTED_IN]->(:Movie)\n    WHERE vote.eventId = $eventId')) {
+      // clearVotesOnly
+      return { records: [] };
+    }
+    return { records: [] };
+  };
+
+  const shortlist = await socialRepository.generateShortlist('host-1', 'mn-1');
+
+  // Verify the shortlist matches our mock movie
+  assert.equal(shortlist.shortlist.length, 1);
+  assert.equal(shortlist.shortlist[0].movie.tmdbId, 501);
+  assert.equal(shortlist.shortlist[0].movie.title, 'Interstellar');
+
+  // Verify group taste vector calculations and index query
+  const vectorQueryCall = calls.find((c) => c.query.includes('queryNodes'));
+  assert.ok(vectorQueryCall);
+  const computedGroupTasteVector = vectorQueryCall.params.groupTasteVector;
+  assert.equal(computedGroupTasteVector.length, 384);
+  // Weight is LIKED (3.0) * freq (1) = 3.0. Embedding is 0.2. Normalized vector is 0.2.
+  assert.ok(Math.abs(computedGroupTasteVector[0] - 0.2) < 0.0001);
+});

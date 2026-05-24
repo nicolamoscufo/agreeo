@@ -516,6 +516,7 @@ class BackendSocialService {
             finalScore: _nullableDouble(json['finalScore']),
             likesCount: _nullableInt(json['likesCount']),
             dislikesCount: _nullableInt(json['dislikesCount']),
+            eliminated: json['eliminated'] == true,
           );
         })
         .toList(growable: false);

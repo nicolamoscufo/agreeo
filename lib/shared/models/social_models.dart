@@ -266,6 +266,7 @@ class ShortlistCandidate {
     this.finalScore,
     this.likesCount,
     this.dislikesCount,
+    this.eliminated = false,
   });
 
   final Movie movie;
@@ -276,6 +277,7 @@ class ShortlistCandidate {
   final double? finalScore;
   final int? likesCount;
   final int? dislikesCount;
+  final bool eliminated;
 }
 
 class MovieNightVote {

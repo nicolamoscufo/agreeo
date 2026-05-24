@@ -675,7 +675,7 @@ async function getPersonalizedRecommendationCandidates(uid) {
       rec,
       count(DISTINCT similar) AS similarUsers,
       avg(r2.rating) AS avgSimilarRating,
-      sum(similarityScore * (toFloat(r2.rating) - 3.0)) AS collaborativeScore,
+      ((sum(similarityScore * (toFloat(r2.rating) - 3.0)) / coalesce(sum(similarityScore), 1.0)) * log(toFloat(count(DISTINCT similar)) + 1.0) * 10.0) AS collaborativeScore,
       avg(overlapCount) AS avgOverlapCount,
       max(negativePenalty) AS negativePenalty
     WITH
@@ -731,11 +731,157 @@ async function getPersonalizedRecommendationCandidates(uid) {
     .filter(Boolean);
 }
 
+async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
+  const safeLimit = toPositiveInteger(limit, 50, 200);
+  const tagsResult = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[r:LIKED|SELECTED_FAVORITE|WATCHLISTED|DISLIKED]->(m:Movie)
+    MATCH (m)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)
+    WHERE t.embedding IS NOT NULL
+    RETURN t.embedding AS embedding, type(r) AS relType, coalesce(h.frequency, 1) AS frequency
+    `,
+    { uid }
+  );
+
+  if (tagsResult.records.length === 0) {
+    return [];
+  }
+
+  const userTasteVector = new Array(384).fill(0);
+  let totalWeight = 0;
+
+  for (const record of tagsResult.records) {
+    const embedding = record.get('embedding');
+    if (!Array.isArray(embedding) || embedding.length !== 384) continue;
+
+    const relType = record.get('relType');
+    const frequency = toNativeNumber(record.get('frequency')) || 1;
+
+    let relWeight = 1.0;
+    if (relType === 'SELECTED_FAVORITE') {
+      relWeight = 4.0;
+    } else if (relType === 'LIKED') {
+      relWeight = 3.0;
+    } else if (relType === 'WATCHLISTED') {
+      relWeight = 1.5;
+    } else if (relType === 'DISLIKED') {
+      relWeight = -3.0;
+    }
+
+    const weight = relWeight * frequency;
+
+    for (let i = 0; i < 384; i++) {
+      userTasteVector[i] += embedding[i] * weight;
+    }
+    totalWeight += weight;
+  }
+
+  if (totalWeight <= 0) {
+    return [];
+  }
+
+  // Normalize the User Taste Vector
+  for (let i = 0; i < 384; i++) {
+    userTasteVector[i] /= totalWeight;
+  }
+
+  const vectorResult = await neo4jService.run(
+    `
+    CALL db.index.vector.queryNodes('tag_embeddings', toInteger($topK), $userTasteVector)
+    YIELD node AS tagNode, score AS similarity
+    MATCH (tagNode)<-[h:HAS_TAG]-(ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)
+    
+    MATCH (me:AppUser {uid: $uid})
+    WHERE NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
+    
+    WITH ml, m, tagNode.name AS tag, h.frequency AS tagFrequency, similarity
+    WITH ml, m, tag, tagFrequency, (2.0 * similarity - 1.0) AS stdSimilarity
+    WHERE stdSimilarity >= $similarityThreshold
+    
+    WITH ml, m, sum(tagFrequency * (stdSimilarity ^ 3)) AS rawScore, collect({ tag: tag, frequency: tagFrequency, similarity: stdSimilarity }) AS matchedTags
+    WITH m, rawScore / sqrt(toFloat(coalesce(ml.totalTagCount, 1.0))) AS tagRelevanceScore, matchedTags
+    WHERE tagRelevanceScore > 0
+    
+    RETURN
+      m.tmdbId AS tmdbId,
+      m.title AS title,
+      tagRelevanceScore,
+      matchedTags,
+      m.movieLensAvgRating AS globalAvg,
+      m.movieLensRatingCount AS ratingCount
+    ORDER BY tagRelevanceScore DESC, m.movieLensAvgRating DESC, m.movieLensRatingCount DESC
+    LIMIT toInteger($limit)
+    `,
+    {
+      uid,
+      userTasteVector,
+      topK: 25,
+      similarityThreshold: 0.35,
+      limit: safeLimit,
+    }
+  );
+
+  return vectorResult.records.map((rec) => {
+    const rawScore = toFiniteNumber(rec.get('tagRelevanceScore'));
+    const finalScore = rawScore * 10.0;
+
+    return {
+      tmdbId: toNativeNumber(rec.get('tmdbId')),
+      title: rec.get('title'),
+      similarUsers: 0,
+      avgSimilarRating: null,
+      collaborativeScore: 0.0,
+      genreScore: 0.0,
+      popularityScore: Math.log(toNativeNumber(rec.get('ratingCount')) + 1.0),
+      negativePenalty: 0.0,
+      explorationBonus: 0.0,
+      finalScore,
+      globalAvg: rec.get('globalAvg') == null ? null : toFiniteNumber(rec.get('globalAvg')),
+      ratingCount: toNativeNumber(rec.get('ratingCount')),
+      source: 'semantic-tag',
+      reason: 'Matches themes and vibes you enjoy based on your ratings.',
+      tagRelevanceScore: rawScore,
+      matchedTags: Array.isArray(rec.get('matchedTags'))
+        ? rec.get('matchedTags').map(mt => ({
+            tag: mt.tag,
+            frequency: toNativeNumber(mt.frequency)
+          }))
+        : [],
+    };
+  });
+}
+
 async function getRecommendationCandidates(uid) {
   const personalized = await getPersonalizedRecommendationCandidates(uid);
-  if (personalized.length > 0) {
+  const semantic = await getSemanticTagRecommendationCandidates(uid);
+
+  const combined = [];
+  const seen = new Set();
+
+  for (const c of personalized) {
+    seen.add(c.tmdbId);
+    combined.push(c);
+  }
+
+  for (const c of semantic) {
+    if (seen.has(c.tmdbId)) {
+      const existing = combined.find(x => x.tmdbId === c.tmdbId);
+      if (existing) {
+        existing.finalScore += c.finalScore;
+        existing.reason = `${existing.reason} Also matches themes you like.`;
+        existing.source = 'hybrid';
+      }
+    } else {
+      seen.add(c.tmdbId);
+      combined.push(c);
+    }
+  }
+
+  combined.sort((a, b) => b.finalScore - a.finalScore);
+
+  if (combined.length > 0) {
     return {
-      candidates: personalized,
+      candidates: combined,
       fallbackUsed: false,
       fallbackReason: null,
       fallbackStrategy: null,
@@ -1019,6 +1165,53 @@ async function getTopNegativeMovies(uid, limit = 5) {
   }));
 }
 
+async function getTopPositiveTagSignals(uid, limit = 10) {
+  const safeLimit = toPositiveInteger(limit, 10, 50);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[signal:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(movie:Movie)
+    MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)
+    WITH t.name AS name,
+      (CASE type(signal)
+        WHEN 'SELECTED_FAVORITE' THEN coalesce(signal.weight, 4.0)
+        WHEN 'LIKED' THEN 3.0
+        WHEN 'WATCHLISTED' THEN 1.5
+        ELSE 1.0
+      END * coalesce(h.frequency, 1)) AS tagWeight
+    RETURN name, sum(tagWeight) AS score
+    ORDER BY score DESC, name ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
+    name: record.get('name') || '',
+    score: toFiniteNumber(record.get('score')),
+  }));
+}
+
+async function getTopNegativeTagSignals(uid, limit = 10) {
+  const safeLimit = toPositiveInteger(limit, 10, 50);
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[signal:DISLIKED]->(movie:Movie)
+    MATCH (movie)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)
+    WITH t.name AS name,
+      (3.0 * coalesce(h.frequency, 1)) AS tagWeight
+    RETURN name, sum(tagWeight) AS score
+    ORDER BY score DESC, name ASC
+    LIMIT ${safeLimit}
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => ({
+    name: record.get('name') || '',
+    score: toFiniteNumber(record.get('score')),
+  }));
+}
+
 async function getCandidatePoolStats(uid) {
   const result = await neo4jService.run(
     `
@@ -1141,6 +1334,7 @@ module.exports = {
   removeSeen,
   getUserLibrary,
   getPersonalizedRecommendationCandidates,
+  getSemanticTagRecommendationCandidates,
   getRecommendationCandidates,
   getRecommendations,
   getExploratoryCandidates,
@@ -1149,6 +1343,8 @@ module.exports = {
   getTopNegativeGenreSignals,
   getTopPositiveMovies,
   getTopNegativeMovies,
+  getTopPositiveTagSignals,
+  getTopNegativeTagSignals,
   getCandidatePoolStats,
   findMoviesBySemanticTags,
 };
