@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
@@ -6,6 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
+
+String _preferredSwipeImageUrl(Movie movie) {
+  final raw = movie.posterUrl.isNotEmpty ? movie.posterUrl : movie.backdropUrl;
+  return raw.replaceFirst('/w500/', '/w780/');
+}
 
 class AgreeoSwipeScreen extends ConsumerStatefulWidget {
   const AgreeoSwipeScreen({super.key, this.onNavigateTab});
@@ -20,9 +27,7 @@ enum SwipeDirection { left, right, up, down }
 
 class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   bool _queueRefillScheduled = false;
-  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(
-    0.0,
-  );
+  final Set<String> _precachedSwipeImages = <String>{};
 
   @override
   void initState() {
@@ -30,12 +35,6 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scheduleRefillIfNeeded(0);
     });
-  }
-
-  @override
-  void dispose() {
-    _dragProgressNotifier.dispose();
-    super.dispose();
   }
 
   void _scheduleRefillIfNeeded(int queueLength) {
@@ -84,15 +83,31 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      _resetDragProgressAfterFrame();
     }
   }
 
-  void _resetDragProgressAfterFrame() {
+  void _scheduleSwipeImagePrecache(BuildContext context, List<Movie> queue) {
+    final urls = <String>[];
+    for (final movie in queue.take(4)) {
+      final imageUrl = _preferredSwipeImageUrl(movie);
+      if (imageUrl.isNotEmpty && _precachedSwipeImages.add(imageUrl)) {
+        urls.add(imageUrl);
+      }
+    }
+
+    if (urls.isEmpty) return;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _dragProgressNotifier.value = 0.0;
+      for (final url in urls) {
+        unawaited(
+          precacheImage(
+            CachedNetworkImageProvider(url),
+            context,
+            onError: (Object _, StackTrace? _) {},
+          ),
+        );
+      }
     });
   }
 
@@ -100,6 +115,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(agreeoAppControllerProvider);
     final queue = state.remainingDailySuggestions;
+    _scheduleSwipeImagePrecache(context, queue);
     _scheduleRefillIfNeeded(queue.length);
     final currentMovie = queue.isNotEmpty ? queue.first : null;
     final nextMovie = queue.length > 1 ? queue[1] : null;
@@ -219,22 +235,13 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
           // Background Movie
           if (nextMovie != null)
             Positioned.fill(
-              child: ValueListenableBuilder<double>(
-                valueListenable: _dragProgressNotifier,
-                builder: (context, dragProgress, _) {
-                  final easedProgress = Curves.easeOutCubic.transform(
-                    dragProgress,
-                  );
-                  return Transform.scale(
-                    scale: 0.985 + (easedProgress * 0.015),
-                    child: _ImmersiveMovieCard(
-                      movie: nextMovie,
-                      isBackground: true,
-                      backgroundProgress: easedProgress,
-                      actions: const _SwipeCardFooterSkeleton(),
-                    ),
-                  );
-                },
+              child: RepaintBoundary(
+                child: _ImmersiveMovieCard(
+                  movie: nextMovie,
+                  isBackground: true,
+                  backgroundProgress: 1,
+                  actions: const _SwipeCardActionsPreview(),
+                ),
               ),
             ),
 
@@ -244,9 +251,6 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
               key: ValueKey<String>(currentMovie.id),
               movie: currentMovie,
               canUndo: state.undoStack.isNotEmpty,
-              onDragProgress: (progress) {
-                _dragProgressNotifier.value = progress;
-              },
               onSwiped: (direction) =>
                   _handleSwiped(currentMovie.id, direction),
               onUndo: () async {
@@ -367,7 +371,6 @@ class SwipeableCard extends StatefulWidget {
     required this.onSwiped,
     required this.onUndo,
     required this.onInfoTap,
-    required this.onDragProgress,
   });
 
   final Movie movie;
@@ -375,7 +378,6 @@ class SwipeableCard extends StatefulWidget {
   final ValueChanged<SwipeDirection> onSwiped;
   final VoidCallback onUndo;
   final VoidCallback onInfoTap;
-  final ValueChanged<double> onDragProgress;
 
   @override
   State<SwipeableCard> createState() => _SwipeableCardState();
@@ -383,6 +385,12 @@ class SwipeableCard extends StatefulWidget {
 
 class _SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
+  static const Duration _programmaticSwipeDuration = Duration(
+    milliseconds: 280,
+  );
+  static const Duration _maxFlingDuration = Duration(milliseconds: 280);
+  static const Duration _minFlingDuration = Duration(milliseconds: 170);
+
   late final AnimationController _swipeController;
   Animation<Offset>? _swipeAnimation;
   final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(
@@ -400,7 +408,6 @@ class _SwipeableCardState extends State<SwipeableCard>
         )..addListener(() {
           if (_swipeAnimation != null) {
             _dragOffsetNotifier.value = _swipeAnimation!.value;
-            _notifyDragProgress();
           }
         });
   }
@@ -412,20 +419,6 @@ class _SwipeableCardState extends State<SwipeableCard>
     super.dispose();
   }
 
-  void _notifyDragProgress() {
-    if (!mounted) return;
-    final dragOffset = _dragOffsetNotifier.value;
-    final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
-    final size = MediaQuery.sizeOf(context);
-    final progress =
-        (isHorizontalDominant
-                ? (dragOffset.dx.abs() / (size.width * 0.45))
-                : (dragOffset.dy.abs() / (size.height * 0.25)))
-            .clamp(0.0, 1.0)
-            .toDouble();
-    widget.onDragProgress(progress);
-  }
-
   Future<void> _animateDragTo(
     Offset target, {
     Duration duration = const Duration(milliseconds: 260),
@@ -433,11 +426,37 @@ class _SwipeableCardState extends State<SwipeableCard>
   }) async {
     _swipeController.stop();
     _swipeController.duration = duration;
-    _swipeAnimation = Tween<Offset>(
+    final animation = Tween<Offset>(
       begin: _dragOffsetNotifier.value,
       end: target,
     ).animate(CurvedAnimation(parent: _swipeController, curve: curve));
-    await _swipeController.forward(from: 0);
+    _swipeAnimation = animation;
+    try {
+      await _swipeController.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
+    } finally {
+      if (_swipeAnimation == animation) {
+        _swipeAnimation = null;
+      }
+    }
+  }
+
+  Duration _flingDurationFor(Offset target, Offset velocity) {
+    final remainingDistance = (target - _dragOffsetNotifier.value).distance;
+    final speed = velocity.distance;
+    if (speed < 10) return _maxFlingDuration;
+
+    final milliseconds = (remainingDistance / speed * 1000).clamp(
+      _minFlingDuration.inMilliseconds.toDouble(),
+      _maxFlingDuration.inMilliseconds.toDouble(),
+    );
+    return Duration(milliseconds: milliseconds.round());
+  }
+
+  Duration _snapBackDurationFor(Offset offset) {
+    final progress = (offset.distance / 260).clamp(0.0, 1.0).toDouble();
+    return Duration(milliseconds: (160 + progress * 70).round());
   }
 
   Future<void> _swipeProgrammatic(SwipeDirection direction) async {
@@ -462,8 +481,8 @@ class _SwipeableCardState extends State<SwipeableCard>
     HapticFeedback.mediumImpact();
     await _animateDragTo(
       target,
-      duration: const Duration(milliseconds: 310),
-      curve: Curves.easeOutQuart,
+      duration: _programmaticSwipeDuration,
+      curve: Curves.easeOutCubic,
     );
     widget.onSwiped(direction);
   }
@@ -482,7 +501,7 @@ class _SwipeableCardState extends State<SwipeableCard>
       if (!shouldVote) {
         await _animateDragTo(
           Offset.zero,
-          duration: const Duration(milliseconds: 210),
+          duration: _snapBackDurationFor(dragOffset),
         );
         return;
       }
@@ -491,17 +510,20 @@ class _SwipeableCardState extends State<SwipeableCard>
           : dragOffset.dx > 0;
 
       final direction = swipeLike ? SwipeDirection.right : SwipeDirection.left;
+      final projectedY = (dragOffset.dy + velocityY * 0.10)
+          .clamp(-size.height * 0.42, size.height * 0.42)
+          .toDouble();
       final target = Offset(
         (swipeLike ? 1 : -1) * (size.width + 260),
-        dragOffset.dy,
+        projectedY,
       );
 
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
       await _animateDragTo(
         target,
-        duration: const Duration(milliseconds: 310),
-        curve: Curves.easeOutQuart,
+        duration: _flingDurationFor(target, details.velocity.pixelsPerSecond),
+        curve: Curves.easeOutCubic,
       );
       widget.onSwiped(direction);
     } else {
@@ -510,7 +532,7 @@ class _SwipeableCardState extends State<SwipeableCard>
       if (!shouldVote) {
         await _animateDragTo(
           Offset.zero,
-          duration: const Duration(milliseconds: 210),
+          duration: _snapBackDurationFor(dragOffset),
         );
         return;
       }
@@ -519,8 +541,11 @@ class _SwipeableCardState extends State<SwipeableCard>
           : dragOffset.dy < 0;
 
       final direction = swipeUp ? SwipeDirection.up : SwipeDirection.down;
+      final projectedX = (dragOffset.dx + velocityX * 0.10)
+          .clamp(-size.width * 0.42, size.width * 0.42)
+          .toDouble();
       final target = Offset(
-        dragOffset.dx,
+        projectedX,
         (swipeUp ? -1 : 1) * (size.height + 260),
       );
 
@@ -528,8 +553,8 @@ class _SwipeableCardState extends State<SwipeableCard>
       setState(() => _isSubmittingSwipe = true);
       await _animateDragTo(
         target,
-        duration: const Duration(milliseconds: 310),
-        curve: Curves.easeOutQuart,
+        duration: _flingDurationFor(target, details.velocity.pixelsPerSecond),
+        curve: Curves.easeOutCubic,
       );
       widget.onSwiped(direction);
     }
@@ -537,32 +562,39 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   @override
   Widget build(BuildContext context) {
-    final movieCard = _ImmersiveMovieCard(
-      movie: widget.movie,
-      isBackground: false,
-      onInfoTap: widget.onInfoTap,
-      actions: _SwipeCardActions(
-        canUndo: widget.canUndo,
-        onUndo: widget.onUndo,
-        onDislike: () => _swipeProgrammatic(SwipeDirection.left),
-        onSeen: () => _swipeProgrammatic(SwipeDirection.up),
-        onLike: () => _swipeProgrammatic(SwipeDirection.right),
-        onWatchlist: () => _swipeProgrammatic(SwipeDirection.down),
+    final movieCard = RepaintBoundary(
+      child: _ImmersiveMovieCard(
+        movie: widget.movie,
+        isBackground: false,
+        onInfoTap: widget.onInfoTap,
+        actions: _SwipeCardActions(
+          canUndo: widget.canUndo,
+          onUndo: widget.onUndo,
+          onDislike: () => _swipeProgrammatic(SwipeDirection.left),
+          onSeen: () => _swipeProgrammatic(SwipeDirection.up),
+          onLike: () => _swipeProgrammatic(SwipeDirection.right),
+          onWatchlist: () => _swipeProgrammatic(SwipeDirection.down),
+        ),
       ),
     );
 
     return GestureDetector(
+      onPanStart: _isSubmittingSwipe
+          ? null
+          : (_) {
+              _swipeController.stop();
+              _swipeAnimation = null;
+            },
       onPanUpdate: _isSubmittingSwipe
           ? null
           : (details) {
               _dragOffsetNotifier.value += details.delta;
-              _notifyDragProgress();
             },
       onPanEnd: (details) => _handlePanEnd(details),
       onPanCancel: () {
         _animateDragTo(
           Offset.zero,
-          duration: const Duration(milliseconds: 210),
+          duration: _snapBackDurationFor(_dragOffsetNotifier.value),
         );
       },
       child: ValueListenableBuilder<Offset>(
@@ -583,21 +615,22 @@ class _SwipeableCardState extends State<SwipeableCard>
           final isHoriz = dragOffset.dx.abs() >= dragOffset.dy.abs();
           final overlayProgress = isHoriz ? hProgress : vProgress;
 
-          return Transform.translate(
-            offset: dragOffset,
-            child: Transform.rotate(
-              angle: rotation,
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  child!,
-                  if (overlayProgress > 0)
-                    _SwipeStampOverlay(
-                      progress: overlayProgress,
-                      dragOffset: dragOffset,
-                    ),
-                ],
-              ),
+          final transform = Matrix4.identity()
+            ..translateByDouble(dragOffset.dx, dragOffset.dy, 0, 1)
+            ..rotateZ(rotation);
+
+          return Transform(
+            transform: transform,
+            alignment: Alignment.center,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                child!,
+                _SwipeStampOverlay(
+                  progress: overlayProgress,
+                  dragOffset: dragOffset,
+                ),
+              ],
             ),
           );
         },
@@ -623,7 +656,11 @@ class _ImmersiveMovieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = _preferredImageUrl(movie);
+    final imageUrl = _preferredSwipeImageUrl(movie);
+    final cacheWidth =
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .round();
     final expansionProgress = isBackground
         ? backgroundProgress.clamp(0.0, 1.0).toDouble()
         : 1.0;
@@ -663,6 +700,11 @@ class _ImmersiveMovieCard extends StatelessWidget {
                 CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  useOldImageOnUrlChange: true,
+                  filterQuality: FilterQuality.low,
+                  memCacheWidth: cacheWidth,
                   errorWidget: (context, url, error) =>
                       Container(color: AgreeoColors.deepBlack),
                 )
@@ -847,13 +889,6 @@ class _ImmersiveMovieCard extends StatelessWidget {
       ),
     );
   }
-
-  String _preferredImageUrl(Movie movie) {
-    final raw = movie.posterUrl.isNotEmpty
-        ? movie.posterUrl
-        : movie.backdropUrl;
-    return raw.replaceFirst('/w500/', '/w780/');
-  }
 }
 
 class _SwipeStampOverlay extends StatelessWidget {
@@ -1021,24 +1056,24 @@ class _SwipeCardActions extends StatelessWidget {
   }
 }
 
-class _SwipeCardFooterSkeleton extends StatelessWidget {
-  const _SwipeCardFooterSkeleton();
+class _SwipeCardActionsPreview extends StatelessWidget {
+  const _SwipeCardActionsPreview();
+
+  static void _ignoreTap() {}
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List<Widget>.generate(5, (index) {
-        final isMain = index == 1 || index == 3;
-        return Container(
-          width: isMain ? 62 : 52,
-          height: isMain ? 62 : 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.14),
-          ),
-        );
-      }),
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: _SwipeCardActions(
+          canUndo: false,
+          onUndo: _ignoreTap,
+          onDislike: _ignoreTap,
+          onSeen: _ignoreTap,
+          onLike: _ignoreTap,
+          onWatchlist: _ignoreTap,
+        ),
+      ),
     );
   }
 }
