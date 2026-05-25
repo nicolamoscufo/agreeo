@@ -234,16 +234,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
         children: <Widget>[
           // Background Movie
           if (nextMovie != null)
-            Positioned.fill(
-              child: RepaintBoundary(
-                child: _ImmersiveMovieCard(
-                  movie: nextMovie,
-                  isBackground: true,
-                  backgroundProgress: 1,
-                  actions: const _SwipeCardActionsPreview(),
-                ),
-              ),
-            ),
+            Positioned.fill(child: _BackgroundMovieCard(movie: nextMovie)),
 
           // Current Movie
           Positioned.fill(
@@ -565,7 +556,6 @@ class _SwipeableCardState extends State<SwipeableCard>
     final movieCard = RepaintBoundary(
       child: _ImmersiveMovieCard(
         movie: widget.movie,
-        isBackground: false,
         onInfoTap: widget.onInfoTap,
         actions: _SwipeCardActions(
           canUndo: widget.canUndo,
@@ -639,19 +629,32 @@ class _SwipeableCardState extends State<SwipeableCard>
   }
 }
 
+class _BackgroundMovieCard extends StatelessWidget {
+  const _BackgroundMovieCard({required this.movie});
+
+  final Movie movie;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(
+      key: ValueKey<String>('background-${movie.id}'),
+      child: _ImmersiveMovieCard(
+        movie: movie,
+        actions: const _SwipeCardActionsPreview(),
+      ),
+    );
+  }
+}
+
 class _ImmersiveMovieCard extends StatelessWidget {
   const _ImmersiveMovieCard({
     required this.movie,
     required this.actions,
-    this.isBackground = false,
-    this.backgroundProgress = 0,
     this.onInfoTap,
   });
 
   final Movie movie;
   final Widget actions;
-  final bool isBackground;
-  final double backgroundProgress;
   final VoidCallback? onInfoTap;
 
   @override
@@ -661,25 +664,13 @@ class _ImmersiveMovieCard extends StatelessWidget {
         (MediaQuery.sizeOf(context).width *
                 MediaQuery.devicePixelRatioOf(context))
             .round();
-    final expansionProgress = isBackground
-        ? backgroundProgress.clamp(0.0, 1.0).toDouble()
-        : 1.0;
-    double expandPadding(double background, double foreground) {
-      return background + ((foreground - background) * expansionProgress);
-    }
-
     final metadata = <String>[
       if (movie.releaseYear > 0) movie.releaseYear.toString(),
       if (movie.genres.isNotEmpty) movie.genres.take(3).join(', '),
     ].join(' • ');
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        expandPadding(26, 16),
-        expandPadding(24, 18),
-        expandPadding(26, 16),
-        expandPadding(48, 18),
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
@@ -784,6 +775,8 @@ class _ImmersiveMovieCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                          if (onInfoTap == null)
+                            const SizedBox(width: 44, height: 44),
                         ],
                       ),
                       Expanded(
@@ -1059,20 +1052,99 @@ class _SwipeCardActions extends StatelessWidget {
 class _SwipeCardActionsPreview extends StatelessWidget {
   const _SwipeCardActionsPreview();
 
-  static void _ignoreTap() {}
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallPhone = constraints.maxWidth < 340;
+        final baseSize = isSmallPhone ? 44.0 : 52.0;
+        final mainSize = isSmallPhone ? 52.0 : 62.0;
+
+        return ExcludeSemantics(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: <Widget>[
+              _SwipeCardActionPreviewButton(
+                icon: Icons.undo_rounded,
+                size: baseSize,
+                opacity: 0.4,
+                backgroundColor: AgreeoColors.darkSurface,
+                iconColor: Colors.white,
+              ),
+              _SwipeCardActionPreviewButton(
+                icon: Icons.close_rounded,
+                size: mainSize,
+                backgroundColor: AgreeoColors.popcornWhite.withValues(
+                  alpha: 0.12,
+                ),
+                iconColor: AgreeoColors.popcornWhite,
+              ),
+              _SwipeCardActionPreviewButton(
+                icon: Icons.remove_red_eye_outlined,
+                size: baseSize,
+                backgroundColor: AgreeoColors.popcornWhite.withValues(
+                  alpha: 0.12,
+                ),
+                iconColor: AgreeoColors.popcornWhite,
+              ),
+              _SwipeCardActionPreviewButton(
+                icon: Icons.favorite_rounded,
+                size: mainSize,
+                backgroundColor: AgreeoColors.cinematicRed.withValues(
+                  alpha: 0.15,
+                ),
+                iconColor: AgreeoColors.cinematicRed,
+              ),
+              _SwipeCardActionPreviewButton(
+                icon: Icons.bookmark_rounded,
+                size: baseSize,
+                backgroundColor: AgreeoColors.kernelGold.withValues(
+                  alpha: 0.15,
+                ),
+                iconColor: AgreeoColors.kernelGold,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SwipeCardActionPreviewButton extends StatelessWidget {
+  const _SwipeCardActionPreviewButton({
+    required this.icon,
+    required this.size,
+    required this.backgroundColor,
+    required this.iconColor,
+    this.opacity = 1,
+  });
+
+  final IconData icon;
+  final double size;
+  final Color backgroundColor;
+  final Color iconColor;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: IgnorePointer(
-        child: _SwipeCardActions(
-          canUndo: false,
-          onUndo: _ignoreTap,
-          onDislike: _ignoreTap,
-          onSeen: _ignoreTap,
-          onLike: _ignoreTap,
-          onWatchlist: _ignoreTap,
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: backgroundColor,
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
+        child: Icon(icon, color: iconColor, size: size * 0.45),
       ),
     );
   }
