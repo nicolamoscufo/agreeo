@@ -18,11 +18,11 @@ Tutti i componenti visivi dell'applicazione utilizzano i token colore definiti n
 
 | Nome Token | Codice HEX | Descrizione e Utilizzo | Effetto Visivo |
 | :--- | :--- | :--- | :--- |
-| **`cinematicRed`** | `#E50914` | Rosso ispirato alle sale cinematografiche. Usato per azioni principali, pulsanti attivi, badge e primo step di Onboarding. | Cattura l'attenzione immediata. |
+| **`cinematicRed`** | `#E50914` | Rosso ispirato alle sale cinematografiche. Usato per brand accent, stati attivi, like, errori e azioni distruttive/pericolose. | Cattura l'attenzione immediata senza confondere CTA normali con danger. |
 | **`popcornWhite`** | `#FFFFFF` | Bianco puro. Usato per i testi principali, icone e contorni dei pulsanti secondari. | Contrasto perfetto e leggibilità massima. |
 | **`anthraciteBlack`** | `#1E1E1E` | Sfondo principale dello Scaffold e dei blocchi di base. | Tonalità scura calda, meno aggressiva del nero puro. |
 | **`darkSurface`** | `#2A2A2A` | Sfondo di card, contenitori elevati, fogli di opzione e campi di input. | Distingue i blocchi interattivi dallo sfondo. |
-| **`kernelGold`** | `#FFFFC107` | Giallo oro caldo. Usato per stelle di rating, preferiti, salvataggi in watchlist e secondo step di Onboarding. | Evoca il colore del popcorn caramellato e delle stelle dei film. |
+| **`kernelGold`** | `#FFC107` | Giallo oro caldo. Usato per CTA primarie normali, stelle di rating, preferiti, salvataggi in watchlist e secondo step di Onboarding. | Evoca il colore del popcorn caramellato e delle stelle dei film. |
 
 ---
 

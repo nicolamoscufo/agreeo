@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 /// to keep the visual identity coherent across the entire app.
 abstract final class AgreeoColors {
   // ── Primary brand ──
-  /// Netflix-inspired cinematic red — primary accent, buttons, active states.
+  /// Netflix-inspired cinematic red — brand accent, danger, likes, active states.
   static const cinematicRed = Color(0xFFE50914);
 
   /// Pure white — text, secondary UI, clean contrast.
@@ -26,7 +26,7 @@ abstract final class AgreeoColors {
   static const trueBlack = Color(0xFF0A0A0A);
 
   // ── Accents ──
-  /// Gold highlight — ratings, stars, watchlist badges.
+  /// Gold highlight — primary CTAs, ratings, stars, watchlist badges.
   static const kernelGold = Color(0xFFFFC107);
 
   // ── Semantic shades (derived from the palette) ──

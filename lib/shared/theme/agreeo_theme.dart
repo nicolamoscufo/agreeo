@@ -1,24 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'agreeo_colors.dart';
+
 ThemeData buildAgreeoTheme(Brightness brightness) {
   // Ignoriamo la brightness in ingresso e forziamo la dark mode
   // Il tema "Cinema Popcorn" è progettato specificamente per ambienti scuri.
-  // Palette Cinema Popcorn Edition
-  const cinematicRed = Color(0xFFE50914);
-  const popcornWhite = Color(0xFFFFFFFF);
-  const anthraciteBlack = Color(0xFF1E1E1E);
-  const darkSurface = Color(0xFF2A2A2A);
-  const kernelGold = Color(0xFFFFC107);
-
   final colorScheme = ColorScheme.dark(
-    primary: cinematicRed,
-    secondary: popcornWhite,
-    surface: anthraciteBlack,
-    surfaceContainerHighest: darkSurface,
+    primary: AgreeoColors.cinematicRed,
+    secondary: AgreeoColors.popcornWhite,
+    surface: AgreeoColors.anthraciteBlack,
+    surfaceContainerHighest: AgreeoColors.darkSurface,
     onPrimary: Colors.white,
     onSurface: Colors.white,
-    tertiary: kernelGold,
+    tertiary: AgreeoColors.kernelGold,
   );
 
   final baseTextTheme = GoogleFonts.spaceGroteskTextTheme();
@@ -37,7 +32,7 @@ ThemeData buildAgreeoTheme(Brightness brightness) {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(28),
         side: BorderSide(
-          color: popcornWhite.withValues(alpha: 0.1),
+          color: AgreeoColors.popcornWhite.withValues(alpha: 0.1),
           width: 1,
         ), // Bordo sottile bianco
       ),
@@ -91,8 +86,8 @@ ThemeData buildAgreeoTheme(Brightness brightness) {
         // FIX CRITICO: Cambiato Size.fromHeight in Size(0, 52)
         // Questo impedisce al bottone di espandersi all'infinito e far crashare le Row.
         minimumSize: const Size(0, 52),
-        backgroundColor: cinematicRed,
-        foregroundColor: Colors.white,
+        backgroundColor: AgreeoColors.kernelGold,
+        foregroundColor: AgreeoColors.trueBlack,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
@@ -101,19 +96,21 @@ ThemeData buildAgreeoTheme(Brightness brightness) {
       style: OutlinedButton.styleFrom(
         // FIX CRITICO: Anche qui, rimuoviamo l'espansione infinita
         minimumSize: const Size(0, 52),
-        foregroundColor: popcornWhite,
+        foregroundColor: AgreeoColors.popcornWhite,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        side: BorderSide(color: popcornWhite.withValues(alpha: 0.5)),
+        side: BorderSide(
+          color: AgreeoColors.popcornWhite.withValues(alpha: 0.5),
+        ),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: anthraciteBlack,
+      backgroundColor: AgreeoColors.anthraciteBlack,
       contentTextStyle: const TextStyle(color: Colors.white),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: cinematicRed, width: 1),
+        side: BorderSide(color: AgreeoColors.cinematicRed, width: 1),
       ),
     ),
   );
