@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/shared/components/filter_bottom_sheet.dart';
@@ -92,6 +93,13 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
       }
       _refreshSearch();
     });
+  }
+
+  void _openCreateMovieNight() {
+    HapticFeedback.mediumImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MovieNightWizardScreen()),
+    );
   }
 
   String _timeBasedGreeting() {
@@ -212,6 +220,10 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 18),
+
+              _MovieNightHomeCta(onCreate: _openCreateMovieNight),
 
               const SizedBox(height: 18),
 
@@ -360,7 +372,8 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                   icon: Icons.favorite_rounded,
                   iconColor: AgreeoColors.kernelGold,
                   title: 'Recommended for you',
-                  subtitle: 'Your best current matches, ranked from your onboarding and feedback signals.',
+                  subtitle:
+                      'Your best current matches, ranked from your onboarding and feedback signals.',
                   movies: recommended,
                 ),
                 const SizedBox(height: 22),
@@ -426,6 +439,93 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
         .toList(growable: false);
 
     return filtered;
+  }
+}
+
+class _MovieNightHomeCta extends StatelessWidget {
+  const _MovieNightHomeCta({required this.onCreate});
+
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: <Color>[
+            AgreeoColors.cinematicRed.withValues(alpha: 0.94),
+            AgreeoColors.kernelGold.withValues(alpha: 0.88),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AgreeoColors.cinematicRed.withValues(alpha: 0.22),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Organize a Movie Night',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Invite friends, set clear preferences, vote, and get one shared pick.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.86),
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: onCreate,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: colorScheme.primary,
+                    ),
+                    icon: const Icon(Icons.groups_rounded),
+                    label: const Text('Create Movie Night'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+              ),
+              child: const Icon(
+                Icons.local_movies_outlined,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -82,6 +82,9 @@ class _MovieNightWaitingRoomScreenState
     final canJoin =
         event.status == MovieNightStatus.waiting &&
         currentParticipant?.status == MovieNightParticipantStatus.pending;
+    final isGeneratingShortlist = socialState.inflightEventIds.contains(
+      event.id,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -109,6 +112,12 @@ class _MovieNightWaitingRoomScreenState
               ),
               const SizedBox(height: 18),
               _SummaryCard(event: event),
+              const SizedBox(height: 12),
+              _StatusFeedbackCard(
+                event: event,
+                pendingCount: pendingCount,
+                isGeneratingShortlist: isGeneratingShortlist,
+              ),
               const SizedBox(height: 18),
               _ParticipantsCard(participants: event.participants),
               if (event.inviteLink.isNotEmpty) ...<Widget>[
@@ -266,10 +275,21 @@ class _MovieNightWaitingRoomScreenState
                               eventId: event.id,
                               constraints: updatedConstraints,
                             );
-                        if (updatedEvent == null && context.mounted) {
+                        if (!context.mounted) {
+                          return;
+                        }
+                        if (updatedEvent == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Could not update constraints.'),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Preferences updated. The shortlist will use the new rules.',
+                              ),
                             ),
                           );
                         }
@@ -513,6 +533,78 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
+class _StatusFeedbackCard extends StatelessWidget {
+  const _StatusFeedbackCard({
+    required this.event,
+    required this.pendingCount,
+    required this.isGeneratingShortlist,
+  });
+
+  final MovieNightEvent event;
+  final int pendingCount;
+  final bool isGeneratingShortlist;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _statusCopy();
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: ListTile(
+        leading: Icon(status.icon),
+        title: Text(status.title),
+        subtitle: Text(status.subtitle),
+      ),
+    );
+  }
+
+  ({IconData icon, String title, String subtitle}) _statusCopy() {
+    if (event.status == MovieNightStatus.draft) {
+      return (
+        icon: Icons.edit_calendar_outlined,
+        title: 'Draft setup',
+        subtitle: 'Finish preferences and invitations before opening the vote.',
+      );
+    }
+    if (isGeneratingShortlist) {
+      return (
+        icon: Icons.auto_awesome_rounded,
+        title: 'Generating shortlist',
+        subtitle:
+            'Agreeo is applying the group preferences before opening the vote.',
+      );
+    }
+    if (event.status == MovieNightStatus.waiting && pendingCount > 0) {
+      return (
+        icon: Icons.hourglass_top_rounded,
+        title:
+            'Waiting for $pendingCount friend${pendingCount == 1 ? '' : 's'}',
+        subtitle:
+            'The host can start voting now, or wait for more people to join.',
+      );
+    }
+    if (event.status == MovieNightStatus.waiting) {
+      return (
+        icon: Icons.check_circle_outline_rounded,
+        title: 'Ready to vote',
+        subtitle:
+            'Everyone invited has joined. Start voting when the group is ready.',
+      );
+    }
+    if (event.status == MovieNightStatus.voting) {
+      return (
+        icon: Icons.how_to_vote_rounded,
+        title: 'Voting in progress',
+        subtitle: 'Participants are voting on the generated shortlist.',
+      );
+    }
+    return (
+      icon: Icons.emoji_events_outlined,
+      title: 'Consensus reached',
+      subtitle: 'The final group choice is ready.',
+    );
+  }
+}
+
 class _NonHostInfoCard extends StatelessWidget {
   const _NonHostInfoCard({
     required this.event,
@@ -661,7 +753,7 @@ class _EditConstraintsSheetState extends State<_EditConstraintsSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Included genres'),
+              const Text('Include genres'),
               const SizedBox(height: 8),
               _GenreSheetWrap(
                 selected: _included,
@@ -674,7 +766,7 @@ class _EditConstraintsSheetState extends State<_EditConstraintsSheet> {
                 }),
               ),
               const SizedBox(height: 16),
-              const Text('Excluded genres'),
+              const Text('Exclude genres'),
               const SizedBox(height: 8),
               _GenreSheetWrap(
                 selected: _excluded,
@@ -687,7 +779,7 @@ class _EditConstraintsSheetState extends State<_EditConstraintsSheet> {
                 }),
               ),
               const SizedBox(height: 16),
-              Text('Maximum duration: ${_maxDuration}m'),
+              Text('Max duration: $_maxDuration min'),
               Slider(
                 value: _maxDuration.toDouble(),
                 min: 80,

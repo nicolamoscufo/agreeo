@@ -3,6 +3,7 @@ import 'package:agreeo/features/friends/presentation/movie_night_result_screen.d
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
+import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
@@ -28,8 +29,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
   bool _navigatedToResult = false;
   late final AnimationController _swipeController;
   Animation<Offset>? _swipeAnimation;
-  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(Offset.zero);
-  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(0.0);
+  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(
+    Offset.zero,
+  );
+  final ValueNotifier<double> _dragProgressNotifier = ValueNotifier<double>(
+    0.0,
+  );
   bool _isSubmittingSwipe = false;
   int _cardVersion = 0;
   int _lastKnownRound = 1;
@@ -56,11 +61,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     if (!mounted) return;
     final size = MediaQuery.sizeOf(context);
     final isHorizontalDominant = offset.dx.abs() >= offset.dy.abs();
-    final progress = (isHorizontalDominant
-            ? (offset.dx.abs() / (size.width * 0.45))
-            : (offset.dy.abs() / (size.height * 0.25)))
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final progress =
+        (isHorizontalDominant
+                ? (offset.dx.abs() / (size.width * 0.45))
+                : (offset.dy.abs() / (size.height * 0.25)))
+            .clamp(0.0, 1.0)
+            .toDouble();
     _dragProgressNotifier.value = progress;
   }
 
@@ -149,9 +155,10 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
 
   Future<void> _animateDragTo(Offset target) async {
     _swipeController.stop();
-    _swipeAnimation = Tween<Offset>(begin: _dragOffsetNotifier.value, end: target).animate(
-      CurvedAnimation(parent: _swipeController, curve: Curves.easeOutCubic),
-    );
+    _swipeAnimation =
+        Tween<Offset>(begin: _dragOffsetNotifier.value, end: target).animate(
+          CurvedAnimation(parent: _swipeController, curve: Curves.easeOutCubic),
+        );
     await _swipeController.forward(from: 0);
   }
 
@@ -183,7 +190,10 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       final vote = voteLike
           ? MovieNightVoteValue.like
           : MovieNightVoteValue.dislike;
-      final target = Offset((voteLike ? 1 : -1) * (size.width + 260), dragOffset.dy);
+      final target = Offset(
+        (voteLike ? 1 : -1) * (size.width + 260),
+        dragOffset.dy,
+      );
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
       await _animateDragTo(target);
@@ -203,7 +213,10 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
       final vote = swipeUp
           ? MovieNightVoteValue.alreadySeen
           : MovieNightVoteValue.neutral;
-      final target = Offset(dragOffset.dx, (swipeUp ? -1 : 1) * (size.height + 260));
+      final target = Offset(
+        dragOffset.dx,
+        (swipeUp ? -1 : 1) * (size.height + 260),
+      );
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
       await _animateDragTo(target);
@@ -245,6 +258,30 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
     final votedParticipantCount = joinedParticipants
         .where((participant) => completedVoterIds.contains(participant.userId))
         .length;
+
+    if (event.shortlist.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Voting')),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: EmptyState(
+                icon: Icons.movie_filter_rounded,
+                title: 'No movies match these preferences',
+                message:
+                    'Relax one constraint or refresh the shortlist before asking the group to vote.',
+                action: FilledButton.tonalIcon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Back to waiting room'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     // Detect tie-breaker round change — reset voting state
     if (event.round > _lastKnownRound) {
@@ -293,12 +330,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                       _PulsingIcon(
-                         icon: Icons.check_circle_outline_rounded,
-                         size: 64,
-                         color: Colors.white,
-                       ),
-                       const SizedBox(height: 24),
+                      _PulsingIcon(
+                        icon: Icons.check_circle_outline_rounded,
+                        size: 64,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 24),
                       Text(
                         'All votes in!',
                         style: Theme.of(context).textTheme.headlineSmall
@@ -392,7 +429,11 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
+                      const Icon(
+                        Icons.flash_on_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Tie-Breaker — Round ${event.round}',
@@ -452,7 +493,8 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                 onPanUpdate: _isSubmittingSwipe
                     ? null
                     : (details) {
-                        final newOffset = _dragOffsetNotifier.value + details.delta;
+                        final newOffset =
+                            _dragOffsetNotifier.value + details.delta;
                         _dragOffsetNotifier.value = newOffset;
                         _updateDragProgress(newOffset);
                       },
@@ -512,16 +554,19 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                     final rotation =
                         (dragOffset.dx / width).clamp(-1.0, 1.0).toDouble() *
                         0.18;
-                    final hProgress =
-                        (dragOffset.dx.abs() / (width * 0.42))
-                            .clamp(0.0, 1.0)
-                            .toDouble();
+                    final hProgress = (dragOffset.dx.abs() / (width * 0.42))
+                        .clamp(0.0, 1.0)
+                        .toDouble();
                     final vProgress =
-                        (dragOffset.dy.abs() / (MediaQuery.sizeOf(context).height * 0.22))
+                        (dragOffset.dy.abs() /
+                                (MediaQuery.sizeOf(context).height * 0.22))
                             .clamp(0.0, 1.0)
                             .toDouble();
-                    final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
-                    final overlayProgress = isHorizontalDominant ? hProgress : vProgress;
+                    final isHorizontalDominant =
+                        dragOffset.dx.abs() >= dragOffset.dy.abs();
+                    final overlayProgress = isHorizontalDominant
+                        ? hProgress
+                        : vProgress;
                     return Transform.translate(
                       offset: dragOffset,
                       child: Transform.rotate(
@@ -559,10 +604,14 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AgreeoColors.kernelGold.withValues(alpha: 0.15),
+                              color: AgreeoColors.kernelGold.withValues(
+                                alpha: 0.15,
+                              ),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
+                                color: AgreeoColors.kernelGold.withValues(
+                                  alpha: 0.3,
+                                ),
                                 width: 2,
                               ),
                             ),
@@ -574,7 +623,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                           ),
                           const SizedBox(height: 32),
                           const Text(
-                            'Pareggio rilevato! 🍿',
+                            'Tie detected!',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white,
@@ -585,7 +634,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Alcuni film hanno ottenuto lo stesso punteggio. Votate di nuovo per decidere il vincitore!',
+                            'Some movies have the same score. Vote again to decide the winner.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
@@ -611,10 +660,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               elevation: 8,
-                              shadowColor: AgreeoColors.kernelGold.withValues(alpha: 0.4),
+                              shadowColor: AgreeoColors.kernelGold.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                             child: const Text(
-                              'Inizia spareggio',
+                              'Start tie-breaker',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -951,6 +1002,10 @@ class _VotingImmersiveCard extends StatelessWidget {
                             const SizedBox.shrink(),
                         ],
                       ),
+                      if (progress != null && !isBackground) ...<Widget>[
+                        const SizedBox(height: 8),
+                        const _VotingRulesHint(),
+                      ],
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -1056,20 +1111,38 @@ class _VotingImmersiveCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AgreeoColors.darkSurface,
-            AgreeoColors.deepBlack,
-          ],
+          colors: [AgreeoColors.darkSurface, AgreeoColors.deepBlack],
         ),
       ),
       child: Center(
         child: Opacity(
           opacity: 0.12,
-          child: Icon(
-            Icons.movie_rounded,
-            size: 160,
-            color: Colors.white,
-          ),
+          child: Icon(Icons.movie_rounded, size: 160, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _VotingRulesHint extends StatelessWidget {
+  const _VotingRulesHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: const Text(
+        'Vote every movie: like, maybe, already seen, or dislike. You can undo until the group result is ready.',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          height: 1.25,
         ),
       ),
     );
@@ -1234,11 +1307,7 @@ class _PulsingIconState extends State<_PulsingIcon>
           scale: scale,
           child: Opacity(
             opacity: opacity,
-            child: Icon(
-              widget.icon,
-              size: widget.size,
-              color: widget.color,
-            ),
+            child: Icon(widget.icon, size: widget.size, color: widget.color),
           ),
         );
       },

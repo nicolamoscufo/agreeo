@@ -4,7 +4,9 @@ import 'package:agreeo/features/friends/state/friends_movie_night_controller.dar
 import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/components/primitives.dart';
+import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/state/nav_index_provider.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +44,11 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
   void dispose() {
     _confettiController.dispose();
     super.dispose();
+  }
+
+  void _returnToTab(int index) {
+    ref.read(navIndexProvider.notifier).state = index;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -102,7 +109,9 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: <BoxShadow>[
                           BoxShadow(
-                            color: AgreeoColors.cinematicRed.withValues(alpha: 0.4),
+                            color: AgreeoColors.cinematicRed.withValues(
+                              alpha: 0.4,
+                            ),
                             blurRadius: 34,
                             spreadRadius: 2,
                           ),
@@ -114,7 +123,10 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                           borderRadius: BorderRadius.circular(30),
                           child: AspectRatio(
                             aspectRatio: 2 / 3,
-                            child: Image(image: imageProvider, fit: BoxFit.cover),
+                            child: Image(
+                              image: imageProvider,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         errorWidget: (context, url, error) => ClipRRect(
@@ -198,6 +210,12 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                     ),
                   ),
                 ],
+                const SizedBox(height: 18),
+                _ResultExplanationCard(
+                  event: event,
+                  winner: winner,
+                  ranking: ranking,
+                ),
                 if (ranking.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 18),
                   _FullLeaderboard(
@@ -227,6 +245,20 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                       onPressed: () async {
                         final message = await ref
                             .read(agreeoAppControllerProvider.notifier)
+                            .addToWatchlist(movie.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(message)));
+                        }
+                      },
+                      icon: const Icon(Icons.bookmark_add_outlined),
+                      label: const Text('Save to Watchlist'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final message = await ref
+                            .read(agreeoAppControllerProvider.notifier)
                             .markAsWatched(movie.id);
                         if (context.mounted) {
                           ScaffoldMessenger.of(
@@ -239,23 +271,29 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () {
-                        final text = '\u{1F3AC} Movie Night Result\n\n'
+                        final text =
+                            '\u{1F3AC} Movie Night Result\n\n'
                             '\u{1F3C6} Winner: ${movie.title}\n'
                             '\u2B50 Score: ${(winner.finalScore ?? winner.compatibilityScore).toStringAsFixed(1)}\n'
                             '\u2764 ${winner.likesCount ?? 0} likes\n\n'
                             'Voted on Agreeo!';
                         Clipboard.setData(ClipboardData(text: text));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Result copied to clipboard!')),
+                          const SnackBar(
+                            content: Text('Result copied to clipboard!'),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.share_rounded),
                       label: const Text('Share Result'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).popUntil((route) => route.isFirst),
+                      onPressed: () => _returnToTab(0),
+                      icon: const Icon(Icons.home_outlined),
+                      label: const Text('Back to Home'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _returnToTab(3),
                       icon: const Icon(Icons.people_outline_rounded),
                       label: const Text('Back to Friends'),
                     ),
@@ -279,6 +317,67 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
         ),
       ),
     );
+  }
+}
+
+class _ResultExplanationCard extends StatelessWidget {
+  const _ResultExplanationCard({
+    required this.event,
+    required this.winner,
+    required this.ranking,
+  });
+
+  final MovieNightEvent event;
+  final ShortlistCandidate winner;
+  final List<MovieNightCandidateRank> ranking;
+
+  @override
+  Widget build(BuildContext context) {
+    final rank = _winnerRank();
+    final joinedCount = event.joinedParticipants.length;
+    final likes = rank?.likes ?? winner.likesCount ?? 0;
+    final dislikes = rank?.dislikes ?? winner.dislikesCount ?? 0;
+    final score =
+        (winner.finalScore ?? rank?.finalScore ?? winner.compatibilityScore)
+            .toStringAsFixed(1);
+    final constraints = movieNightConstraintsLabel(event.constraints);
+    final likesLabel = joinedCount == 0
+        ? '$likes likes'
+        : '$likes/$joinedCount likes';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              'Why this movie won',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Agreeo selected it because it had the strongest group score ($score), with $likesLabel and $dislikes dislike${dislikes == 1 ? '' : 's'}.',
+            ),
+            if (constraints != 'No constraints set') ...<Widget>[
+              const SizedBox(height: 8),
+              Text('It also respects the preferences: $constraints.'),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  MovieNightCandidateRank? _winnerRank() {
+    for (final entry in ranking) {
+      if (entry.candidate.movie.id == winner.movie.id) {
+        return entry;
+      }
+    }
+    return null;
   }
 }
 
@@ -368,8 +467,7 @@ class _FullLeaderboard extends StatelessWidget {
                   title: Text(
                     movie.title,
                     style: TextStyle(
-                      fontWeight:
-                          isWinner ? FontWeight.w800 : FontWeight.w500,
+                      fontWeight: isWinner ? FontWeight.w800 : FontWeight.w500,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -391,9 +489,9 @@ class _FullLeaderboard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isWinner
                           ? AgreeoColors.kernelGold.withValues(alpha: 0.2)
-                          : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -473,5 +571,3 @@ class _ConfettiPainter extends CustomPainter {
     return oldDelegate.progress != progress;
   }
 }
-
-

@@ -59,6 +59,14 @@ class _MovieNightWizardScreenState
               friend.name.toLowerCase().contains(_friendSearch.toLowerCase()),
         )
         .toList(growable: false);
+    final currentConstraints = MovieNightConstraints(
+      includedGenres: _includedGenres.toList(growable: false),
+      excludedGenres: _excludedGenres.toList(growable: false),
+      maxDurationMinutes: _maxDurationMinutes,
+      minimumRating: _minimumRating,
+      language: _language,
+    );
+    final needsFriendSelection = _step == 2 && _selectedFriendIds.isEmpty;
 
     final pages = <_WizardPageData>[
       _WizardPageData(
@@ -109,6 +117,7 @@ class _MovieNightWizardScreenState
         child: _InviteStep(
           friends: filteredFriends,
           selectedFriendIds: _selectedFriendIds,
+          constraints: currentConstraints,
           searchController: _friendSearchController,
           onSearchChanged: (value) => setState(() {
             _friendSearch = value.trim();
@@ -176,6 +185,10 @@ class _MovieNightWizardScreenState
                 step: _step,
                 onBack: _step == 0 ? null : () => _goToStep(_step - 1),
                 onContinue: _continue,
+                canContinue: !needsFriendSelection,
+                helperText: needsFriendSelection
+                    ? 'Select at least one friend to continue.'
+                    : null,
               ),
             ],
           ),
@@ -554,11 +567,15 @@ class _WizardActions extends StatelessWidget {
     required this.step,
     required this.onBack,
     required this.onContinue,
+    required this.canContinue,
+    this.helperText,
   });
 
   final int step;
   final VoidCallback? onBack;
   final VoidCallback onContinue;
+  final bool canContinue;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -575,27 +592,43 @@ class _WizardActions extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (onBack != null) ...<Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Back'),
+          if (helperText != null) ...<Widget>[
+            Text(
+              helperText!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(height: 10),
           ],
-          Expanded(
-            flex: 2,
-            child: FilledButton.icon(
-              onPressed: onContinue,
-              icon: Icon(
-                isLast ? Icons.done_rounded : Icons.arrow_forward_rounded,
+          Row(
+            children: <Widget>[
+              if (onBack != null) ...<Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Back'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: canContinue ? onContinue : null,
+                  icon: Icon(
+                    isLast ? Icons.done_rounded : Icons.arrow_forward_rounded,
+                  ),
+                  label: Text(isLast ? 'Create Movie Night' : 'Continue'),
+                ),
               ),
-              label: Text(isLast ? 'Create Movie Night' : 'Continue'),
-            ),
+            ],
           ),
         ],
       ),
@@ -686,7 +719,14 @@ class _ConstraintsStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Included genres', style: Theme.of(context).textTheme.titleMedium),
+        Text('Include genres', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Tap genres the group wants to see in the shortlist.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 10),
         _GenreWrap(
           selected: includedGenres,
@@ -694,7 +734,14 @@ class _ConstraintsStep extends StatelessWidget {
           onTap: onIncludedToggle,
         ),
         const SizedBox(height: 18),
-        Text('Excluded genres', style: Theme.of(context).textTheme.titleMedium),
+        Text('Exclude genres', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'These genres will be filtered out before voting starts.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: 10),
         _GenreWrap(
           selected: excludedGenres,
@@ -702,7 +749,7 @@ class _ConstraintsStep extends StatelessWidget {
           onTap: onExcludedToggle,
         ),
         const SizedBox(height: 18),
-        Text('Maximum duration: ${maxDurationMinutes}m'),
+        Text('Max duration: $maxDurationMinutes min'),
         Slider(
           value: maxDurationMinutes.toDouble(),
           min: 80,
@@ -785,6 +832,7 @@ class _InviteStep extends StatelessWidget {
   const _InviteStep({
     required this.friends,
     required this.selectedFriendIds,
+    required this.constraints,
     required this.searchController,
     required this.onSearchChanged,
     required this.onToggleFriend,
@@ -792,6 +840,7 @@ class _InviteStep extends StatelessWidget {
 
   final List<Friend> friends;
   final Set<String> selectedFriendIds;
+  final MovieNightConstraints constraints;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onToggleFriend;
@@ -801,6 +850,26 @@ class _InviteStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        _ConstraintReviewCard(constraints: constraints),
+        const SizedBox(height: 14),
+        Row(
+          children: <Widget>[
+            Text(
+              'Invite friends',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const Spacer(),
+            InfoBadge(label: '${selectedFriendIds.length} selected'),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Select at least one friend so the Movie Night is a group decision.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
         AgreeoSearchBar(
           controller: searchController,
           hintText: 'Search friends to invite',
@@ -826,6 +895,45 @@ class _InviteStep extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ConstraintReviewCard extends StatelessWidget {
+  const _ConstraintReviewCard({required this.constraints});
+
+  final MovieNightConstraints constraints;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      color: colorScheme.primaryContainer.withValues(alpha: 0.28),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Icon(Icons.rule_rounded),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Preferences summary',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(movieNightConstraintsLabel(constraints)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
