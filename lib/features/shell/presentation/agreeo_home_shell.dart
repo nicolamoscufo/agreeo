@@ -279,7 +279,7 @@ class _RandomMovieDialogState extends ConsumerState<_RandomMovieDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Impossibile caricare un film casuale. Riprova.';
+          _errorMessage = 'Could not load a random movie. Try again.';
           _isLoading = false;
         });
       }
@@ -319,7 +319,7 @@ class _RandomMovieDialogState extends ConsumerState<_RandomMovieDialog> {
             Row(
               children: [
                 const Text(
-                  'Consiglio Casuale',
+                  'Random Pick',
                   style: TextStyle(
                     fontFamily: 'Outfit',
                     fontSize: 20,
@@ -372,7 +372,7 @@ class _RandomMovieDialogState extends ConsumerState<_RandomMovieDialog> {
                             _fetchRandomMovie();
                           },
                     icon: const Icon(Icons.shuffle_rounded, size: 18),
-                    label: const Text('Riprova'),
+                    label: const Text('Try Again'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -410,7 +410,7 @@ class _RandomMovieDialogState extends ConsumerState<_RandomMovieDialog> {
                               widget.onViewDetails(_currentMovie!);
                             },
                       child: const Text(
-                        'Dettagli',
+                        'Details',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -438,7 +438,7 @@ class _RandomMovieDialogState extends ConsumerState<_RandomMovieDialog> {
             ),
             SizedBox(height: 16),
             Text(
-              'Sto scegliendo per te...',
+              'Picking something for you...',
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 14,

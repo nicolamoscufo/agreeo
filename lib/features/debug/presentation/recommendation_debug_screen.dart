@@ -43,9 +43,9 @@ class _RecommendationDebugScreenState
           title: const Text('Recommendation Debug'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Come Funziona', icon: Icon(Icons.psychology_rounded)),
-              Tab(text: 'Analisi Punteggi', icon: Icon(Icons.calculate_rounded)),
-              Tab(text: 'Diagnostica', icon: Icon(Icons.insights_rounded)),
+              Tab(text: 'How It Works', icon: Icon(Icons.psychology_rounded)),
+              Tab(text: 'Score Analysis', icon: Icon(Icons.calculate_rounded)),
+              Tab(text: 'Diagnostics', icon: Icon(Icons.insights_rounded)),
             ],
           ),
           actions: [
@@ -70,7 +70,7 @@ class _RecommendationDebugScreenState
                   padding: const EdgeInsets.all(24),
                   child: EmptyState(
                     icon: Icons.bug_report_outlined,
-                    title: 'Dati di debug non disponibili',
+                    title: 'Debug Data Unavailable',
                     message: snapshot.error.toString(),
                     action: FilledButton(
                       onPressed: () {
@@ -78,7 +78,7 @@ class _RecommendationDebugScreenState
                           _debugFuture = _load();
                         });
                       },
-                      child: const Text('Riprova'),
+                      child: const Text('Try Again'),
                     ),
                   ),
                 ),
@@ -92,16 +92,16 @@ class _RecommendationDebugScreenState
                   padding: const EdgeInsets.all(24),
                   child: EmptyState(
                     icon: Icons.analytics_outlined,
-                    title: 'Nessun dato di debug',
+                    title: 'No Debug Data',
                     message:
-                        'Il backend non ha restituito dati diagnostici. Completa l\'onboarding o effettua qualche swipe prima di riprovare.',
+                        'The backend did not return diagnostic data. Complete onboarding or swipe on a few movies before trying again.',
                     action: FilledButton(
                       onPressed: () {
                         setState(() {
                           _debugFuture = _load();
                         });
                       },
-                      child: const Text('Riprova'),
+                      child: const Text('Try Again'),
                     ),
                   ),
                 ),
@@ -138,7 +138,7 @@ class _RecommendationDebugScreenState
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 1: ALGORITHM EXPLAINER (COME FUNZIONA)
+  // TAB 1: ALGORITHM EXPLAINER (HOW IT WORKS)
   // ---------------------------------------------------------------------------
   Widget _buildAlgorithmTab(BuildContext context) {
     return RefreshIndicator(
@@ -167,7 +167,7 @@ class _RecommendationDebugScreenState
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Il Motore di Raccomandazione',
+                          'The Recommendation Engine',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
@@ -178,9 +178,9 @@ class _RecommendationDebugScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Agreeo utilizza un modello di raccomandazione ibrido basato su Neo4j '
-                    'e il dataset MovieLens per proporti film affini ai tuoi gusti '
-                    'senza rinunciare alla scoperta di nuovi generi.',
+                    'Agreeo uses a hybrid recommendation model powered by Neo4j '
+                    'and the MovieLens dataset to suggest movies that match your taste '
+                    'while still helping you discover new genres.',
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -197,13 +197,13 @@ class _RecommendationDebugScreenState
             stepNumber: '1',
             icon: Icons.filter_alt_rounded,
             iconColor: AgreeoColors.cinematicRed,
-            title: 'Fase 1: Filtri Rigidi (Esclusione)',
+            title: 'Step 1: Hard Filters (Exclusion)',
             description:
-                'Prima di iniziare a calcolare i punteggi, escludiamo dal catalogo '
-                'tutto ciò che renderebbe la raccomandazione ridondante o sgradita:\n\n'
-                '• 🚫 **Già Swippati**: Film a cui hai già dato Like, Dislike o salvato nella Watchlist.\n'
-                '• 👁️ **Già Visti**: Film contrassegnati come già visti.\n'
-                '• 🖼️ **Metadati Mancanti**: Film che non contengono un poster o un\'immagine di copertina.',
+                'Before scoring starts, the catalog excludes everything that would make '
+                'a recommendation redundant or unwanted:\n\n'
+                '• 🚫 **Already Swiped**: Movies you already liked, disliked, or saved to your Watchlist.\n'
+                '• 👁️ **Already Seen**: Movies marked as already watched.\n'
+                '• 🖼️ **Missing Metadata**: Movies without a poster or cover image.',
           ),
           const SizedBox(height: 16),
           _buildAlgoStepCard(
@@ -211,21 +211,21 @@ class _RecommendationDebugScreenState
             stepNumber: '2',
             icon: Icons.calculate_rounded,
             iconColor: Colors.blueAccent,
-            title: 'Fase 2: Assegnazione dei Punteggi',
+            title: 'Step 2: Score Assignment',
             description:
-                'I candidati rimanenti vengono valutati attraverso due logiche a seconda della sorgente:\n\n'
-                '💡 **A. Punteggio Personalizzato (Collaborativo & Semantico)**\n'
-                'Combina due motori di raccomandazione ibridi:\n'
-                '  • **Collaborativo (Grafo Neo4j)**: Trova altri utenti con interessi simili. Pesi dei tuoi segnali:\n'
-                '     - Preferiti: **+4.0** | Likes: **+3.0** | Watchlist: **+1.25**\n'
-                '     - *Penalità Generi*: Sottrae un punteggio dinamico proporzionale al numero e al rapporto di dislike (es. da **-1.5** fino a **-15.0+** per generi con molti dislike).\n'
-                '  • **Semantico (Tag Embeddings)**: Calcola un **Vettore del Gusto Utente** aggregando i vettori dei tag (384 dimensioni) dei tuoi film swippati. Cerca nel database Neo4j tramite un indice vettoriale (`tag_embeddings`) i film con tag e atmosfere più affini ai tuoi gusti.\n\n'
-                '🚀 **B. Punteggio Esplorativo**\n'
-                'Cerca film popolari al di fuori della tua cerchia solita per testare nuove direzioni:\n'
-                '   - Corrispondenza generi familiari: **+15.0** per genere.\n'
-                '   - Popolarità globale: **10.0 * Media + log(Voti)**.\n'
-                '   - Generi non esplorati (Nuovi Generi): **+40.0**.\n'
-                '   - Generi sgraditi: **-25.0**.',
+                'Remaining candidates are evaluated with two scoring paths depending on their source:\n\n'
+                '💡 **A. Personalized Score (Collaborative & Semantic)**\n'
+                'Combines two hybrid recommendation engines:\n'
+                '  • **Collaborative (Neo4j Graph)**: Finds other users with similar interests. Your signal weights:\n'
+                '     - Favorites: **+4.0** | Likes: **+3.0** | Watchlist: **+1.25**\n'
+                '     - *Genre Penalty*: Subtracts a dynamic score proportional to dislike count and ratio (for example from **-1.5** up to **-15.0+** for heavily disliked genres).\n'
+                '  • **Semantic (Tag Embeddings)**: Builds a **User Taste Vector** from 384-dimensional tag vectors across your swiped movies. It searches Neo4j through the `tag_embeddings` vector index for movies with tags and vibes closest to your taste.\n\n'
+                '🚀 **B. Exploratory Score**\n'
+                'Looks for popular movies outside your usual circle to test new directions:\n'
+                '   - Familiar genre match: **+15.0** per genre.\n'
+                '   - Global popularity: **10.0 * Average + log(Votes)**.\n'
+                '   - Unexplored genres (New Genres): **+40.0**.\n'
+                '   - Disliked genres: **-25.0**.',
           ),
           const SizedBox(height: 16),
           _buildAlgoStepCard(
@@ -233,12 +233,12 @@ class _RecommendationDebugScreenState
             stepNumber: '3',
             icon: Icons.shuffle_rounded,
             iconColor: Colors.purpleAccent,
-            title: 'Fase 3: Mix e Blending Giornaliero',
+            title: 'Step 3: Daily Mix and Blending',
             description:
-                'La tua coda di swipe quotidiana non viene riempita di soli consigli personali '
-                'per evitare la "bolla dei filtri". Il backend unisce i risultati in questo rapporto:\n\n'
-                '• 🔀 **65% Raccomandazioni Personali**: Film ad altissima compatibilità calcolata.\n'
-                '• 🔀 **35% Raccomandazioni Esplorative**: Spunti freschi per affinare i tuoi interessi.',
+                'Your daily swipe queue is not filled only with personal recommendations '
+                'so the app avoids a filter bubble. The backend blends results with this ratio:\n\n'
+                '• 🔀 **65% Personal Recommendations**: Movies with very high calculated compatibility.\n'
+                '• 🔀 **35% Exploratory Recommendations**: Fresh prompts that refine your interests.',
           ),
         ],
       ),
@@ -305,7 +305,7 @@ class _RecommendationDebugScreenState
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 2: DETTAGLIO PUNTEGGI CANDIDATI (ANALISI PUNTEGGI)
+  // TAB 2: CANDIDATE SCORE DETAILS (SCORE ANALYSIS)
   // ---------------------------------------------------------------------------
   Widget _buildScoresTab(
       BuildContext context, Map<String, dynamic> scoringStats) {
@@ -320,9 +320,9 @@ class _RecommendationDebugScreenState
               padding: EdgeInsets.symmetric(horizontal: 24, vertical: 60),
               child: EmptyState(
                 icon: Icons.movie_filter_rounded,
-                title: 'Nessun film classificato',
+                title: 'No Ranked Movies',
                 message:
-                    'Al momento non ci sono candidati classificati nel pool. Effettua qualche swipe o aggiorna.',
+                    'There are no ranked candidates in the pool right now. Swipe on a few movies or refresh.',
               ),
             ),
           ],
@@ -339,7 +339,7 @@ class _RecommendationDebugScreenState
         itemBuilder: (context, index) {
           final entry = recommendations[index];
           final finalScore = entry['finalScore'] ?? 0;
-          final title = entry['title'] ?? 'Titolo sconosciuto';
+          final title = entry['title'] ?? 'Unknown title';
           final reason = entry['reason'] ?? '';
 
           final collaborativeScore = entry['collaborativeScore'] ?? 0.0;
@@ -398,7 +398,7 @@ class _RecommendationDebugScreenState
                     children: [
                       const Divider(height: 16),
                       const Text(
-                        'COMPOSIZIONE DEL PUNTEGGIO',
+                        'SCORE COMPOSITION',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -409,42 +409,42 @@ class _RecommendationDebugScreenState
                       const SizedBox(height: 12),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Punteggio Collaborativo (Neo4j)',
+                        label: 'Collaborative Score (Neo4j)',
                         value: collaborativeScore,
                         icon: Icons.people_outline_rounded,
                         isPositive: true,
                       ),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Corrispondenza Generi (Onboarding/Likes)',
+                        label: 'Genre Match (Onboarding/Likes)',
                         value: genreScore,
                         icon: Icons.category_outlined,
                         isPositive: true,
                       ),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Popolarità & Voti (MovieLens)',
+                        label: 'Popularity & Votes (MovieLens)',
                         value: popularityScore,
                         icon: Icons.star_outline_rounded,
                         isPositive: true,
                       ),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Bonus Esplorazione (Nuovi Generi)',
+                        label: 'Exploration Bonus (New Genres)',
                         value: explorationBonus,
                         icon: Icons.explore_outlined,
                         isPositive: true,
                       ),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Penalità Generi Sgraditi (Disliked)',
+                        label: 'Disliked Genre Penalty',
                         value: negativePenalty,
                         icon: Icons.warning_amber_rounded,
                         isPositive: false,
                       ),
                       _buildScoreDetailRow(
                         context,
-                        label: 'Affinità Tag Semantici (Embeddings)',
+                        label: 'Semantic Tag Affinity (Embeddings)',
                         value: tagScore,
                         icon: Icons.local_offer_outlined,
                         isPositive: true,
@@ -452,7 +452,7 @@ class _RecommendationDebugScreenState
                       if (matchedTags.isNotEmpty) ...[
                         const Divider(height: 16),
                         const Text(
-                          'TAG SEMANTICI CORRISPONDENTI',
+                          'MATCHING SEMANTIC TAGS',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -501,7 +501,7 @@ class _RecommendationDebugScreenState
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Punteggio Finale Calcolato',
+                            'Calculated Final Score',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -593,27 +593,27 @@ class _RecommendationDebugScreenState
           _buildFunnel(context, candidatePoolStats),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Segnali del Profilo Utente',
+            title: 'User Profile Signals',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _KeyValueRow(
-                  label: 'ID Utente',
+                  label: 'User ID',
                   value: '${userSignals['uid'] ?? '-'}',
                 ),
                 _KeyValueRow(
-                  label: 'Totale Azioni di Feedback',
+                  label: 'Total Feedback Actions',
                   value: '${userSignals['totalFeedbackActions'] ?? 0}',
-                  tooltip: 'Il numero totale di interazioni (Like, Dislike, ecc.) che alimentano l\'algoritmo su Neo4j.',
+                  tooltip: 'The total number of interactions (Like, Dislike, etc.) feeding the Neo4j algorithm.',
                 ),
                 const SizedBox(height: 8),
                 _TokenWrap(
-                  label: 'Generi Preferiti (Onboarding)',
+                  label: 'Favorite Genres (Onboarding)',
                   entries: _listOfStrings(userSignals['onboardingGenres']),
                 ),
                 const Divider(height: 24),
                 const Text(
-                  'CONTEGGI INTERAZIONI',
+                  'INTERACTION COUNTS',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -623,48 +623,48 @@ class _RecommendationDebugScreenState
                 ),
                 const SizedBox(height: 10),
                 _KeyValueRow(
-                  label: 'Film Preferiti',
+                  label: 'Favorite Movies',
                   value: '${userSignals['favoriteMoviesCount'] ?? 0}',
-                  tooltip: 'Film scelti nell\'onboarding. Hanno un peso enorme di +4.0 per trovare film simili nel grafo.',
+                  tooltip: 'Movies selected during onboarding. They carry a strong +4.0 weight for finding similar movies in the graph.',
                 ),
                 _KeyValueRow(
-                  label: 'Film Piaciuti (Like)',
+                  label: 'Liked Movies',
                   value: '${userSignals['likedMoviesCount'] ?? 0}',
-                  tooltip: 'Film a cui hai messo Like. Aggiungono un peso positivo di +3.0 nel calcolo collaborativo.',
+                  tooltip: 'Movies you liked. They add a positive +3.0 weight to collaborative scoring.',
                 ),
                 _KeyValueRow(
-                  label: 'Film Sgraditi (Dislike)',
+                  label: 'Disliked Movies',
                   value: '${userSignals['dislikedMoviesCount'] ?? 0}',
-                  tooltip: 'Film rifiutati. Se accumuli 2+ dislike in un genere, questo subirà una forte penalizzazione.',
+                  tooltip: 'Rejected movies. If you accumulate 2+ dislikes in one genre, that genre gets a strong penalty.',
                 ),
                 _KeyValueRow(
-                  label: 'Film Già Visti',
+                  label: 'Already Seen Movies',
                   value: '${userSignals['alreadySeenCount'] ?? 0}',
-                  tooltip: 'Film che hai già visto. Vengono completamente rimossi dai candidati per evitare ripetizioni.',
+                  tooltip: 'Movies you already watched. They are removed from candidates to avoid repeats.',
                 ),
                 _KeyValueRow(
-                  label: 'Salvati in Watchlist',
+                  label: 'Saved to Watchlist',
                   value: '${userSignals['watchlistCount'] ?? 0}',
-                  tooltip: 'Film salvati in libreria. Hanno un impatto positivo di +1.25 sulle raccomandazioni.',
+                  tooltip: 'Movies saved in your library. They add a positive +1.25 impact to recommendations.',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Interessi dei Generi',
+            title: 'Genre Interests',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TokenWrap(
-                  label: 'Generi Positivi Principali (e punteggio)',
+                  label: 'Top Positive Genres (and score)',
                   entries: _listOfMaps(recommendationSignals['topPositiveGenres'])
                       .map((entry) => '${entry['name']} (${entry['score']})')
                       .toList(),
                 ),
                 const SizedBox(height: 16),
                 _TokenWrap(
-                  label: 'Generi Negativi Principali (e dislike)',
+                  label: 'Top Negative Genres (and dislikes)',
                   entries: _listOfMaps(recommendationSignals['topNegativeGenres'])
                       .map((entry) => '${entry['name']} (${entry['score']})')
                       .toList(),
@@ -674,12 +674,12 @@ class _RecommendationDebugScreenState
           ),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Tag Semantici (Embeddings)',
+            title: 'Semantic Tags (Embeddings)',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TokenWrap(
-                  label: 'Tag Positivi Principali (e peso)',
+                  label: 'Top Positive Tags (and weight)',
                   entries: _listOfMaps(recommendationSignals['topPositiveTags'])
                       .map((entry) {
                         final score = entry['score'];
@@ -690,7 +690,7 @@ class _RecommendationDebugScreenState
                 ),
                 const SizedBox(height: 16),
                 _TokenWrap(
-                  label: 'Tag Negativi Principali (e peso)',
+                  label: 'Top Negative Tags (and weight)',
                   entries: _listOfMaps(recommendationSignals['topNegativeTags'])
                       .map((entry) {
                         final score = entry['score'];
@@ -704,12 +704,12 @@ class _RecommendationDebugScreenState
           ),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Titoli Chiave nel Grafo',
+            title: 'Key Titles in the Graph',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _TokenWrap(
-                  label: 'Film Positivi Influenti',
+                  label: 'Influential Positive Movies',
                   entries: _listOfMaps(
                           recommendationSignals['influentialPositiveMovies'])
                       .map((entry) =>
@@ -718,7 +718,7 @@ class _RecommendationDebugScreenState
                 ),
                 const SizedBox(height: 16),
                 _TokenWrap(
-                  label: 'Film Negativi Penalizzanti',
+                  label: 'Penalizing Negative Movies',
                   entries: _listOfMaps(
                           recommendationSignals['penalizedNegativeMovies'])
                       .map((entry) => '${entry['title']}')
@@ -729,7 +729,7 @@ class _RecommendationDebugScreenState
           ),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Mix della Coda Giornaliera',
+            title: 'Daily Queue Mix',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -737,12 +737,12 @@ class _RecommendationDebugScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _StatBox(
-                      label: 'Personalizzati',
+                      label: 'Personalized',
                       value: '${dailyStats['personalizedCandidateCount'] ?? 0}',
                       color: Colors.purpleAccent,
                     ),
                     _StatBox(
-                      label: 'Esplorativi',
+                      label: 'Exploratory',
                       value: '${dailyStats['exploratoryCandidateCount'] ?? 0}',
                       color: Colors.tealAccent,
                     ),
@@ -750,14 +750,14 @@ class _RecommendationDebugScreenState
                 ),
                 const SizedBox(height: 16),
                 _KeyValueRow(
-                  label: 'Rapporto Coda Attuale',
+                  label: 'Current Queue Ratio',
                   value:
-                      '${dailyStats['personalizedPercentage'] ?? 0}% Personali / ${dailyStats['exploratoryPercentage'] ?? 0}% Esplora',
-                  tooltip: 'L\'algoritmo bilancia la coda di swipe: ~65% basato sui tuoi gusti diretti e ~35% su generi nuovi (Esplorativi).',
+                      '${dailyStats['personalizedPercentage'] ?? 0}% Personal / ${dailyStats['exploratoryPercentage'] ?? 0}% Explore',
+                  tooltip: 'The algorithm balances the swipe queue: about 65% based on your direct taste signals and about 35% based on new exploratory genres.',
                 ),
                 const Divider(height: 24),
                 const Text(
-                  'CAMPIONE DELLA CODA DI SWIPE',
+                  'SWIPE QUEUE SAMPLE',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -767,7 +767,7 @@ class _RecommendationDebugScreenState
                 ),
                 const SizedBox(height: 10),
                 if (_listOfMaps(dailyStats['sampleQueue']).isEmpty)
-                  const Text('Nessun campione di coda disponibile.')
+                  const Text('No queue sample available.')
                 else
                   ..._listOfMaps(dailyStats['sampleQueue']).map((entry) {
                     final source = entry['source'] ?? '';
@@ -779,7 +779,7 @@ class _RecommendationDebugScreenState
 
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(entry['title'] ?? 'Film sconosciuto'),
+                      title: Text(entry['title'] ?? 'Unknown movie'),
                       subtitle: Text(
                         entry['reason'] ?? '',
                         style: const TextStyle(fontSize: 12),
@@ -792,7 +792,7 @@ class _RecommendationDebugScreenState
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          isExplore ? 'Esplora' : 'Personal',
+                          isExplore ? 'Explore' : 'Personal',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -807,29 +807,29 @@ class _RecommendationDebugScreenState
           ),
           const SizedBox(height: 16),
           _DebugCard(
-            title: 'Stato di Emergenza (Fallback)',
+            title: 'Fallback State',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _KeyValueRow(
-                  label: 'Strategia di Fallback Attiva',
-                  value: fallbackStats['used'] == true ? 'Sì' : 'No',
-                  tooltip: 'Se attivo, significa che il backend ha usato film popolari generici a causa di dati insufficienti nel grafo.',
+                  label: 'Fallback Strategy Active',
+                  value: fallbackStats['used'] == true ? 'Yes' : 'No',
+                  tooltip: 'If active, the backend used generic popular movies because the graph did not have enough data.',
                 ),
                 _KeyValueRow(
-                  label: 'Motivo Fallback',
+                  label: 'Fallback Reason',
                   value: '${fallbackStats['reason'] ?? '-'}',
-                  tooltip: 'La causa specifica che ha impedito all\'algoritmo personalizzato di generare abbastanza raccomandazioni.',
+                  tooltip: 'The specific cause that prevented the personalized algorithm from generating enough recommendations.',
                 ),
                 _KeyValueRow(
-                  label: 'Strategia di Recupero',
+                  label: 'Recovery Strategy',
                   value: '${fallbackStats['strategy'] ?? '-'}',
-                  tooltip: 'Il metodo alternativo utilizzato per caricare i film (es. film popolari con generi dell\'onboarding).',
+                  tooltip: 'The alternative method used to load movies, such as popular movies from onboarding genres.',
                 ),
                 _KeyValueRow(
-                  label: 'Candidati di Fallback Caricati',
+                  label: 'Loaded Fallback Candidates',
                   value: '${fallbackStats['candidateCount'] ?? 0}',
-                  tooltip: 'Il numero di film caricati dal piano di riserva.',
+                  tooltip: 'The number of movies loaded by the fallback plan.',
                 ),
               ],
             ),
@@ -854,28 +854,28 @@ class _RecommendationDebugScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Imbuto dei Candidati (Pipeline)',
+              'Candidate Funnel (Pipeline)',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildFunnelStep(context, 'Considerati Iniziali', total,
+            _buildFunnelStep(context, 'Initially Considered', total,
                 isHeader: true),
             _buildFunnelArrow(),
-            _buildFunnelStep(context, 'Filtrati Già Visti', -seen,
+            _buildFunnelStep(context, 'Filtered Already Seen', -seen,
                 isNegative: true),
             _buildFunnelArrow(),
-            _buildFunnelStep(context, 'Filtrati Sgraditi (Disliked)', -disliked,
+            _buildFunnelStep(context, 'Filtered Disliked', -disliked,
                 isNegative: true),
             _buildFunnelArrow(),
-            _buildFunnelStep(context, 'Filtrati Già Swippati', -swiped,
-                isNegative: true),
-            _buildFunnelArrow(),
-            _buildFunnelStep(
-                context, 'Filtrati Metadati Mancanti', -missing,
+            _buildFunnelStep(context, 'Filtered Already Swiped', -swiped,
                 isNegative: true),
             _buildFunnelArrow(),
             _buildFunnelStep(
-                context, 'Candidati Rimanenti (Fase Ranking)', remaining,
+                context, 'Filtered Missing Metadata', -missing,
+                isNegative: true),
+            _buildFunnelArrow(),
+            _buildFunnelStep(
+                context, 'Remaining Candidates (Ranking Stage)', remaining,
                 isResult: true),
           ],
         ),
@@ -1151,4 +1151,3 @@ class _StatBox extends StatelessWidget {
     );
   }
 }
-

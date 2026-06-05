@@ -74,7 +74,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                           children: [
                             Icon(Icons.dashboard_rounded, size: 16),
                             SizedBox(width: 6),
-                            Text('Attività'),
+                            Text('Activity'),
                           ],
                         ),
                       ),
@@ -84,7 +84,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                           children: [
                             Icon(Icons.settings_rounded, size: 16),
                             SizedBox(width: 6),
-                            Text('Impostazioni'),
+                            Text('Settings'),
                           ],
                         ),
                       ),
@@ -95,7 +95,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
             ],
             body: TabBarView(
               children: <Widget>[
-                // Tab 1: Attività
+                // Tab 1: Activity
                 ListView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
                   children: [
@@ -150,7 +150,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   ],
                 ),
 
-                // Tab 2: Impostazioni
+                // Tab 2: Settings
                 ListView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
                   children: [
@@ -888,4 +888,3 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(_TabBarDelegate oldDelegate) => false;
 }
-

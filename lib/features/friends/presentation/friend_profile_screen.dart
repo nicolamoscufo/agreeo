@@ -51,7 +51,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
         setState(() {
           _isLoading = false;
           if (res == null) {
-            _errorMessage = 'Impossibile caricare il profilo dell\'amico.';
+            _errorMessage = 'Could not load this friend profile.';
           }
         });
       }
@@ -59,7 +59,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Errore di connessione. Riprova.';
+          _errorMessage = 'Connection error. Try again.';
         });
       }
     }
@@ -73,7 +73,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     if (profile == null) {
       if (_errorMessage != null) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Profilo Amico')),
+          appBar: AppBar(title: const Text('Friend Profile')),
           body: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -94,7 +94,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Errore di caricamento',
+                    'Loading Error',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -111,7 +111,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                   FilledButton.icon(
                     onPressed: _loadProfile,
                     icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Riprova'),
+                    label: const Text('Try Again'),
                   ),
                 ],
               ),
@@ -122,7 +122,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
 
       if (_isLoading || socialState.friends.any((friend) => friend.id == widget.friendId)) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Profilo Amico')),
+          appBar: AppBar(title: const Text('Friend Profile')),
           body: const Center(
             child: CircularProgressIndicator(),
           ),
@@ -130,9 +130,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       }
 
       return Scaffold(
-        appBar: AppBar(title: const Text('Profilo Amico')),
+        appBar: AppBar(title: const Text('Friend Profile')),
         body: const Center(
-          child: Text('Amico non trovato'),
+          child: Text('Friend not found'),
         ),
       );
     }
