@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:agreeo/features/bootstrap/presentation/agreeo_bootstrap_gate.dart';
+import 'package:agreeo/features/shell/presentation/offline_screen.dart';
+import 'package:agreeo/shared/state/connectivity_provider.dart';
 import 'package:agreeo/shared/state/movie_night_invite_provider.dart';
+import 'package:agreeo/shared/state/theme_mode_provider.dart';
 import 'package:agreeo/shared/theme/agreeo_theme.dart';
 import 'package:agreeo/shared/utils/movie_night_invite_links.dart';
 import 'package:app_links/app_links.dart';
@@ -56,14 +59,37 @@ class _AgreeoAppState extends ConsumerState<AgreeoApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       title: 'Agreeo',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       theme: buildAgreeoTheme(Brightness.light),
       darkTheme: buildAgreeoTheme(Brightness.dark),
-      builder: (context, child) => _CompactPhoneUi(child: child),
+      builder: (context, child) => _ConnectivityOverlay(
+        child: _CompactPhoneUi(child: child),
+      ),
       home: const AgreeoBootstrapGate(),
+    );
+  }
+}
+
+/// Shows the [OfflineScreen] takeover over the whole app while the device is
+/// offline (per [connectivityProvider]), fading it in/out.
+class _ConnectivityOverlay extends ConsumerWidget {
+  const _ConnectivityOverlay({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = ref.watch(connectivityProvider);
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        child,
+        if (!online) const OfflineScreen(),
+      ],
     );
   }
 }

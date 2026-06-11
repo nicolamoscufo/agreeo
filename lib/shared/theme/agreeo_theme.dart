@@ -1,120 +1,201 @@
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Builds the Daylight [ThemeData] for the given [brightness].
+///
+/// Colors come exclusively from [AgreeoTokens] (registered under `extensions`),
+/// so widgets read `context.tokens.*` rather than the ColorScheme where possible.
+/// Display/headline/title use Bricolage Grotesque (w800); body/label use Manrope.
 ThemeData buildAgreeoTheme(Brightness brightness) {
-  // Ignoriamo la brightness in ingresso e forziamo la dark mode
-  // Il tema "Cinema Popcorn" è progettato specificamente per ambienti scuri.
-  // Palette Cinema Popcorn Edition
-  const cinematicRed = Color(0xFFE50914);
-  const popcornWhite = Color(0xFFFFFFFF);
-  const anthraciteBlack = Color(0xFF1E1E1E);
-  const darkSurface = Color(0xFF2A2A2A);
-  const kernelGold = Color(0xFFFFC107);
+  final tokens =
+      brightness == Brightness.dark ? AgreeoTokens.dark : AgreeoTokens.light;
 
-  final colorScheme = ColorScheme.dark(
-    primary: cinematicRed,
-    secondary: popcornWhite,
-    surface: anthraciteBlack,
-    surfaceContainerHighest: darkSurface,
-    onPrimary: Colors.white,
-    onSurface: Colors.white,
-    tertiary: kernelGold,
+  final colorScheme = ColorScheme(
+    brightness: brightness,
+    primary: tokens.red,
+    onPrimary: tokens.onText,
+    secondary: tokens.purple,
+    onSecondary: tokens.onText,
+    tertiary: tokens.gold,
+    onTertiary: tokens.onText,
+    surface: tokens.surface,
+    onSurface: tokens.text,
+    surfaceContainerHighest: tokens.surface2,
+    onSurfaceVariant: tokens.sub,
+    outline: tokens.line2,
+    outlineVariant: tokens.line,
+    error: tokens.redDeep,
+    onError: tokens.onText,
   );
 
-  final baseTextTheme = GoogleFonts.spaceGroteskTextTheme();
+  // Body/label in Manrope; display/headline/title in Bricolage Grotesque w800.
+  final manrope = GoogleFonts.manropeTextTheme();
+  final display = GoogleFonts.bricolageGrotesqueTextTheme();
+
+  TextStyle disp(TextStyle? s) => (s ?? const TextStyle()).copyWith(
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.5,
+        color: tokens.text,
+      );
+  TextStyle body(TextStyle? s) =>
+      (s ?? const TextStyle()).copyWith(color: tokens.text);
+
+  final textTheme = TextTheme(
+    displayLarge: disp(display.displayLarge),
+    displayMedium: disp(display.displayMedium),
+    displaySmall: disp(display.displaySmall),
+    headlineLarge: disp(display.headlineLarge),
+    headlineMedium: disp(display.headlineMedium),
+    headlineSmall: disp(display.headlineSmall),
+    titleLarge: disp(display.titleLarge),
+    titleMedium: disp(display.titleMedium).copyWith(letterSpacing: -0.3),
+    titleSmall: disp(display.titleSmall).copyWith(letterSpacing: -0.2),
+    bodyLarge: body(manrope.bodyLarge),
+    bodyMedium: body(manrope.bodyMedium),
+    bodySmall: body(manrope.bodySmall).copyWith(color: tokens.sub),
+    labelLarge: body(manrope.labelLarge).copyWith(fontWeight: FontWeight.w700),
+    labelMedium: body(manrope.labelMedium).copyWith(fontWeight: FontWeight.w600),
+    labelSmall: body(manrope.labelSmall).copyWith(color: tokens.sub),
+  );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: brightness,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: colorScheme.surface,
-    textTheme: baseTextTheme.apply(
-      bodyColor: colorScheme.onSurface,
-      displayColor: colorScheme.onSurface,
+    scaffoldBackgroundColor: tokens.bg,
+    canvasColor: tokens.bg,
+    textTheme: textTheme,
+    extensions: <ThemeExtension<dynamic>>[tokens],
+    splashColor: tokens.red.withValues(alpha: 0.08),
+    highlightColor: tokens.red.withValues(alpha: 0.05),
+    dividerTheme: DividerThemeData(color: tokens.line, thickness: 1),
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: tokens.text,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      titleTextStyle: textTheme.titleLarge,
+      iconTheme: IconThemeData(color: tokens.text),
     ),
     cardTheme: CardThemeData(
-      color: colorScheme.surfaceContainerHighest,
+      color: tokens.surface,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(28),
-        side: BorderSide(
-          color: popcornWhite.withValues(alpha: 0.1),
-          width: 1,
-        ), // Bordo sottile bianco
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: tokens.line, width: 1),
       ),
       elevation: 0,
       margin: EdgeInsets.zero,
     ),
-    appBarTheme: AppBarTheme(
-      backgroundColor: Colors.transparent,
-      foregroundColor: colorScheme.onSurface,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: false,
-      titleTextStyle: baseTextTheme.titleLarge?.copyWith(
-        color: colorScheme.onSurface,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: colorScheme.surfaceContainerHighest,
-      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      fillColor: tokens.surface,
+      hintStyle: TextStyle(color: tokens.faint),
+      labelStyle: TextStyle(color: tokens.sub),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: tokens.line),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(
-          color: colorScheme.onSurface.withValues(
-            alpha: 0.1,
-          ), // Grigio molto tenue
-        ),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: tokens.line),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: tokens.red, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     ),
     chipTheme: ChipThemeData(
+      backgroundColor: tokens.surface,
+      selectedColor: tokens.red,
+      side: BorderSide(color: tokens.line),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-      side: BorderSide.none,
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      selectedColor: colorScheme.primary,
-      labelStyle: TextStyle(color: colorScheme.onSurface),
-      secondaryLabelStyle: TextStyle(color: colorScheme.onPrimary),
+      labelStyle: TextStyle(color: tokens.sub, fontWeight: FontWeight.w600),
+      secondaryLabelStyle:
+          TextStyle(color: tokens.onText, fontWeight: FontWeight.w700),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        // FIX CRITICO: Cambiato Size.fromHeight in Size(0, 52)
-        // Questo impedisce al bottone di espandersi all'infinito e far crashare le Row.
         minimumSize: const Size(0, 52),
-        backgroundColor: cinematicRed,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        backgroundColor: tokens.red,
+        foregroundColor: tokens.onText,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        // FIX CRITICO: Anche qui, rimuoviamo l'espansione infinita
         minimumSize: const Size(0, 52),
-        foregroundColor: popcornWhite,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        side: BorderSide(color: popcornWhite.withValues(alpha: 0.5)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        foregroundColor: tokens.text,
+        backgroundColor: tokens.surface,
+        side: BorderSide(color: tokens.line2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: tokens.red,
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: anthraciteBlack,
-      contentTextStyle: const TextStyle(color: Colors.white),
+      backgroundColor: tokens.surface2,
+      contentTextStyle: TextStyle(color: tokens.text),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: cinematicRed, width: 1),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: tokens.line2),
       ),
     ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: tokens.bg2,
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: tokens.bg2,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: tokens.red),
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: <TargetPlatform, PageTransitionsBuilder>{
+        TargetPlatform.android: _AgPageTransitionsBuilder(),
+        TargetPlatform.iOS: _AgPageTransitionsBuilder(),
+        TargetPlatform.macOS: _AgPageTransitionsBuilder(),
+        TargetPlatform.windows: _AgPageTransitionsBuilder(),
+        TargetPlatform.linux: _AgPageTransitionsBuilder(),
+      },
+    ),
   );
+}
+
+/// Daylight page transition: slide-up + fade (easeOutCubic). Route duration
+/// (~300ms) is supplied by the route itself.
+class _AgPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _AgPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(curved),
+        child: child,
+      ),
+    );
+  }
 }

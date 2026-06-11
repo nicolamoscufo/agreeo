@@ -1,16 +1,21 @@
 import 'dart:ui' as ui;
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// Local dark palette for the immersive (full-bleed, dark) voting experience.
+const Color _vDeep = Color(0xFF161310);
+const Color _vGold = Color(0xFFFFC24B);
+const Color _vRed = Color(0xFFFF6F52);
+const Color _vSurface = Color(0xFF2C251F);
 
 class MovieNightVotingScreen extends ConsumerStatefulWidget {
   const MovieNightVotingScreen({super.key, required this.eventId});
@@ -266,16 +271,13 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
-              child: EmptyState(
-                icon: Icons.movie_filter_rounded,
+              child: AgStateCard(
+                icon: AgIcons.film,
                 title: 'No movies match these preferences',
                 message:
                     'Relax one constraint or refresh the shortlist before asking the group to vote.',
-                action: FilledButton.tonalIcon(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Back to waiting room'),
-                ),
+                actionLabel: 'Back to waiting room',
+                onAction: () => Navigator.of(context).pop(),
               ),
             ),
           ),
@@ -300,7 +302,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
 
     if (unvoted.isEmpty) {
       return Scaffold(
-        backgroundColor: AgreeoColors.deepBlack,
+        backgroundColor: _vDeep,
         body: SafeArea(
           child: Stack(
             children: [
@@ -414,12 +416,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                   ),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AgreeoColors.kernelGold, Color(0xFFD97706)],
+                      colors: [_vGold, Color(0xFFD97706)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: AgreeoColors.kernelGold.withValues(alpha: 0.4),
+                        color: _vGold.withValues(alpha: 0.4),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -604,12 +606,12 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AgreeoColors.kernelGold.withValues(
+                              color: _vGold.withValues(
                                 alpha: 0.15,
                               ),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: AgreeoColors.kernelGold.withValues(
+                                color: _vGold.withValues(
                                   alpha: 0.3,
                                 ),
                                 width: 2,
@@ -617,7 +619,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                             ),
                             child: const Icon(
                               Icons.bolt_rounded,
-                              color: AgreeoColors.kernelGold,
+                              color: _vGold,
                               size: 64,
                             ),
                           ),
@@ -650,7 +652,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                               });
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AgreeoColors.kernelGold,
+                              backgroundColor: _vGold,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 32,
@@ -660,7 +662,7 @@ class _MovieNightVotingScreenState extends ConsumerState<MovieNightVotingScreen>
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               elevation: 8,
-                              shadowColor: AgreeoColors.kernelGold.withValues(
+                              shadowColor: _vGold.withValues(
                                 alpha: 0.4,
                               ),
                             ),
@@ -745,7 +747,7 @@ class _ParticipantVoteProgressCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               backgroundColor: Colors.white.withValues(alpha: 0.16),
               valueColor: const AlwaysStoppedAnimation<Color>(
-                AgreeoColors.kernelGold,
+                _vGold,
               ),
             ),
             const SizedBox(height: 12),
@@ -759,8 +761,8 @@ class _ParticipantVoteProgressCard extends StatelessWidget {
                       ? Icons.check_circle_rounded
                       : Icons.hourglass_top_rounded,
                   color: voted
-                      ? AgreeoColors.kernelGold
-                      : AgreeoColors.kernelGold,
+                      ? _vGold
+                      : _vGold,
                 ),
                 title: Text(
                   participant.name,
@@ -799,24 +801,24 @@ class _SwipeStampOverlay extends StatelessWidget {
 
     if (isHorizontalDominant) {
       if (dragOffset.dx >= 0) {
-        color = AgreeoColors.kernelGold;
+        color = _vGold;
         alignment = Alignment.topLeft;
         angle = -0.18;
         label = 'LIKE \u2665';
       } else {
-        color = AgreeoColors.cinematicRed;
+        color = _vRed;
         alignment = Alignment.topRight;
         angle = 0.18;
         label = 'NOPE \u2715';
       }
     } else {
       if (dragOffset.dy < 0) {
-        color = AgreeoColors.popcornWhite;
+        color = Colors.white;
         alignment = Alignment.bottomCenter;
         angle = 0;
         label = 'SEEN \u{1F441}';
       } else {
-        color = AgreeoColors.kernelGold;
+        color = _vGold;
         alignment = Alignment.topCenter;
         angle = 0;
         label = 'MAYBE \u223C';
@@ -1111,7 +1113,7 @@ class _VotingImmersiveCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AgreeoColors.darkSurface, AgreeoColors.deepBlack],
+          colors: [_vSurface, _vDeep],
         ),
       ),
       child: Center(

@@ -1,12 +1,11 @@
 import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,13 +15,15 @@ class FriendProfileScreen extends ConsumerStatefulWidget {
   final String friendId;
 
   @override
-  ConsumerState<FriendProfileScreen> createState() =>
-      _FriendProfileScreenState();
+  ConsumerState<FriendProfileScreen> createState() => _FriendProfileScreenState();
 }
+
+enum _FriendTab { watched, reviews, watchlist }
 
 class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
   bool _isLoading = false;
   String? _errorMessage;
+  _FriendTab _tab = _FriendTab.watched;
 
   @override
   void initState() {
@@ -40,22 +41,18 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
       final res = await ref
           .read(friendsMovieNightControllerProvider.notifier)
           .loadFriendProfile(widget.friendId)
           .timeout(const Duration(seconds: 10));
-
       if (mounted) {
         setState(() {
           _isLoading = false;
-          if (res == null) {
-            _errorMessage = 'Could not load this friend profile.';
-          }
+          if (res == null) _errorMessage = 'Could not load this friend profile.';
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -65,741 +62,395 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     }
   }
 
+  Future<void> _confirmRemove(Friend friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Remove ${friend.name}?'),
+        content: const Text('You will no longer see each other\'s profiles or create movie nights together.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    ref.read(friendsMovieNightControllerProvider.notifier).removeFriend(friend.id);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final profile = socialState.profileFor(widget.friendId);
+    final t = context.tokens;
+    final social = ref.watch(friendsMovieNightControllerProvider);
+    final profile = social.profileFor(widget.friendId);
 
     if (profile == null) {
-      if (_errorMessage != null) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Friend Profile')),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.error_outline_rounded,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading Error',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Try Again'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }
-
-      if (_isLoading || socialState.friends.any((friend) => friend.id == widget.friendId)) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Friend Profile')),
-          body: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-      }
-
       return Scaffold(
-        appBar: AppBar(title: const Text('Friend Profile')),
-        body: const Center(
-          child: Text('Friend not found'),
+        backgroundColor: t.bg,
+        appBar: AppBar(backgroundColor: t.bg, leading: const _BackIconButton()),
+        body: Center(
+          child: _errorMessage != null
+              ? AgStateCard(
+                  icon: AgIcons.wifiOff,
+                  title: 'Loading error',
+                  message: _errorMessage!,
+                  actionLabel: 'Try again',
+                  onAction: _loadProfile,
+                )
+              : _isLoading
+                  ? CircularProgressIndicator(color: t.red)
+                  : Text('Friend not found', style: TextStyle(color: t.sub)),
         ),
       );
     }
 
     final friend = profile.friend;
     final privacy = friend.privacySettings;
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    // Shared movie nights count
-    final sharedNights = socialState.movieNights
-        .where(
-          (e) => e.participants.any((p) => p.userId == friend.id),
-        )
+    final sharedNights = social.movieNights
+        .where((e) => e.participants.any((p) => p.userId == friend.id))
         .length;
 
     return Scaffold(
+      backgroundColor: t.bg,
       body: SafeArea(
-        child: DefaultTabController(
-          length: 3,
-          child: NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      // ── Top bar ──
-                      Row(
-                        children: <Widget>[
-                          IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back_rounded),
-                          ),
-                          const Spacer(),
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert_rounded),
-                            onSelected: (value) {
-                              if (value == 'remove') {
-                                _confirmRemoveFriend(context, friend);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'remove',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.person_remove_rounded,
-                                        size: 20, color: AgreeoColors.cinematicRed),
-                                    SizedBox(width: 8),
-                                    Text('Remove friend'),
-                                  ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _SquareIcon(icon: AgIcons.chevronLeft, onTap: () => Navigator.of(context).pop()),
+                  _SquareIcon(icon: Icons.more_horiz_rounded, onTap: () => _confirmRemove(friend)),
+                ],
+              ),
+            ),
+            // Header card
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: t.gradSoft,
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: t.line2),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        AgAvatar(name: friend.name, imageUrl: friend.avatarUrl, size: 68),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                friend.name,
+                                style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -0.4, color: t.text),
+                              ),
+                              if (friend.bio.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  friend.bio,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, height: 1.4, color: t.sub),
                                 ),
+                              ],
+                              const SizedBox(height: 7),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(AgIcons.users, size: 13, color: t.faint),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Friends',
+                                    style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, fontWeight: FontWeight.w700, color: t.faint),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ── Profile Header Card ──
-                      _FriendHeaderCard(
-                        friend: friend,
-                        sharedNights: sharedNights,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Quick Actions ──
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => MovieNightWizardScreen(
-                                      preSelectedFriendIds: <String>[friend.id],
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.local_movies_outlined,
-                                  size: 18),
-                              label: const Text('Movie Night'),
-                              style: FilledButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _TabBarDelegate(
-                  TabBar(
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.center,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    dividerColor: cs.outlineVariant.withValues(alpha: 0.3),
-                    labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                        ),
+                      ],
                     ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                    tabs: <Widget>[
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Watched'),
-                            if (privacy.canShowWatched &&
-                                profile.watchedMovies.isNotEmpty)
-                              _CountBadge(
-                                  count: profile.watchedMovies.length),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Reviews'),
-                            if (privacy.canShowReviews &&
-                                profile.reviews.isNotEmpty)
-                              _CountBadge(count: profile.reviews.length),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Watchlist'),
-                            if (privacy.canShowWatchlist &&
-                                profile.watchlist.isNotEmpty)
-                              _CountBadge(count: profile.watchlist.length),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            body: TabBarView(
-              children: <Widget>[
-                privacy.canShowWatched
-                    ? _MovieGrid(movies: profile.watchedMovies)
-                    : _PrivacyState(
-                        message:
-                            '${friend.name}\'s watched movies are private.',
-                      ),
-                privacy.canShowReviews
-                    ? _ReviewList(reviews: profile.reviews)
-                    : _PrivacyState(
-                        message: '${friend.name}\'s reviews are private.',
-                      ),
-                privacy.canShowWatchlist
-                    ? _MovieGrid(movies: profile.watchlist)
-                    : _PrivacyState(
-                        message: '${friend.name}\'s watchlist is private.',
-                      ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmRemoveFriend(
-      BuildContext context, Friend friend) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Remove ${friend.name}?'),
-        content: const Text(
-          'You will no longer see each other\'s profiles or be able to create movie nights together.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AgreeoColors.cinematicRed,
-            ),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    ref
-        .read(friendsMovieNightControllerProvider.notifier)
-        .removeFriend(friend.id);
-    if (context.mounted) Navigator.of(context).pop();
-  }
-}
-
-// ── Friend Header Card ──
-class _FriendHeaderCard extends StatelessWidget {
-  const _FriendHeaderCard({
-    required this.friend,
-    required this.sharedNights,
-  });
-
-  final Friend friend;
-  final int sharedNights;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            cs.primary.withValues(alpha: 0.1),
-            cs.tertiary.withValues(alpha: 0.06),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: cs.primary.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: <Widget>[
-              UserAvatar(initials: friend.initials, size: 72),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      friend.name,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (friend.bio.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        friend.bio,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
-                        Icon(Icons.people_rounded,
-                            size: 14, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Friends',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        _StatBox(icon: AgIcons.eye, value: friend.watchedCount, label: 'Watched', color: t.text),
+                        const SizedBox(width: 9),
+                        _StatBox(icon: AgIcons.edit, value: friend.reviewsCount, label: 'Reviews', color: t.gold),
+                        const SizedBox(width: 9),
+                        _StatBox(icon: AgIcons.film, value: sharedNights, label: 'Nights', color: t.red),
                       ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _MiniStat(
-                  icon: Icons.visibility_rounded,
-                  color: AgreeoColors.popcornWhite,
-                  label: 'Watched',
-                  value: friend.watchedCount.toString(),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+              child: AgButton(
+                label: 'Start a Movie Night',
+                icon: AgIcons.film,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MovieNightWizardScreen(preSelectedFriendIds: [friend.id]),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MiniStat(
-                  icon: Icons.rate_review_rounded,
-                  color: AgreeoColors.kernelGold,
-                  label: 'Reviews',
-                  value: friend.reviewsCount.toString(),
-                ),
+            ),
+            // Tabs
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+              child: Row(
+                children: [
+                  _TabLabel(label: 'Watched', active: _tab == _FriendTab.watched, onTap: () => setState(() => _tab = _FriendTab.watched)),
+                  const SizedBox(width: 24),
+                  _TabLabel(label: 'Reviews', active: _tab == _FriendTab.reviews, onTap: () => setState(() => _tab = _FriendTab.reviews)),
+                  const SizedBox(width: 24),
+                  _TabLabel(label: 'Watchlist', active: _tab == _FriendTab.watchlist, onTap: () => setState(() => _tab = _FriendTab.watchlist)),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MiniStat(
-                  icon: Icons.local_movies_rounded,
-                  color: AgreeoColors.kernelGold,
-                  label: 'Nights',
-                  value: sharedNights.toString(),
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+            Divider(height: 1, thickness: 1, color: t.line),
+            Expanded(child: _buildTabBody(profile, privacy, friend)),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildTabBody(FriendProfile profile, PrivacySettings privacy, Friend friend) {
+    switch (_tab) {
+      case _FriendTab.watched:
+        return privacy.canShowWatched
+            ? _MovieGrid(movies: profile.watchedMovies)
+            : _PrivateState(name: friend.name, what: 'watched movies');
+      case _FriendTab.reviews:
+        return privacy.canShowReviews
+            ? _ReviewList(reviews: profile.reviews)
+            : _PrivateState(name: friend.name, what: 'reviews');
+      case _FriendTab.watchlist:
+        return privacy.canShowWatchlist
+            ? _MovieGrid(movies: profile.watchlist)
+            : _PrivateState(name: friend.name, what: 'watchlist');
+    }
+  }
+}
+
+class _BackIconButton extends StatelessWidget {
+  const _BackIconButton();
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(AgIcons.chevronLeft, color: context.tokens.text),
+      tooltip: 'Back',
+      onPressed: () => Navigator.of(context).pop(),
     );
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-
+class _SquareIcon extends StatelessWidget {
+  const _SquareIcon({required this.icon, required this.onTap});
   final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: color.withValues(alpha: 0.08),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Count Badge ──
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 6),
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.line)),
+        child: Icon(icon, size: 20, color: t.text),
+      ),
+    );
+  }
+}
+
+class _StatBox extends StatelessWidget {
+  const _StatBox({required this.icon, required this.value, required this.label, required this.color});
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
         ),
-        child: Text(
-          count.toString(),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 5),
+            Text('$value', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 19, color: t.text)),
+            Text(label, style: TextStyle(fontFamily: 'Manrope', fontSize: 11, fontWeight: FontWeight.w600, color: t.faint)),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Tab Bar Delegate ──
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _TabBarDelegate(this.tabBar);
-  final TabBar tabBar;
-
+class _TabLabel extends StatelessWidget {
+  const _TabLabel({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
   @override
-  double get minExtent => tabBar.preferredSize.height;
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
-      child: tabBar,
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 11),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Manrope',
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 14,
+                color: active ? t.text : t.faint,
+              ),
+            ),
+            if (active)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: -11,
+                child: Container(height: 2.5, decoration: BoxDecoration(color: t.red, borderRadius: BorderRadius.circular(9))),
+              ),
+          ],
+        ),
+      ),
     );
   }
-
-  @override
-  bool shouldRebuild(_TabBarDelegate oldDelegate) => false;
 }
 
-// ── Movie Grid (replaces flat list with poster grid) ──
 class _MovieGrid extends StatelessWidget {
   const _MovieGrid({required this.movies});
-
   final List<Movie> movies;
-
   @override
   Widget build(BuildContext context) {
     if (movies.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.all(20),
-        child: EmptyState(
-          icon: Icons.movie_filter_outlined,
-          title: 'Nothing visible here',
-          message: 'This section has no public movie activity yet.',
-        ),
+        padding: EdgeInsets.only(top: 30),
+        child: AgStateCard(icon: AgIcons.film, title: 'Nothing here yet', message: 'No public movie activity in this section.'),
       );
     }
-
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 0.55,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 12,
+        childAspectRatio: 2 / 3,
+        crossAxisSpacing: 11,
+        mainAxisSpacing: 11,
       ),
       itemCount: movies.length,
-      itemBuilder: (context, index) {
-        final movie = movies[index];
-        return _MoviePosterCard(
-          movie: movie,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
-              ),
-            );
-          },
+      itemBuilder: (context, i) {
+        final m = movies[i];
+        return AgPoster(
+          imageUrl: m.posterUrl,
+          title: m.title,
+          radius: 12,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: m.id)),
+          ),
         );
       },
     );
   }
 }
 
-class _MoviePosterCard extends StatelessWidget {
-  const _MoviePosterCard({required this.movie, required this.onTap});
-
-  final Movie movie;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: CachedNetworkImage(
-                imageUrl: movie.posterUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorWidget: (context, url, error) => Container(
-                  color: AgreeoColors.darkSurface,
-                  child: const Center(
-                    child: Icon(
-                      Icons.movie_creation_outlined,
-                      color: Colors.white38,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            movie.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Review List ──
 class _ReviewList extends StatelessWidget {
   const _ReviewList({required this.reviews});
-
   final List<FriendMovieReview> reviews;
-
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     if (reviews.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.all(20),
-        child: EmptyState(
-          icon: Icons.rate_review_outlined,
-          title: 'No reviews visible',
-          message: 'When this friend shares reviews, they will appear here.',
-        ),
+        padding: EdgeInsets.only(top: 30),
+        child: AgStateCard(icon: AgIcons.edit, title: 'No reviews visible', message: 'Shared reviews will appear here.'),
       );
     }
-
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      itemBuilder: (context, index) {
-        final review = reviews[index];
-        return _ReviewCard(review: review);
-      },
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
       itemCount: reviews.length,
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
-  final FriendMovieReview review;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Material(
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  AgreeoMovieDetailsScreen(movieId: review.movie.id),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 52,
-                  height: 78,
-                  child: CachedNetworkImage(
-                    imageUrl: review.movie.posterUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => Container(
-                      color: AgreeoColors.darkSurface,
-                      child: const Icon(Icons.movie_creation_outlined,
-                          size: 20),
-                    ),
+      separatorBuilder: (_, _) => const SizedBox(height: 11),
+      itemBuilder: (context, i) {
+        final r = reviews[i];
+        return GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: r.movie.id)),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: t.line)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 50, child: AgPoster(imageUrl: r.movie.posterUrl, title: r.movie.title, radius: 9)),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(r.movie.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 14.5, color: t.text)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          for (var s = 0; s < 5; s++)
+                            Icon(s < r.rating ? AgIcons.star : AgIcons.starOutline, size: 12, color: s < r.rating ? t.gold : t.line2),
+                          const SizedBox(width: 8),
+                          Text(movieNightDateLabel(r.date), style: TextStyle(fontFamily: 'Manrope', fontSize: 11, color: t.faint)),
+                        ],
+                      ),
+                      if (r.reviewPreview.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Text('"${r.reviewPreview}"', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, height: 1.45, fontStyle: FontStyle.italic, color: t.sub)),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      review.movie.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        ...List.generate(
-                          5,
-                          (i) => Icon(
-                            i < review.rating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 16,
-                            color: i < review.rating
-                                ? AgreeoColors.kernelGold
-                                : cs.outline,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          movieNightDateLabel(review.date),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (review.reviewPreview.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        review.reviewPreview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          height: 1.4,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-// ── Privacy State ──
-class _PrivacyState extends StatelessWidget {
-  const _PrivacyState({required this.message});
-
-  final String message;
-
+class _PrivateState extends StatelessWidget {
+  const _PrivateState({required this.name, required this.what});
+  final String name;
+  final String what;
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
-      child: EmptyState(
-        icon: Icons.lock_outline_rounded,
+      padding: const EdgeInsets.only(top: 30),
+      child: AgStateCard(
+        icon: AgIcons.bookmark,
         title: 'Private section',
-        message: message,
+        message: "${name.split(' ').first}'s $what is private. Become closer friends to unlock it.",
+        iconColor: context.tokens.faint,
       ),
     );
   }

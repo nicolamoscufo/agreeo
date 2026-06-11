@@ -251,36 +251,46 @@ class BackendMovieService {
     return _decodeMovieList(body['results']);
   }
 
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   Future<http.Response> _authorizedRequest(String method, String path) async {
     final token = await _authService.readToken();
     if (token == null || token.isEmpty) {
       throw StateError('Missing access token for authenticated movie request.');
     }
 
+    var response = await _send(method, path, token);
+
+    // Transparently recover from an expired access token: refresh once and retry.
+    if (response.statusCode == 401) {
+      final refreshed = await _authService.refreshAccessToken();
+      if (refreshed != null && refreshed.isNotEmpty) {
+        response = await _send(method, path, refreshed);
+      }
+    }
+
+    _ensureSuccess(response);
+
+    return response;
+  }
+
+  Future<http.Response> _send(String method, String path, String token) {
     final uri = Uri.parse('${_config.baseUrl}$path');
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
 
-    late final http.Response response;
     switch (method) {
       case 'POST':
-        response = await _client.post(uri, headers: headers);
-        break;
+        return _client.post(uri, headers: headers).timeout(_requestTimeout);
       case 'DELETE':
-        response = await _client.delete(uri, headers: headers);
-        break;
+        return _client.delete(uri, headers: headers).timeout(_requestTimeout);
       case 'GET':
-        response = await _client.get(uri, headers: headers);
-        break;
+        return _client.get(uri, headers: headers).timeout(_requestTimeout);
       default:
         throw UnsupportedError('Unsupported method $method');
     }
-
-    _ensureSuccess(response);
-
-    return response;
   }
 
   void _ensureSuccess(http.Response response) {

@@ -1,37 +1,33 @@
 import 'package:agreeo/shared/models/agreeo_models.dart';
-import 'package:agreeo/shared/components/primitives.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
 
+/// Daylight Filters sheet. Reference: `ag-states.jsx` FilterSheetScreen.
+/// Returns the chosen [MovieSearchFilters] (or null if dismissed).
 Future<MovieSearchFilters?> showMovieFilterBottomSheet(
   BuildContext context, {
   required MovieSearchFilters initialFilters,
   required List<String> genres,
 }) {
-  return showModalBottomSheet<MovieSearchFilters>(
+  return showAgSheet<MovieSearchFilters>(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    builder: (_) =>
-        _MovieFilterBottomSheet(initialFilters: initialFilters, genres: genres),
+    heightFactor: 0.86,
+    child: _FilterSheet(initialFilters: initialFilters, genres: genres),
   );
 }
 
-class _MovieFilterBottomSheet extends StatefulWidget {
-  const _MovieFilterBottomSheet({
-    required this.initialFilters,
-    required this.genres,
-  });
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet({required this.initialFilters, required this.genres});
 
   final MovieSearchFilters initialFilters;
   final List<String> genres;
 
   @override
-  State<_MovieFilterBottomSheet> createState() =>
-      _MovieFilterBottomSheetState();
+  State<_FilterSheet> createState() => _FilterSheetState();
 }
 
-class _MovieFilterBottomSheetState extends State<_MovieFilterBottomSheet> {
+class _FilterSheetState extends State<_FilterSheet> {
   late MovieSearchFilters _filters;
 
   @override
@@ -40,204 +36,103 @@ class _MovieFilterBottomSheetState extends State<_MovieFilterBottomSheet> {
     _filters = widget.initialFilters;
   }
 
+  int get _activeCount => [
+        _filters.genre,
+        _filters.maxRuntimeMinutes,
+        _filters.minReleaseYear,
+        _filters.minRating,
+      ].where((v) => v != null).length;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Filters',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Keep discovery fast by tightening only what matters tonight.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _FilterSection(
-                title: 'Genre',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    SelectableChip(
-                      label: 'Any',
-                      selected: _filters.genre == null,
-                      onTap: () {
-                        setState(() {
-                          _filters = _filters.copyWith(clearGenre: true);
-                        });
-                      },
-                    ),
-                    ...widget.genres.map(
-                      (genre) => SelectableChip(
-                        label: genre,
-                        selected: _filters.genre == genre,
-                        onTap: () {
-                          setState(() {
-                            _filters = _filters.copyWith(genre: genre);
-                          });
-                        },
-                      ),
-                    ),
+    final t = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Filters', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 25, letterSpacing: -0.5, color: t.text)),
+        const SizedBox(height: 7),
+        Text('Keep discovery fast by tightening only what matters tonight.', style: TextStyle(fontFamily: 'Manrope', fontSize: 13, height: 1.45, color: t.sub)),
+        const SizedBox(height: 22),
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Section(
+                  title: 'Genre',
+                  children: [
+                    AgChip(label: 'Any', active: _filters.genre == null, onTap: () => setState(() => _filters = _filters.copyWith(clearGenre: true))),
+                    for (final g in widget.genres)
+                      AgChip(label: g, active: _filters.genre == g, onTap: () => setState(() => _filters = _filters.copyWith(genre: g))),
                   ],
                 ),
-              ),
-              _FilterSection(
-                title: 'Max duration',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    _numericChip('Any', _filters.maxRuntimeMinutes == null, () {
-                      setState(() {
-                        _filters = _filters.copyWith(
-                          clearMaxRuntimeMinutes: true,
-                        );
-                      });
-                    }),
-                    _numericChip('90m', _filters.maxRuntimeMinutes == 90, () {
-                      setState(() {
-                        _filters = _filters.copyWith(maxRuntimeMinutes: 90);
-                      });
-                    }),
-                    _numericChip('120m', _filters.maxRuntimeMinutes == 120, () {
-                      setState(() {
-                        _filters = _filters.copyWith(maxRuntimeMinutes: 120);
-                      });
-                    }),
-                    _numericChip('150m', _filters.maxRuntimeMinutes == 150, () {
-                      setState(() {
-                        _filters = _filters.copyWith(maxRuntimeMinutes: 150);
-                      });
-                    }),
+                _Section(
+                  title: 'Max duration',
+                  children: [
+                    AgChip(label: 'Any', active: _filters.maxRuntimeMinutes == null, onTap: () => setState(() => _filters = _filters.copyWith(clearMaxRuntimeMinutes: true))),
+                    for (final m in const [90, 120, 150])
+                      AgChip(label: '${m}m', active: _filters.maxRuntimeMinutes == m, onTap: () => setState(() => _filters = _filters.copyWith(maxRuntimeMinutes: m))),
                   ],
                 ),
-              ),
-              _FilterSection(
-                title: 'From year',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    _numericChip('Any', _filters.minReleaseYear == null, () {
-                      setState(() {
-                        _filters = _filters.copyWith(clearMinReleaseYear: true);
-                      });
-                    }),
-                    _numericChip('2015+', _filters.minReleaseYear == 2015, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minReleaseYear: 2015);
-                      });
-                    }),
-                    _numericChip('2020+', _filters.minReleaseYear == 2020, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minReleaseYear: 2020);
-                      });
-                    }),
-                    _numericChip('2023+', _filters.minReleaseYear == 2023, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minReleaseYear: 2023);
-                      });
-                    }),
+                _Section(
+                  title: 'From year',
+                  children: [
+                    AgChip(label: 'Any', active: _filters.minReleaseYear == null, onTap: () => setState(() => _filters = _filters.copyWith(clearMinReleaseYear: true))),
+                    for (final y in const [2015, 2020, 2023])
+                      AgChip(label: '$y+', active: _filters.minReleaseYear == y, onTap: () => setState(() => _filters = _filters.copyWith(minReleaseYear: y))),
                   ],
                 ),
-              ),
-              _FilterSection(
-                title: 'Minimum rating',
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    _numericChip('Any', _filters.minRating == null, () {
-                      setState(() {
-                        _filters = _filters.copyWith(clearMinRating: true);
-                      });
-                    }),
-                    _numericChip('7.0+', _filters.minRating == 7.0, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minRating: 7.0);
-                      });
-                    }),
-                    _numericChip('8.0+', _filters.minRating == 8.0, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minRating: 8.0);
-                      });
-                    }),
-                    _numericChip('8.5+', _filters.minRating == 8.5, () {
-                      setState(() {
-                        _filters = _filters.copyWith(minRating: 8.5);
-                      });
-                    }),
+                _Section(
+                  title: 'Minimum rating',
+                  children: [
+                    AgChip(label: 'Any', active: _filters.minRating == null, onTap: () => setState(() => _filters = _filters.copyWith(clearMinRating: true))),
+                    for (final r in const [7.0, 8.0, 8.5])
+                      AgChip(label: '${r.toStringAsFixed(1)}+', active: _filters.minRating == r, onTap: () => setState(() => _filters = _filters.copyWith(minRating: r))),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _filters = const MovieSearchFilters();
-                        });
-                      },
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.of(context).pop(_filters),
-                      child: const Text('Apply'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(child: AgButton.secondary(label: 'Reset', height: 50, onPressed: () => setState(() => _filters = const MovieSearchFilters()))),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: AgButton(
+                label: _activeCount == 0 ? 'Apply' : 'Apply · $_activeCount set',
+                icon: AgIcons.check,
+                height: 50,
+                onPressed: () => Navigator.of(context).pop(_filters),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
     );
-  }
-
-  Widget _numericChip(String label, bool selected, VoidCallback onTap) {
-    return SelectableChip(label: label, selected: selected, onTap: onTap);
   }
 }
 
-class _FilterSection extends StatelessWidget {
-  const _FilterSection({required this.title, required this.child});
-
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.children});
   final String title;
-  final Widget child;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          child,
+        children: [
+          Text(title, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 14.5, color: t.text)),
+          const SizedBox(height: 11),
+          Wrap(spacing: 9, runSpacing: 9, children: children),
         ],
       ),
     );

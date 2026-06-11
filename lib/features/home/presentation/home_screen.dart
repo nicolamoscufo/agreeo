@@ -1,15 +1,20 @@
 import 'dart:async';
 
 import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
+import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
+import 'package:agreeo/features/home/presentation/mood_selector_sheet.dart';
+import 'package:agreeo/features/home/presentation/random_pick_sheet.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
+import 'package:agreeo/features/profile/presentation/profile_screen.dart';
+import 'package:agreeo/features/shell/presentation/notifications_page.dart';
+import 'package:agreeo/providers/notifications_provider.dart';
 import 'package:agreeo/shared/components/filter_bottom_sheet.dart';
-import 'package:agreeo/shared/components/movie_widgets.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/home_refresh_provider.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,25 +26,31 @@ class AgreeoHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<AgreeoHomeScreen> createState() => _AgreeoHomeScreenState();
 }
 
-class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
-  static const int _sectionBatchSize = 30;
+class _QuickFilter {
+  const _QuickFilter(this.label, this.filters, {this.icon});
+  final String label;
+  final MovieSearchFilters? filters;
+  final IconData? icon;
+}
 
+class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   MovieSearchFilters _filters = const MovieSearchFilters();
-  String _activeQuickFilter = 'Any';
+  String _activeQuickFilter = 'For you';
   Future<List<Movie>>? _searchFuture;
-  int _recommendedVisibleCount = _sectionBatchSize;
-  int _trendingVisibleCount = _sectionBatchSize;
   bool _isRefreshingHome = false;
-  int _currentPage = 1;
 
-  @override
-  void initState() {
-    super.initState();
-    // Horizontal carousels now trigger load-more; no vertical listener.
-  }
+  static const _quickFilters = <_QuickFilter>[
+    _QuickFilter('For you', null, icon: AgIcons.sparkle),
+    _QuickFilter('Under 2h', MovieSearchFilters(maxRuntimeMinutes: 120)),
+    _QuickFilter('Sci-Fi', MovieSearchFilters(genre: 'Sci-Fi')),
+    _QuickFilter('Drama', MovieSearchFilters(genre: 'Drama')),
+    _QuickFilter('Comedy', MovieSearchFilters(genre: 'Comedy')),
+    _QuickFilter('Action', MovieSearchFilters(genre: 'Action')),
+    _QuickFilter('Top rated', MovieSearchFilters(minRating: 7.5)),
+  ];
 
   @override
   void dispose() {
@@ -50,20 +61,11 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   }
 
   Future<void> _refreshHome() async {
-    if (_isRefreshingHome) {
-      return;
-    }
-
+    if (_isRefreshingHome) return;
     _isRefreshingHome = true;
     try {
-      _currentPage = 1;
-      await ref
-          .read(agreeoAppControllerProvider.notifier)
-          .refreshHomeFeed(page: _currentPage);
-      if (!mounted) {
-        return;
-      }
-
+      await ref.read(agreeoAppControllerProvider.notifier).refreshHomeFeed();
+      if (!mounted) return;
       ref.read(homeRefreshProvider.notifier).state++;
     } finally {
       _isRefreshingHome = false;
@@ -73,14 +75,11 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   void _refreshSearch() {
     _searchDebounce?.cancel();
     final query = _searchController.text.trim();
-
     setState(() {
       if (query.isEmpty && !_filters.hasActiveFilters) {
         _searchFuture = null;
       } else {
-        _searchFuture = ref
-            .read(movieServiceProvider)
-            .searchMovies(query, _filters);
+        _searchFuture = ref.read(movieServiceProvider).searchMovies(query, _filters);
       }
     });
   }
@@ -88,10 +87,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   void _scheduleSearchRefresh() {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 280), () {
-      if (!mounted) {
-        return;
-      }
-      _refreshSearch();
+      if (mounted) _refreshSearch();
     });
   }
 
@@ -102,498 +98,654 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
     );
   }
 
-  String _timeBasedGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) {
-      return '☀️ Good morning';
-    } else if (hour < 17) {
-      return '👋 Good afternoon';
-    } else {
-      return '🌙 Good evening';
+  void _openDetails(Movie movie) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
+      ),
+    );
+  }
+
+  void _surpriseMe() {
+    HapticFeedback.lightImpact();
+    showRandomPick(context);
+  }
+
+  Future<void> _openFilters() async {
+    HapticFeedback.lightImpact();
+    final updated = await showMovieFilterBottomSheet(
+      context,
+      initialFilters: _filters,
+      genres: agreeoGenreOptions,
+    );
+    if (updated != null) {
+      setState(() {
+        _filters = updated;
+        _activeQuickFilter = '';
+      });
+      _refreshSearch();
     }
   }
 
-  String _dynamicSubtitle(AgreeoAppState state) {
-    final unwatchedWatchlist = state.movieStates.values
-        .where((s) => s.inWatchlist && !s.watched)
-        .length;
-
-    final parts = <String>[];
-    if (unwatchedWatchlist > 0) {
-      parts.add('$unwatchedWatchlist unwatched in your watchlist');
-    }
-
-    if (parts.isEmpty) {
-      return 'What should we discover today?';
-    }
-    return '${parts.join(' · ')} 🍿';
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(homeRefreshProvider, (previous, next) {
-      if (previous == next) {
-        return;
-      }
-
+      if (previous == next) return;
       setState(() {
         _searchController.clear();
         _searchFuture = null;
         _filters = const MovieSearchFilters();
-        _activeQuickFilter = 'Any';
-        _recommendedVisibleCount = _sectionBatchSize;
-        _trendingVisibleCount = _sectionBatchSize;
+        _activeQuickFilter = 'For you';
       });
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-          );
+          _scrollController.animateTo(0,
+              duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
         }
       });
     });
 
+    final t = context.tokens;
     final state = ref.watch(agreeoAppControllerProvider);
-    final session = state.session;
+    final unread = ref.watch(notificationsProvider).unreadCount;
+    final friends = ref.watch(friendsMovieNightControllerProvider).friends;
     final query = _searchController.text.trim().toLowerCase();
     final hasRemoteSearch = query.isNotEmpty || _filters.hasActiveFilters;
+    final firstName = (state.session?.displayName ?? 'there').split(' ').first;
 
-    List<Movie> recommended = const <Movie>[];
-    List<Movie> trending = const <Movie>[];
-    List<Movie> filteredCatalog = const <Movie>[];
-
-    if (!hasRemoteSearch) {
-      recommended = _applyFilters(
-        state.recommendedForYou,
-        query,
-      ).take(_recommendedVisibleCount).toList(growable: false);
-      trending = _applyFilters(
-        state.trendingMovies,
-        query,
-      ).take(_trendingVisibleCount).toList(growable: false);
-      filteredCatalog = _applyFilters(state.catalog, query);
-    }
-
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final displayName = session?.displayName ?? 'there';
-
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            AgreeoColors.trueBlack,
-            AgreeoColors.deepBlack,
-            AgreeoColors.anthraciteBlack,
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refreshHome,
-          child: ListView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 120),
-            children: <Widget>[
-              // ── Greeting ──────────────────────────────────
-              Text(
-                '${_timeBasedGreeting()}, $displayName',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.8,
-                ),
-              ),
-              const SizedBox(height: 6),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 350),
-                child: Text(
-                  _dynamicSubtitle(state),
-                  key: ValueKey<String>(_dynamicSubtitle(state)),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              _MovieNightHomeCta(onCreate: _openCreateMovieNight),
-
-              const SizedBox(height: 18),
-
-              // ── Search bar with filter badge ──────────────
-              AgreeoSearchBar(
-                controller: _searchController,
-                hintText: 'Search a title, genre, or vibe',
-                onChanged: (_) => _scheduleSearchRefresh(),
-                trailing: Stack(
-                  clipBehavior: Clip.none,
-                  children: <Widget>[
-                    IconButton.filledTonal(
-                      onPressed: () async {
-                        HapticFeedback.lightImpact();
-                        final updated = await showMovieFilterBottomSheet(
-                          context,
-                          initialFilters: _filters,
-                          genres: agreeoGenreOptions,
-                        );
-                        if (updated != null) {
-                          setState(() {
-                            _filters = updated;
-                          });
-                          _refreshSearch();
-                        }
-                      },
-                      icon: Icon(
-                        Icons.tune_rounded,
-                        color: _filters.hasActiveFilters
-                            ? colorScheme.primary
-                            : null,
-                      ),
-                    ),
-                    // Active-filter badge
-                    if (_filters.hasActiveFilters)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AgreeoColors.trueBlack,
-                              width: 1.5,
-                            ),
-                          ),
+    return SafeArea(
+      bottom: false,
+      child: RefreshIndicator(
+        onRefresh: _refreshHome,
+        color: t.red,
+        backgroundColor: t.surface,
+        child: ListView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 120),
+          children: [
+            // Header
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_greeting()}, $firstName',
+                        style: TextStyle(
+                          fontFamily: 'Manrope',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: t.faint,
                         ),
                       ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // ── Quick filter chips ────────────────────────
-              SizedBox(
-                height: 42,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: <Widget>[
-                    _quickChip('Any', null, null),
-                    _quickChip(
-                      'Under 2h',
-                      const MovieSearchFilters(maxRuntimeMinutes: 120),
-                      Icons.timer_rounded,
-                    ),
-                    _quickChip(
-                      'Sci-Fi',
-                      const MovieSearchFilters(genre: 'Sci-Fi'),
-                      Icons.rocket_launch_rounded,
-                    ),
-                    _quickChip(
-                      'Comedy',
-                      const MovieSearchFilters(genre: 'Comedy'),
-                      Icons.sentiment_very_satisfied_rounded,
-                    ),
-                    _quickChip(
-                      'Drama',
-                      const MovieSearchFilters(genre: 'Drama'),
-                      Icons.theater_comedy_rounded,
-                    ),
-                    _quickChip(
-                      'Action',
-                      const MovieSearchFilters(genre: 'Action'),
-                      Icons.local_fire_department_rounded,
-                    ),
-                    _quickChip(
-                      'Top Rated',
-                      const MovieSearchFilters(minRating: 7.5),
-                      Icons.star_rounded,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── Content sections ──────────────────────────
-              if (hasRemoteSearch)
-                FutureBuilder<List<Movie>>(
-                  future: _searchFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting &&
-                        !snapshot.hasData) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40),
-                          child: CircularProgressIndicator(),
+                      const SizedBox(height: 2),
+                      Text(
+                        "What's the move?",
+                        style: TextStyle(
+                          fontFamily: 'Bricolage Grotesque',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 25,
+                          letterSpacing: -0.6,
+                          color: t.text,
                         ),
-                      );
-                    }
-
-                    final results = snapshot.data ?? const <Movie>[];
-                    return _CollectionSection(
-                      icon: Icons.search_rounded,
-                      iconColor: colorScheme.tertiary,
-                      title: query.isNotEmpty
-                          ? 'Search results'
-                          : 'Filtered results',
-                      subtitle: _appendCount(
-                        query.isNotEmpty
-                            ? 'TMDB search results enriched with your current app filters.'
-                            : 'Results pulled from the full TMDB catalog with your active filters.',
-                        results.length,
                       ),
-                      movies: results,
-                    );
-                  },
-                )
-              else if (_filters.hasActiveFilters)
-                _CollectionSection(
-                  icon: Icons.filter_list_rounded,
-                  iconColor: colorScheme.secondary,
-                  title: 'Filtered picks',
-                  subtitle: _appendCount(
-                    'The current catalog after your discovery filters.',
-                    filteredCatalog.length,
+                    ],
                   ),
-                  movies: filteredCatalog,
-                )
-              else ...<Widget>[
-                _CollectionSection(
-                  icon: Icons.favorite_rounded,
-                  iconColor: AgreeoColors.kernelGold,
-                  title: 'Recommended for you',
-                  subtitle:
-                      'Your best current matches, ranked from your onboarding and feedback signals.',
-                  movies: recommended,
                 ),
-                const SizedBox(height: 22),
-                _CollectionSection(
-                  icon: Icons.local_fire_department_rounded,
-                  iconColor: AgreeoColors.kernelGold,
-                  title: 'Trending now',
-                  subtitle: _appendCount(
-                    'Fresh, high-heat picks for a low-friction start.',
-                    trending.length,
+                _BellButton(
+                  unread: unread,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
                   ),
-                  movies: trending,
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
+                  ),
+                  child: AgAvatar(name: state.session?.displayName ?? 'You', color: t.red, size: 44),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            // Search + filters + mood
+            Row(
+              children: [
+                Expanded(
+                  child: AgSearchField(
+                    controller: _searchController,
+                    hint: 'Search films, people…',
+                    onChanged: (_) => _scheduleSearchRefresh(),
+                    onSubmitted: (_) => _refreshSearch(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _SquareButton(
+                  icon: AgIcons.sliders,
+                  highlighted: _filters.hasActiveFilters,
+                  onTap: _openFilters,
+                ),
+                const SizedBox(width: 10),
+                _SquareButton(
+                  icon: AgIcons.sparkle,
+                  gradient: true,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    showMoodSelectorSheet(context);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Quick chips
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _quickFilters.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final q = _quickFilters[i];
+                  return AgChip(
+                    label: q.label,
+                    icon: q.icon,
+                    active: _activeQuickFilter == q.label,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _activeQuickFilter = q.label;
+                        _filters = q.filters ?? const MovieSearchFilters();
+                      });
+                      _refreshSearch();
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Movie Night CTA
+            _MovieNightCta(onCreate: _openCreateMovieNight, friends: friends),
+            const SizedBox(height: 22),
+            if (hasRemoteSearch)
+              _SearchResults(future: _searchFuture, onTap: _openDetails)
+            else ...[
+              AgSectionHeader(
+                title: 'Made for you',
+                actionLabel: 'See all',
+                onAction: () {},
+              ),
+              const SizedBox(height: 14),
+              _PosterRail(
+                movies: state.recommendedForYou,
+                posterWidth: 132,
+                showMeta: true,
+                onTap: _openDetails,
+              ),
+              const SizedBox(height: 18),
+              _RandomPickCard(onSurprise: _surpriseMe),
+              const SizedBox(height: 18),
+              const AgSectionHeader(title: 'Trending with friends'),
+              const SizedBox(height: 14),
+              _PosterRail(
+                movies: state.trendingMovies,
+                posterWidth: 108,
+                onTap: _openDetails,
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _quickChip(String label, MovieSearchFilters? filters, IconData? icon) {
-    final selected = _activeQuickFilter == label;
-    return Padding(
-      padding: const EdgeInsets.only(right: 10),
-      child: SelectableChip(
-        label: label,
-        selected: selected,
-        icon: icon,
-        onTap: () {
-          HapticFeedback.selectionClick();
-          setState(() {
-            if (selected || filters == null) {
-              _activeQuickFilter = 'Any';
-              _filters = const MovieSearchFilters();
-            } else {
-              _activeQuickFilter = label;
-              _filters = filters;
-            }
-          });
-          _refreshSearch();
+class _BellButton extends StatelessWidget {
+  const _BellButton({required this.unread, required this.onTap});
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: t.line),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(AgIcons.bell, size: 21, color: t.text),
+            if (unread > 0)
+              Positioned(
+                top: 9,
+                right: 10,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: t.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: t.surface, width: 2),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SquareButton extends StatelessWidget {
+  const _SquareButton({
+    required this.icon,
+    required this.onTap,
+    this.gradient = false,
+    this.highlighted = false,
+  });
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool gradient;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          gradient: gradient ? t.grad : null,
+          color: gradient ? null : t.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: gradient ? null : Border.all(color: t.line),
+          boxShadow: gradient
+              ? [
+                  BoxShadow(
+                    color: t.purple.withValues(alpha: 0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -8,
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          size: 21,
+          color: gradient ? Colors.white : (highlighted ? t.red : t.text),
+        ),
+      ),
+    );
+  }
+}
+
+class _MovieNightCta extends StatelessWidget {
+  const _MovieNightCta({required this.onCreate, required this.friends});
+  final VoidCallback onCreate;
+  final List<dynamic> friends;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onCreate,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          gradient: t.grad,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: t.purple.withValues(alpha: 0.55),
+              blurRadius: 34,
+              offset: const Offset(0, 16),
+              spreadRadius: -14,
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(painter: _DiagonalPatternPainter()),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Start a Movie Night',
+                          style: TextStyle(
+                            fontFamily: 'Bricolage Grotesque',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 19,
+                            letterSpacing: -0.4,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Invite friends, swipe together, agree in minutes.',
+                          style: TextStyle(
+                            fontFamily: 'Manrope',
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Pill is always white → use a fixed dark ink in both themes.
+                              Icon(AgIcons.plus, size: 16, color: Color(0xFF1A120C)),
+                              SizedBox(width: 7),
+                              Text(
+                                'New session',
+                                style: TextStyle(
+                                  fontFamily: 'Manrope',
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                  color: Color(0xFF1A120C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  if (friends.isNotEmpty)
+                    SizedBox(
+                      width: 42.0 + (friends.length.clamp(1, 3) - 1) * 28,
+                      height: 42,
+                      child: Stack(
+                        children: [
+                          for (var i = 0; i < friends.length.clamp(0, 3); i++)
+                            Positioned(
+                              left: i * 28.0,
+                              child: AgAvatar(
+                                name: (friends[i].name as String?) ?? 'Friend',
+                                size: 42,
+                                ring: true,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiagonalPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.16)
+      ..strokeWidth = 1;
+    const spacing = 9.0;
+    for (double x = -size.height; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RandomPickCard extends StatelessWidget {
+  const _RandomPickCard({required this.onSurprise});
+  final VoidCallback onSurprise;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: t.line),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: t.gradSoft,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: t.line2),
+            ),
+            child: Icon(AgIcons.dice, size: 26, color: t.gold),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Can't decide?",
+                  style: TextStyle(
+                    fontFamily: 'Bricolage Grotesque',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: t.text,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'Pull a random pick from your watchlist',
+                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.sub),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: onSurprise,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: t.text,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Surprise me',
+                style: TextStyle(
+                  fontFamily: 'Manrope',
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: t.onText,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PosterRail extends StatelessWidget {
+  const _PosterRail({
+    required this.movies,
+    required this.posterWidth,
+    required this.onTap,
+    this.showMeta = false,
+  });
+
+  final List<Movie> movies;
+  final double posterWidth;
+  final ValueChanged<Movie> onTap;
+  final bool showMeta;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    if (movies.isEmpty) {
+      return Container(
+        height: posterWidth * 1.5,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: t.line),
+        ),
+        child: Text(
+          'Nothing here yet',
+          style: TextStyle(fontFamily: 'Manrope', color: t.faint),
+        ),
+      );
+    }
+    final height = posterWidth * 1.5 + (showMeta ? 30 : 0);
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: movies.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final m = movies[i];
+          return SizedBox(
+            width: posterWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AgPoster(imageUrl: m.posterUrl, title: m.title, onTap: () => onTap(m)),
+                if (showMeta) ...[
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      AgStars(rating: m.rating),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '· ${m.releaseYear}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
         },
       ),
     );
   }
-
-  String _appendCount(String base, int count) {
-    if (count <= 0) {
-      return base;
-    }
-    return '$base • $count title${count == 1 ? '' : 's'}';
-  }
-
-  List<Movie> _applyFilters(List<Movie> movies, String query) {
-    final filtered = movies
-        .where((movie) {
-          final matchesSearch =
-              query.isEmpty ||
-              movie.title.toLowerCase().contains(query) ||
-              movie.genres.any((genre) => genre.toLowerCase().contains(query));
-          return matchesSearch && _filters.matches(movie);
-        })
-        .toList(growable: false);
-
-    return filtered;
-  }
 }
 
-class _MovieNightHomeCta extends StatelessWidget {
-  const _MovieNightHomeCta({required this.onCreate});
-
-  final VoidCallback onCreate;
+class _SearchResults extends StatelessWidget {
+  const _SearchResults({required this.future, required this.onTap});
+  final Future<List<Movie>>? future;
+  final ValueChanged<Movie> onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: <Color>[
-            AgreeoColors.cinematicRed.withValues(alpha: 0.94),
-            AgreeoColors.kernelGold.withValues(alpha: 0.88),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: AgreeoColors.cinematicRed.withValues(alpha: 0.22),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Organize a Movie Night',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Invite friends, set clear preferences, vote, and get one shared pick.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.86),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    onPressed: onCreate,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: colorScheme.primary,
-                    ),
-                    icon: const Icon(Icons.groups_rounded),
-                    label: const Text('Create Movie Night'),
-                  ),
-                ],
-              ),
+    final t = context.tokens;
+    return FutureBuilder<List<Movie>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 50),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final results = snapshot.data ?? const <Movie>[];
+        if (results.isEmpty) {
+          return Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: t.line),
             ),
-            const SizedBox(width: 14),
-            Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+            child: Column(
+              children: [
+                Icon(AgIcons.search, size: 36, color: t.faint),
+                const SizedBox(height: 14),
+                Text(
+                  'No results',
+                  style: TextStyle(
+                    fontFamily: 'Bricolage Grotesque',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: t.text,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Try a different title or loosen your filters.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Manrope', fontSize: 13, color: t.sub),
+                ),
+              ],
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AgSectionHeader(title: 'Results', subtitle: '${results.length} titles'),
+            const SizedBox(height: 14),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: results.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 2 / 3,
               ),
-              child: const Icon(
-                Icons.local_movies_outlined,
-                color: Colors.white,
-                size: 32,
-              ),
+              itemBuilder: (context, i) {
+                final m = results[i];
+                return AgPoster(imageUrl: m.posterUrl, title: m.title, onTap: () => onTap(m));
+              },
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CollectionSection extends StatelessWidget {
-  const _CollectionSection({
-    required this.title,
-    required this.subtitle,
-    required this.movies,
-    this.icon,
-    this.iconColor,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<Movie> movies;
-  final IconData? icon;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (icon != null)
-          SectionHeader(
-            title: title,
-            subtitle: subtitle,
-            trailing: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: (iconColor ?? colorScheme.primary).withValues(
-                  alpha: 0.14,
-                ),
-              ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: iconColor ?? colorScheme.primary,
-              ),
-            ),
-          )
-        else
-          SectionHeader(title: title, subtitle: subtitle),
-        const SizedBox(height: 14),
-        if (movies.isEmpty)
-          const EmptyState(
-            icon: Icons.movie_filter_rounded,
-            title: 'No picks match that filter',
-            message:
-                'Try relaxing one filter or switch back to a broader discovery view.',
-          )
-        else
-          MovieHorizontalCarousel(
-            movies: movies,
-            onMovieTap: (movie) {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
-                ),
-              );
-            },
-          ),
-      ],
+        );
+      },
     );
   }
 }

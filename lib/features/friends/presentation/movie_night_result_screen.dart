@@ -1,14 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/shared/components/primitives.dart';
-import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/nav_index_provider.dart';
-import 'package:agreeo/shared/utils/movie_night_utils.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,8 +16,7 @@ class MovieNightResultScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   @override
-  ConsumerState<MovieNightResultScreen> createState() =>
-      _MovieNightResultScreenState();
+  ConsumerState<MovieNightResultScreen> createState() => _MovieNightResultScreenState();
 }
 
 class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
@@ -31,10 +27,7 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
   @override
   void initState() {
     super.initState();
-    _confettiController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    );
+    _confettiController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
     if (_shownConfettiIds.add(widget.eventId)) {
       _confettiController.forward();
     }
@@ -51,253 +44,208 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  Future<void> _run(Future<String> Function() action) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final message = await action();
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final event = socialState.eventById(widget.eventId);
+    final t = context.tokens;
+    final social = ref.watch(friendsMovieNightControllerProvider);
+    final controller = ref.read(agreeoAppControllerProvider.notifier);
+    final event = social.eventById(widget.eventId);
     final winner = event?.winnerCandidate;
 
     if (event == null || winner == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Result')),
-        body: const Center(child: Text('Result not ready yet')),
+        backgroundColor: t.bg,
+        body: Center(child: Text('Result not ready yet', style: TextStyle(color: t.sub))),
       );
     }
 
     final movie = winner.movie;
-    final ranking = movieNightRanking(event);
+    final likers = event.joinedParticipants;
+    final likes = winner.likesCount ?? likers.length;
+    final unanimous = likes >= likers.length && likers.isNotEmpty;
+    final meta = [
+      if (movie.releaseYear > 0) '${movie.releaseYear}',
+      if (movie.runtimeLabel.isNotEmpty) movie.runtimeLabel,
+    ].join(' · ');
+
     return Scaffold(
+      backgroundColor: t.bg,
       body: SafeArea(
         child: Stack(
-          children: <Widget>[
-            ListView(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
-                    const Spacer(),
-                    InfoBadge(label: movieNightStatusLabel(event.status)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'The group\'s pick is...',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            AgreeoMovieDetailsScreen(movieId: movie.id),
-                      ),
-                    );
-                  },
-                  child: Center(
-                    child: Container(
-                      width: 220,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: AgreeoColors.cinematicRed.withValues(
-                              alpha: 0.4,
-                            ),
-                            blurRadius: 34,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: CachedNetworkImage(
-                        imageUrl: movie.posterUrl,
-                        imageBuilder: (context, imageProvider) => ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: AspectRatio(
-                            aspectRatio: 2 / 3,
-                            child: Image(
-                              image: imageProvider,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: AspectRatio(
-                            aspectRatio: 2 / 3,
-                            child: Container(
-                              color: AgreeoColors.darkSurface,
-                              child: const Icon(
-                                Icons.movie_creation_outlined,
-                                size: 48,
-                              ),
-                            ),
-                          ),
-                        ),
+          children: [
+            Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.line)),
+                        child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 22),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            AgreeoMovieDetailsScreen(movieId: movie.id),
-                      ),
-                    );
-                  },
-                  child: Text(
-                    movie.title,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${movie.releaseYear} • ${movie.runtimeLabel} • ${movie.genres.take(3).join(', ')}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                if (event.round > 1) ...<Widget>[
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AgreeoColors.kernelGold.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AgreeoColors.kernelGold.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                    children: [
+                      Column(
                         children: [
-                          const Icon(
-                            Icons.flash_on_rounded,
-                            color: AgreeoColors.kernelGold,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
+                          Text('IT\'S A MATCH', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w800, fontSize: 12.5, letterSpacing: 0.6, color: t.red)),
+                          const SizedBox(height: 4),
                           Text(
-                            'Decided after ${event.round} rounds',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                            "Tonight you're watching",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 27, letterSpacing: -0.6, color: t.text),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 18),
+                      // Winner poster + badge
+                      Center(
+                        child: SizedBox(
+                          width: 186,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              AgPoster(
+                                imageUrl: movie.posterUrl,
+                                title: movie.title,
+                                radius: 20,
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id)),
+                                ),
+                              ),
+                              Positioned(
+                                top: -12,
+                                right: -12,
+                                child: Transform.rotate(
+                                  angle: 0.1,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                                    decoration: BoxDecoration(
+                                      gradient: t.grad,
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [BoxShadow(color: t.purple.withValues(alpha: 0.7), blurRadius: 22, offset: const Offset(0, 10), spreadRadius: -6)],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('$likes/${likers.length} ', style: const TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
+                                        const Icon(AgIcons.heartFilled, size: 14, color: Colors.white),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        movie.title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 23, letterSpacing: -0.5, color: t.text),
+                      ),
+                      const SizedBox(height: 8),
+                      if (meta.isNotEmpty || movie.rating > 0)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (meta.isNotEmpty)
+                              Text('$meta   ', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13, color: t.sub)),
+                            if (movie.rating > 0) AgStars(rating: movie.rating, size: 13),
+                          ],
+                        ),
+                      const SizedBox(height: 20),
+                      // Likers card
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: t.line)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(unanimous ? 'EVERYONE LOVED IT' : 'THE GROUP LIKED IT', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.3, color: t.faint)),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 40,
+                                    child: Stack(
+                                      children: [
+                                        for (var i = 0; i < likers.length.clamp(0, 5); i++)
+                                          Positioned(
+                                            left: i * 26.0,
+                                            child: AgAvatar(name: likers[i].name, imageUrl: likers[i].avatarUrl, size: 40, ring: true),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Icon(AgIcons.heartFilled, size: 16, color: t.green),
+                                    const SizedBox(width: 6),
+                                    Text(unanimous ? 'Unanimous' : '$likes likes', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 13, color: t.green)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          AgButton.secondary(label: 'Watchlist', icon: AgIcons.bookmark, expand: false, height: 46, onPressed: () => _run(() => controller.addToWatchlist(movie.id))),
+                          AgButton.secondary(label: 'Watched', icon: AgIcons.eye, expand: false, height: 46, onPressed: () => _run(() => controller.markAsWatched(movie.id))),
+                          AgButton.secondary(
+                            label: 'Share',
+                            icon: AgIcons.share,
+                            expand: false,
+                            height: 46,
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: '🎬 Movie Night winner: ${movie.title} — voted on Agreeo!'));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Result copied to clipboard!')));
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-                const SizedBox(height: 18),
-                _ResultExplanationCard(
-                  event: event,
-                  winner: winner,
-                  ranking: ranking,
                 ),
-                if (ranking.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 18),
-                  _FullLeaderboard(
-                    ranking: ranking,
-                    winnerMovieId: event.winnerMovieId,
+                // Bottom CTAs
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  child: Column(
+                    children: [
+                      AgButton(
+                        label: 'View details',
+                        icon: AgIcons.play,
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id)),
+                        ),
+                      ),
+                      const SizedBox(height: 11),
+                      AgButton.secondary(label: 'Back to Friends', icon: AgIcons.users, onPressed: () => _returnToTab(AgNavTab.friends)),
+                    ],
                   ),
-                ],
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: <Widget>[
-                    FilledButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                AgreeoMovieDetailsScreen(movieId: movie.id),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.info_outline_rounded),
-                      label: const Text('Open details'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () async {
-                        final message = await ref
-                            .read(agreeoAppControllerProvider.notifier)
-                            .addToWatchlist(movie.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(message)));
-                        }
-                      },
-                      icon: const Icon(Icons.bookmark_add_outlined),
-                      label: const Text('Save to Watchlist'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () async {
-                        final message = await ref
-                            .read(agreeoAppControllerProvider.notifier)
-                            .markAsWatched(movie.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text(message)));
-                        }
-                      },
-                      icon: const Icon(Icons.visibility_outlined),
-                      label: const Text('Mark as Watched'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () {
-                        final text =
-                            '\u{1F3AC} Movie Night Result\n\n'
-                            '\u{1F3C6} Winner: ${movie.title}\n'
-                            '\u2B50 Score: ${(winner.finalScore ?? winner.compatibilityScore).toStringAsFixed(1)}\n'
-                            '\u2764 ${winner.likesCount ?? 0} likes\n\n'
-                            'Voted on Agreeo!';
-                        Clipboard.setData(ClipboardData(text: text));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Result copied to clipboard!'),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.share_rounded),
-                      label: const Text('Share Result'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _returnToTab(0),
-                      icon: const Icon(Icons.home_outlined),
-                      label: const Text('Back to Home'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _returnToTab(3),
-                      icon: const Icon(Icons.people_outline_rounded),
-                      label: const Text('Back to Friends'),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -305,11 +253,7 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
               child: IgnorePointer(
                 child: AnimatedBuilder(
                   animation: _confettiController,
-                  builder: (context, child) {
-                    return CustomPaint(
-                      painter: _ConfettiPainter(_confettiController.value),
-                    );
-                  },
+                  builder: (context, child) => CustomPaint(painter: _ConfettiPainter(_confettiController.value, t)),
                 ),
               ),
             ),
@@ -320,227 +264,16 @@ class _MovieNightResultScreenState extends ConsumerState<MovieNightResultScreen>
   }
 }
 
-class _ResultExplanationCard extends StatelessWidget {
-  const _ResultExplanationCard({
-    required this.event,
-    required this.winner,
-    required this.ranking,
-  });
-
-  final MovieNightEvent event;
-  final ShortlistCandidate winner;
-  final List<MovieNightCandidateRank> ranking;
-
-  @override
-  Widget build(BuildContext context) {
-    final rank = _winnerRank();
-    final joinedCount = event.joinedParticipants.length;
-    final likes = rank?.likes ?? winner.likesCount ?? 0;
-    final dislikes = rank?.dislikes ?? winner.dislikesCount ?? 0;
-    final score =
-        (winner.finalScore ?? rank?.finalScore ?? winner.compatibilityScore)
-            .toStringAsFixed(1);
-    final constraints = movieNightConstraintsLabel(event.constraints);
-    final likesLabel = joinedCount == 0
-        ? '$likes likes'
-        : '$likes/$joinedCount likes';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Why this movie won',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Agreeo selected it because it had the strongest group score ($score), with $likesLabel and $dislikes dislike${dislikes == 1 ? '' : 's'}.',
-            ),
-            if (constraints != 'No constraints set') ...<Widget>[
-              const SizedBox(height: 8),
-              Text('It also respects the preferences: $constraints.'),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  MovieNightCandidateRank? _winnerRank() {
-    for (final entry in ranking) {
-      if (entry.candidate.movie.id == winner.movie.id) {
-        return entry;
-      }
-    }
-    return null;
-  }
-}
-
-class _FullLeaderboard extends StatelessWidget {
-  const _FullLeaderboard({required this.ranking, this.winnerMovieId});
-
-  final List<MovieNightCandidateRank> ranking;
-  final String? winnerMovieId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'Full Ranking',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 12),
-            ...ranking.asMap().entries.map((entry) {
-              final index = entry.key;
-              final rank = entry.value;
-              final movie = rank.candidate.movie;
-              final isWinner = movie.id == winnerMovieId;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: isWinner
-                    ? BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: AgreeoColors.kernelGold.withValues(alpha: 0.08),
-                        border: Border.all(
-                          color: AgreeoColors.kernelGold.withValues(alpha: 0.3),
-                        ),
-                      )
-                    : null,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          _rankEmoji(index),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: movie.posterUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: movie.posterUrl,
-                                width: 36,
-                                height: 54,
-                                fit: BoxFit.cover,
-                                errorWidget: (context, url, error) => Container(
-                                  width: 36,
-                                  height: 54,
-                                  color: AgreeoColors.darkSurface,
-                                  child: const Icon(
-                                    Icons.movie_outlined,
-                                    size: 18,
-                                    color: Colors.white54,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                width: 36,
-                                height: 54,
-                                color: AgreeoColors.darkSurface,
-                                child: const Icon(
-                                  Icons.movie_outlined,
-                                  size: 18,
-                                  color: Colors.white54,
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
-                  title: Text(
-                    movie.title,
-                    style: TextStyle(
-                      fontWeight: isWinner ? FontWeight.w800 : FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    rank.candidate.eliminated
-                        ? '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}  \u00b7  Eliminated'
-                        : '\u2764 ${rank.likes}  \u00b7  \u{1F44E} ${rank.dislikes}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isWinner
-                          ? AgreeoColors.kernelGold.withValues(alpha: 0.2)
-                          : Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      rank.finalScore.toStringAsFixed(1),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                        color: isWinner
-                            ? AgreeoColors.kernelGold
-                            : Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _rankEmoji(int index) {
-    return switch (index) {
-      0 => '\u{1F947}',
-      1 => '\u{1F948}',
-      2 => '\u{1F949}',
-      _ => '${index + 1}.',
-    };
-  }
-}
-
 class _ConfettiPainter extends CustomPainter {
-  const _ConfettiPainter(this.progress);
+  _ConfettiPainter(this.progress, this.tokens);
 
   final double progress;
+  final AgreeoTokens tokens;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || progress >= 1) {
-      return;
-    }
-    const colors = <Color>[
-      AgreeoColors.kernelGold,
-      AgreeoColors.cinematicRed,
-      AgreeoColors.popcornWhite,
-      AgreeoColors.kernelGold,
-      AgreeoColors.cinematicRed,
-    ];
+    if (progress <= 0 || progress >= 1) return;
+    final colors = <Color>[tokens.gold, tokens.red, tokens.purple, tokens.green, tokens.gold];
     final fade = (1 - progress).clamp(0.0, 1.0).toDouble();
     for (var index = 0; index < 56; index++) {
       final random = math.Random(index * 41);
@@ -548,18 +281,14 @@ class _ConfettiPainter extends CustomPainter {
       final speed = 0.65 + random.nextDouble() * 0.8;
       final drift = (random.nextDouble() - 0.5) * 120 * progress;
       final y = -40 + (size.height + 160) * progress * speed;
-      final paint = Paint()
-        ..color = colors[index % colors.length].withValues(alpha: fade);
+      final paint = Paint()..color = colors[index % colors.length].withValues(alpha: fade);
       canvas.save();
       canvas.translate(x + drift, y);
       canvas.rotate((progress * 6 + random.nextDouble()) * math.pi);
       final width = 6 + random.nextDouble() * 7;
       final height = 10 + random.nextDouble() * 12;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset.zero, width: width, height: height),
-          const Radius.circular(2),
-        ),
+        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: width, height: height), const Radius.circular(2)),
         paint,
       );
       canvas.restore();
@@ -567,7 +296,5 @@ class _ConfettiPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ConfettiPainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
+  bool shouldRepaint(_ConfettiPainter oldDelegate) => oldDelegate.progress != progress;
 }

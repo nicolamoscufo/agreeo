@@ -310,6 +310,8 @@ class BackendSocialService {
     return _decodeMovieNightEvent(_castMap(body['event']));
   }
 
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   Future<http.Response> _authorizedRequest(
     String method,
     String path, {
@@ -322,33 +324,16 @@ class BackendSocialService {
       );
     }
 
-    final uri = Uri.parse('${_config.baseUrl}$path');
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
     final encodedBody = body == null ? null : jsonEncode(body);
 
-    late final http.Response response;
-    switch (method) {
-      case 'GET':
-        response = await _client.get(uri, headers: headers);
-        break;
-      case 'POST':
-        response = await _client.post(uri, headers: headers, body: encodedBody);
-        break;
-      case 'PATCH':
-        response = await _client.patch(
-          uri,
-          headers: headers,
-          body: encodedBody,
-        );
-        break;
-      case 'DELETE':
-        response = await _client.delete(uri, headers: headers);
-        break;
-      default:
-        throw UnsupportedError('Unsupported method $method');
+    var response = await _send(method, path, token, encodedBody);
+
+    // Transparently recover from an expired access token: refresh once and retry.
+    if (response.statusCode == 401) {
+      final refreshed = await _authService.refreshAccessToken();
+      if (refreshed != null && refreshed.isNotEmpty) {
+        response = await _send(method, path, refreshed, encodedBody);
+      }
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -357,6 +342,36 @@ class BackendSocialService {
       );
     }
     return response;
+  }
+
+  Future<http.Response> _send(
+    String method,
+    String path,
+    String token,
+    String? encodedBody,
+  ) {
+    final uri = Uri.parse('${_config.baseUrl}$path');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+
+    switch (method) {
+      case 'GET':
+        return _client.get(uri, headers: headers).timeout(_requestTimeout);
+      case 'POST':
+        return _client
+            .post(uri, headers: headers, body: encodedBody)
+            .timeout(_requestTimeout);
+      case 'PATCH':
+        return _client
+            .patch(uri, headers: headers, body: encodedBody)
+            .timeout(_requestTimeout);
+      case 'DELETE':
+        return _client.delete(uri, headers: headers).timeout(_requestTimeout);
+      default:
+        throw UnsupportedError('Unsupported method $method');
+    }
   }
 
   List<Friend> _decodeFriends(Object? value) {

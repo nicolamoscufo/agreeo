@@ -1,686 +1,272 @@
 import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_screen.dart';
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
-import 'package:agreeo/shared/components/primitives.dart';
 import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/social_models.dart';
-import 'package:agreeo/shared/utils/movie_night_utils.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Movie Night · Create. Single Daylight screen: name, friend selection
+/// (selected pills + suggested list), and an expandable Filters section that
+/// feeds [MovieNightConstraints]. Reference: `ag-social.jsx` NightCreateScreen.
 class MovieNightWizardScreen extends ConsumerStatefulWidget {
-  const MovieNightWizardScreen({
-    super.key,
-    this.preSelectedFriendIds = const <String>[],
-  });
+  const MovieNightWizardScreen({super.key, this.preSelectedFriendIds = const <String>[]});
 
   final List<String> preSelectedFriendIds;
 
   @override
-  ConsumerState<MovieNightWizardScreen> createState() =>
-      _MovieNightWizardScreenState();
+  ConsumerState<MovieNightWizardScreen> createState() => _MovieNightWizardScreenState();
 }
 
-class _MovieNightWizardScreenState
-    extends ConsumerState<MovieNightWizardScreen> {
+class _MovieNightWizardScreenState extends ConsumerState<MovieNightWizardScreen> {
   late final TextEditingController _nameController;
-  final TextEditingController _friendSearchController = TextEditingController();
-  int _step = 0;
-  DateTime? _dateTime;
-  final Set<String> _includedGenres = <String>{};
-  final Set<String> _excludedGenres = <String>{};
-  int _maxDurationMinutes = 150;
-  double? _minimumRating;
-  String? _language;
-  late final Set<String> _selectedFriendIds;
-  String _friendSearch = '';
+  late final Set<String> _selected;
+  final Set<String> _includedGenres = {};
+  int _maxDuration = 150;
+  double? _minRating;
+  bool _filtersOpen = false;
+  bool _creating = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: _defaultMovieNightName());
-    _selectedFriendIds = widget.preSelectedFriendIds.toSet();
+    _nameController = TextEditingController(text: _defaultName());
+    _selected = widget.preSelectedFriendIds.toSet();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _friendSearchController.dispose();
     super.dispose();
   }
 
+  String _defaultName() {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return '${days[DateTime.now().weekday - 1]} Movie Night';
+  }
+
+  String get _filtersSummary {
+    final parts = <String>[];
+    if (_includedGenres.isNotEmpty) parts.add(_includedGenres.take(2).join(', '));
+    parts.add('Under ${_maxDuration ~/ 60}h${_maxDuration % 60 == 0 ? '' : '½'}');
+    if (_minRating != null) parts.add('${_minRating!.toStringAsFixed(0)}+');
+    return parts.join(' · ');
+  }
+
+  Future<void> _create(List<Friend> friends) async {
+    if (_selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invite at least one friend.')),
+      );
+      return;
+    }
+    setState(() => _creating = true);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final event = await ref.read(friendsMovieNightControllerProvider.notifier).createMovieNight(
+            name: _nameController.text,
+            dateTime: null,
+            constraints: MovieNightConstraints(
+              includedGenres: _includedGenres.toList(),
+              excludedGenres: const [],
+              maxDurationMinutes: _maxDuration,
+              minimumRating: _minRating,
+              language: null,
+            ),
+            invitedFriendIds: _selected.toList(),
+          );
+      if (!mounted) return;
+      navigator.pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => MovieNightWaitingRoomScreen(eventId: event.id)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _creating = false);
+      messenger.showSnackBar(const SnackBar(content: Text('Could not create this Movie Night.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final filteredFriends = socialState.friends
-        .where(
-          (friend) =>
-              _friendSearch.isEmpty ||
-              friend.name.toLowerCase().contains(_friendSearch.toLowerCase()),
-        )
-        .toList(growable: false);
-    final currentConstraints = MovieNightConstraints(
-      includedGenres: _includedGenres.toList(growable: false),
-      excludedGenres: _excludedGenres.toList(growable: false),
-      maxDurationMinutes: _maxDurationMinutes,
-      minimumRating: _minimumRating,
-      language: _language,
-    );
-    final needsFriendSelection = _step == 2 && _selectedFriendIds.isEmpty;
+    final t = context.tokens;
+    final friends = ref.watch(friendsMovieNightControllerProvider).friends;
+    final selectedFriends = friends.where((f) => _selected.contains(f.id)).toList();
 
-    final pages = <_WizardPageData>[
-      _WizardPageData(
-        eyebrow: 'Step 1 of 3',
-        title: 'Set the vibe',
-        subtitle:
-            'Give the night a name, then lock the time only if it exists.',
-        icon: Icons.nightlight_round,
-        accent: AgreeoColors.cinematicRed,
-        child: _BasicsStep(
-          nameController: _nameController,
-          dateTime: _dateTime,
-          onPickDateTime: _pickDateTime,
-          onClearDateTime: () => setState(() => _dateTime = null),
-        ),
-      ),
-      _WizardPageData(
-        eyebrow: 'Step 2 of 3',
-        title: 'Tune recommendations',
-        subtitle: 'Shape movie suggestions before starting to vote.',
-        icon: Icons.tune_rounded,
-        accent: AgreeoColors.kernelGold,
-        child: _ConstraintsStep(
-          includedGenres: _includedGenres,
-          excludedGenres: _excludedGenres,
-          maxDurationMinutes: _maxDurationMinutes,
-          minimumRating: _minimumRating,
-          language: _language,
-          onIncludedToggle: _toggleIncludedGenre,
-          onExcludedToggle: _toggleExcludedGenre,
-          onDurationChanged: (value) => setState(() {
-            _maxDurationMinutes = value.round();
-          }),
-          onMinimumRatingChanged: (value) => setState(() {
-            _minimumRating = value;
-          }),
-          onLanguageChanged: (value) => setState(() {
-            _language = value;
-          }),
-        ),
-      ),
-      _WizardPageData(
-        eyebrow: 'Step 3 of 3',
-        title: 'Bring the crew',
-        subtitle: 'Invite friends now to your movie night.',
-        icon: Icons.groups_rounded,
-        accent: AgreeoColors.kernelGold,
-        child: _InviteStep(
-          friends: filteredFriends,
-          selectedFriendIds: _selectedFriendIds,
-          constraints: currentConstraints,
-          searchController: _friendSearchController,
-          onSearchChanged: (value) => setState(() {
-            _friendSearch = value.trim();
-          }),
-          onToggleFriend: (friendId) => setState(() {
-            if (!_selectedFriendIds.add(friendId)) {
-              _selectedFriendIds.remove(friendId);
-            }
-          }),
-        ),
-      ),
-    ];
-    final page = pages[_step];
-
-    return PopScope<Object?>(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) {
-          return;
-        }
-        await _confirmExit();
-      },
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(
-          title: const Text('Create Movie Night'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: _confirmExit,
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: <Widget>[
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  children: <Widget>[
-                    _WizardHero(page: page, step: _step),
-                    const SizedBox(height: 18),
-                    _StepDots(step: _step),
-                    const SizedBox(height: 18),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) {
-                        return FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.04, 0),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: _WizardCard(key: ValueKey<int>(_step), page: page),
+    return Scaffold(
+      backgroundColor: t.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _NightHeader(step: 0, title: "Who's in tonight?"),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                children: [
+                  // Name field
+                  Container(
+                    decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: t.line)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: TextField(
+                      controller: _nameController,
+                      cursorColor: t.red,
+                      style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                      decoration: agBareInput(
+                        hint: 'Session name',
+                        hintStyle: TextStyle(fontFamily: 'Manrope', color: t.faint),
+                        collapsed: false,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 18),
+                  // Selected pills
+                  if (selectedFriends.isNotEmpty)
+                    SizedBox(
+                      height: 88,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: selectedFriends.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 14),
+                        itemBuilder: (context, i) {
+                          final f = selectedFriends[i];
+                          return SizedBox(
+                            width: 58,
+                            child: Column(
+                              children: [
+                                GestureDetector(
+                                  onTap: () => setState(() => _selected.remove(f.id)),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      AgAvatar(name: f.name, imageUrl: f.avatarUrl, size: 54),
+                                      Positioned(
+                                        top: -2,
+                                        right: -2,
+                                        child: Container(
+                                          width: 20,
+                                          height: 20,
+                                          decoration: BoxDecoration(color: t.red, shape: BoxShape.circle, border: Border.all(color: t.bg, width: 2)),
+                                          child: const Icon(AgIcons.close, size: 11, color: Colors.white),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(f.name.split(' ').first, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Manrope', fontSize: 11, fontWeight: FontWeight.w600, color: t.sub)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  if (selectedFriends.isNotEmpty) const SizedBox(height: 8),
+                  Text('SUGGESTED', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.3, color: t.faint)),
+                  const SizedBox(height: 8),
+                  if (friends.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      child: Text('No friends yet — add friends to invite them.', style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint)),
+                    )
+                  else
+                    for (final f in friends)
+                      _SuggestedRow(
+                        friend: f,
+                        selected: _selected.contains(f.id),
+                        onTap: () => setState(() {
+                          if (!_selected.add(f.id)) _selected.remove(f.id);
+                        }),
+                      ),
+                  const SizedBox(height: 14),
+                  _FiltersCard(
+                    open: _filtersOpen,
+                    summary: _filtersSummary,
+                    includedGenres: _includedGenres,
+                    maxDuration: _maxDuration,
+                    minRating: _minRating,
+                    onToggleOpen: () => setState(() => _filtersOpen = !_filtersOpen),
+                    onGenreTap: (g) => setState(() {
+                      if (!_includedGenres.add(g)) _includedGenres.remove(g);
+                    }),
+                    onDuration: (v) => setState(() => _maxDuration = v.round()),
+                    onRating: (v) => setState(() => _minRating = v),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: AgButton(
+                label: _creating ? 'Creating…' : 'Create session · ${_selected.length} invited',
+                icon: AgIcons.arrow,
+                onPressed: _creating ? null : () => _create(friends),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NightHeader extends StatelessWidget {
+  const _NightHeader({required this.step, required this.title});
+  final int step;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.line)),
+                  child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < 4; i++) ...[
+                      Expanded(
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            gradient: i <= step ? t.grad : null,
+                            color: i <= step ? null : t.surface,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                      ),
+                      if (i < 3) const SizedBox(width: 6),
+                    ],
                   ],
                 ),
               ),
-              _WizardActions(
-                step: _step,
-                onBack: _step == 0 ? null : () => _goToStep(_step - 1),
-                onContinue: _continue,
-                canContinue: !needsFriendSelection,
-                helperText: needsFriendSelection
-                    ? 'Select at least one friend to continue.'
-                    : null,
-              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _confirmExit() async {
-    final shouldLeave = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Leave Movie Night setup?'),
-          content: const Text(
-            'You will lose the Movie Night settings you selected.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Leave'),
-            ),
-          ],
-        );
-      },
-    );
-    if (shouldLeave == true && mounted) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _pickDateTime() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      firstDate: now,
-      lastDate: DateTime(now.year + 2),
-      initialDate: _dateTime ?? now,
-    );
-    if (date == null || !mounted) {
-      return;
-    }
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dateTime ?? now),
-    );
-    if (time == null) {
-      setState(() => _dateTime = date);
-      return;
-    }
-    setState(() {
-      _dateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
-  }
-
-  Future<void> _continue() async {
-    if (_step == 0) {
-      if (_nameController.text.trim().isEmpty) {
-        _showError('Event name is required.');
-        return;
-      }
-      _goToStep(1);
-      return;
-    }
-    if (_step == 1) {
-      if (_includedGenres.any(_excludedGenres.contains)) {
-        _showError('Included and excluded genres cannot conflict.');
-        return;
-      }
-      if (_maxDurationMinutes <= 0) {
-        _showError('Maximum duration must be valid.');
-        return;
-      }
-      _goToStep(2);
-      return;
-    }
-    if (_selectedFriendIds.isEmpty) {
-      _showError('Invite at least one friend before creating the Movie Night.');
-      return;
-    }
-
-    final constraints = MovieNightConstraints(
-      includedGenres: _includedGenres.toList(growable: false),
-      excludedGenres: _excludedGenres.toList(growable: false),
-      maxDurationMinutes: _maxDurationMinutes,
-      minimumRating: _minimumRating,
-      language: _language,
-    );
-    final MovieNightEvent event;
-    try {
-      event = await ref
-          .read(friendsMovieNightControllerProvider.notifier)
-          .createMovieNight(
-            name: _nameController.text,
-            dateTime: _dateTime,
-            constraints: constraints,
-            invitedFriendIds: _selectedFriendIds.toList(growable: false),
-          );
-    } catch (_) {
-      if (mounted) {
-        _showError('Could not create this Movie Night.');
-      }
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => MovieNightWaitingRoomScreen(eventId: event.id),
-      ),
-    );
-  }
-
-  void _toggleIncludedGenre(String genre) {
-    setState(() {
-      if (!_includedGenres.add(genre)) {
-        _includedGenres.remove(genre);
-      }
-      _excludedGenres.remove(genre);
-    });
-  }
-
-  void _toggleExcludedGenre(String genre) {
-    setState(() {
-      if (!_excludedGenres.add(genre)) {
-        _excludedGenres.remove(genre);
-      }
-      _includedGenres.remove(genre);
-    });
-  }
-
-  void _goToStep(int step) {
-    final nextStep = step.clamp(0, 2);
-    setState(() => _step = nextStep);
-  }
-
-  String _defaultMovieNightName() {
-    const weekdays = <String>[
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    return '${weekdays[DateTime.now().weekday - 1]} Movie Night';
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-}
-
-class _WizardPageData {
-  const _WizardPageData({
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accent,
-    required this.child,
-  });
-
-  final String eyebrow;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accent;
-  final Widget child;
-}
-
-class _WizardHero extends StatelessWidget {
-  const _WizardHero({required this.page, required this.step});
-
-  final _WizardPageData page;
-  final int step;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(34),
-        gradient: LinearGradient(
-          colors: <Color>[
-            page.accent.withValues(alpha: 0.9),
-            colorScheme.primary,
-            colorScheme.secondary,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: page.accent.withValues(alpha: 0.28),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: <Widget>[
-          Positioned(
-            right: -18,
-            top: -18,
-            child: Icon(
-              page.icon,
-              size: 132,
-              color: Colors.white.withValues(alpha: 0.12),
-            ),
-          ),
-          Column(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              InfoBadge(label: page.eyebrow),
-              const SizedBox(height: 18),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      page.title,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.8,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Icon(page.icon, color: Colors.white, size: 30),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                page.subtitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 20),
-              LinearProgressIndicator(
-                value: (step + 1) / 3,
-                minHeight: 7,
-                borderRadius: BorderRadius.circular(999),
-                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepDots extends StatelessWidget {
-  const _StepDots({required this.step});
-
-  final int step;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    const labels = <String>['Basics', 'Taste', 'Friends'];
-
-    return Row(
-      children: List<Widget>.generate(labels.length, (index) {
-        final selected = index == step;
-        final done = index < step;
-        return Expanded(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            margin: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: selected
-                  ? colorScheme.primary.withValues(alpha: 0.14)
-                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.48),
-              border: Border.all(
-                color: selected
-                    ? colorScheme.primary.withValues(alpha: 0.28)
-                    : Colors.transparent,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(
-                  done ? Icons.check_circle_rounded : Icons.circle_rounded,
-                  size: 14,
-                  color: selected || done
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    labels[index],
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: selected || done
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-}
-
-class _WizardCard extends StatelessWidget {
-  const _WizardCard({super.key, required this.page});
-
-  final _WizardPageData page;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: page.accent.withValues(alpha: 0.18)),
-      ),
-      child: SingleChildScrollView(child: page.child),
-    );
-  }
-}
-
-class _WizardActions extends StatelessWidget {
-  const _WizardActions({
-    required this.step,
-    required this.onBack,
-    required this.onContinue,
-    required this.canContinue,
-    this.helperText,
-  });
-
-  final int step;
-  final VoidCallback? onBack;
-  final VoidCallback onContinue;
-  final bool canContinue;
-  final String? helperText;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isLast = step == 2;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (helperText != null) ...<Widget>[
-            Text(
-              helperText!,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          Row(
-            children: <Widget>[
-              if (onBack != null) ...<Widget>[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Back'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: canContinue ? onContinue : null,
-                  icon: Icon(
-                    isLast ? Icons.done_rounded : Icons.arrow_forward_rounded,
-                  ),
-                  label: Text(isLast ? 'Create Movie Night' : 'Continue'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BasicsStep extends StatelessWidget {
-  const _BasicsStep({
-    required this.nameController,
-    required this.dateTime,
-    required this.onPickDateTime,
-    required this.onClearDateTime,
-  });
-
-  final TextEditingController nameController;
-  final DateTime? dateTime;
-  final VoidCallback onPickDateTime;
-  final VoidCallback onClearDateTime;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Event name'),
-        ),
-        const SizedBox(height: 14),
-        const InfoBadge(label: 'Content type: Movie'),
-        const SizedBox(height: 14),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.event_rounded),
-          title: Text(
-            dateTime == null
-                ? 'Optional date/time'
-                : movieNightDateLabel(dateTime, includeTime: true),
-          ),
-          subtitle: const Text(
-            'Set this only if the group already has a time.',
-          ),
-          trailing: Wrap(
-            spacing: 8,
-            children: <Widget>[
-              TextButton(onPressed: onPickDateTime, child: const Text('Pick')),
-              if (dateTime != null)
-                TextButton(
-                  onPressed: onClearDateTime,
-                  child: const Text('Clear'),
-                ),
+            children: [
+              Text('MOVIE NIGHT · STEP ${step + 1}', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.4, color: t.red)),
+              const SizedBox(height: 4),
+              Text(title, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 25, letterSpacing: -0.6, color: t.text)),
             ],
           ),
         ),
@@ -689,250 +275,132 @@ class _BasicsStep extends StatelessWidget {
   }
 }
 
-class _ConstraintsStep extends StatelessWidget {
-  const _ConstraintsStep({
-    required this.includedGenres,
-    required this.excludedGenres,
-    required this.maxDurationMinutes,
-    required this.minimumRating,
-    required this.language,
-    required this.onIncludedToggle,
-    required this.onExcludedToggle,
-    required this.onDurationChanged,
-    required this.onMinimumRatingChanged,
-    required this.onLanguageChanged,
-  });
-
-  final Set<String> includedGenres;
-  final Set<String> excludedGenres;
-  final int maxDurationMinutes;
-  final double? minimumRating;
-  final String? language;
-  final ValueChanged<String> onIncludedToggle;
-  final ValueChanged<String> onExcludedToggle;
-  final ValueChanged<double> onDurationChanged;
-  final ValueChanged<double?> onMinimumRatingChanged;
-  final ValueChanged<String?> onLanguageChanged;
+class _SuggestedRow extends StatelessWidget {
+  const _SuggestedRow({required this.friend, required this.selected, required this.onTap});
+  final Friend friend;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('Include genres', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Tap genres the group wants to see in the shortlist.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _GenreWrap(
-          selected: includedGenres,
-          disabled: excludedGenres,
-          onTap: onIncludedToggle,
-        ),
-        const SizedBox(height: 18),
-        Text('Exclude genres', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          'These genres will be filtered out before voting starts.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _GenreWrap(
-          selected: excludedGenres,
-          disabled: includedGenres,
-          onTap: onExcludedToggle,
-        ),
-        const SizedBox(height: 18),
-        Text('Max duration: $maxDurationMinutes min'),
-        Slider(
-          value: maxDurationMinutes.toDouble(),
-          min: 80,
-          max: 210,
-          divisions: 13,
-          label: '${maxDurationMinutes}m',
-          onChanged: onDurationChanged,
-        ),
-        const SizedBox(height: 12),
-        Text('Minimum rating', style: Theme.of(context).textTheme.titleMedium),
-        Wrap(
-          spacing: 8,
-          children: <Widget>[
-            ChoiceChip(
-              selected: minimumRating == null,
-              label: const Text('Any'),
-              onSelected: (_) => onMinimumRatingChanged(null),
-            ),
-            for (final rating in const <double>[6, 7, 8])
-              ChoiceChip(
-                selected: minimumRating == rating,
-                label: Text('${rating.toStringAsFixed(0)}+'),
-                onSelected: (_) => onMinimumRatingChanged(rating),
-              ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        DropdownButtonFormField<String?>(
-          initialValue: language,
-          decoration: const InputDecoration(labelText: 'Language optional'),
-          items: const <DropdownMenuItem<String?>>[
-            DropdownMenuItem<String?>(value: null, child: Text('Any language')),
-            DropdownMenuItem<String?>(value: 'en', child: Text('English')),
-            DropdownMenuItem<String?>(value: 'it', child: Text('Italian')),
-            DropdownMenuItem<String?>(value: 'fr', child: Text('French')),
-            DropdownMenuItem<String?>(value: 'ja', child: Text('Japanese')),
-          ],
-          onChanged: onLanguageChanged,
-        ),
-      ],
-    );
-  }
-}
-
-class _GenreWrap extends StatelessWidget {
-  const _GenreWrap({
-    required this.selected,
-    required this.disabled,
-    required this.onTap,
-  });
-
-  final Set<String> selected;
-  final Set<String> disabled;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: agreeoGenreOptions
-          .take(12)
-          .map((genre) {
-            final isDisabled = disabled.contains(genre);
-            return Opacity(
-              opacity: isDisabled ? 0.45 : 1,
-              child: SelectableChip(
-                label: genre,
-                selected: selected.contains(genre),
-                onTap: isDisabled ? () {} : () => onTap(genre),
-              ),
-            );
-          })
-          .toList(growable: false),
-    );
-  }
-}
-
-class _InviteStep extends StatelessWidget {
-  const _InviteStep({
-    required this.friends,
-    required this.selectedFriendIds,
-    required this.constraints,
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onToggleFriend,
-  });
-
-  final List<Friend> friends;
-  final Set<String> selectedFriendIds;
-  final MovieNightConstraints constraints;
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
-  final ValueChanged<String> onToggleFriend;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _ConstraintReviewCard(constraints: constraints),
-        const SizedBox(height: 14),
-        Row(
-          children: <Widget>[
-            Text(
-              'Invite friends',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Spacer(),
-            InfoBadge(label: '${selectedFriendIds.length} selected'),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Select at least one friend so the Movie Night is a group decision.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 12),
-        AgreeoSearchBar(
-          controller: searchController,
-          hintText: 'Search friends to invite',
-          onChanged: onSearchChanged,
-        ),
-        const SizedBox(height: 12),
-        if (friends.isEmpty)
-          const EmptyState(
-            icon: Icons.people_outline_rounded,
-            title: 'No friends found',
-            message: 'Accept requests or search friends before inviting.',
-          )
-        else
-          ...friends.map(
-            (friend) => CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: selectedFriendIds.contains(friend.id),
-              onChanged: (_) => onToggleFriend(friend.id),
-              title: Text(friend.name),
-              subtitle: Text(
-                '${friend.watchedCount} watched • ${friend.reviewsCount} reviews',
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ConstraintReviewCard extends StatelessWidget {
-  const _ConstraintReviewCard({required this.constraints});
-
-  final MovieNightConstraints constraints;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      color: colorScheme.primaryContainer.withValues(alpha: 0.28),
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(vertical: 9),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Icon(Icons.rule_rounded),
-            const SizedBox(width: 12),
+          children: [
+            AgAvatar(name: friend.name, imageUrl: friend.avatarUrl, size: 42),
+            const SizedBox(width: 13),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Preferences summary',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(movieNightConstraintsLabel(constraints)),
+                children: [
+                  Text(friend.name, style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14.5, color: t.text)),
+                  Text('${friend.watchedCount} watched · ${friend.reviewsCount} reviews', style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint)),
                 ],
               ),
             ),
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: selected ? t.grad : null,
+                shape: BoxShape.circle,
+                border: selected ? null : Border.all(color: t.line2, width: 2),
+              ),
+              child: selected ? const Icon(AgIcons.check, size: 15, color: Colors.white) : null,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FiltersCard extends StatelessWidget {
+  const _FiltersCard({
+    required this.open,
+    required this.summary,
+    required this.includedGenres,
+    required this.maxDuration,
+    required this.minRating,
+    required this.onToggleOpen,
+    required this.onGenreTap,
+    required this.onDuration,
+    required this.onRating,
+  });
+
+  final bool open;
+  final String summary;
+  final Set<String> includedGenres;
+  final int maxDuration;
+  final double? minRating;
+  final VoidCallback onToggleOpen;
+  final ValueChanged<String> onGenreTap;
+  final ValueChanged<double> onDuration;
+  final ValueChanged<double?> onRating;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: t.line)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: onToggleOpen,
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Icon(AgIcons.sliders, size: 18, color: t.sub),
+                const SizedBox(width: 9),
+                Text('Filters', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14, color: t.text)),
+                const Spacer(),
+                Text(summary, style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.faint)),
+                const SizedBox(width: 6),
+                Icon(open ? AgIcons.chevronDown : AgIcons.chevron, size: 18, color: t.faint),
+              ],
+            ),
+          ),
+          if (open) ...[
+            const SizedBox(height: 16),
+            Text('Genres', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 13.5, color: t.text)),
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final g in agreeoGenreOptions.take(10))
+                  AgChip(label: g, active: includedGenres.contains(g), onTap: () => onGenreTap(g)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('Max duration · ${maxDuration}m', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 13.5, color: t.text)),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(activeTrackColor: t.red, thumbColor: t.red, inactiveTrackColor: t.line2),
+              child: Slider(value: maxDuration.toDouble(), min: 80, max: 210, divisions: 13, onChanged: onDuration),
+            ),
+            const SizedBox(height: 4),
+            Text('Minimum rating', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 13.5, color: t.text)),
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 8,
+              children: [
+                AgChip(label: 'Any', active: minRating == null, onTap: () => onRating(null)),
+                for (final r in const [6.0, 7.0, 8.0])
+                  AgChip(label: '${r.toStringAsFixed(0)}+', active: minRating == r, onTap: () => onRating(r)),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

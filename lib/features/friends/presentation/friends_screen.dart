@@ -1,16 +1,19 @@
-import 'dart:async'; // Necessario per il Timer del Debounce
-import 'package:agreeo/shared/theme/agreeo_colors.dart';
+import 'dart:async';
+
 import 'package:agreeo/features/friends/presentation/friend_profile_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_result_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
-import 'package:agreeo/shared/components/primitives.dart';
+import 'package:agreeo/features/profile/presentation/profile_screen.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/agreeo_tokens.dart';
+import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
@@ -22,428 +25,41 @@ class FriendsScreen extends ConsumerStatefulWidget {
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
-  // Gestione intelligente della ricerca (evita spam al backend)
   void _onSearchChanged(String query) {
-    ref
-        .read(friendsMovieNightControllerProvider.notifier)
-        .searchFriends(query, syncBackend: false);
-    setState(
-      () {},
-    ); // Aggiorna la UI per mostrare i risultati solo se c'è testo
-
-    if (_searchDebounce?.isActive ?? false) {
-      _searchDebounce!.cancel();
-    }
-
+    ref.read(friendsMovieNightControllerProvider.notifier).searchFriends(query, syncBackend: false);
+    setState(() {});
+    _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      ref
-          .read(friendsMovieNightControllerProvider.notifier)
-          .searchFriends(query);
+      ref.read(friendsMovieNightControllerProvider.notifier).searchFriends(query);
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final socialState = ref.watch(friendsMovieNightControllerProvider);
-    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
-    final theme = Theme.of(context);
-    final searchQuery = _searchController.text.trim();
-
-    // Stile salvavita per evitare il crash "BoxConstraints(w=Infinity)"
-    final safeButtonStyle = FilledButton.styleFrom(
-      minimumSize: const Size(0, 40),
-      maximumSize: const Size(220, 48), // Impedisce l'espansione infinita
-    );
-
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => ref.read(friendsMovieNightControllerProvider.notifier).refreshSocialLayer(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 128),
-          children: <Widget>[
-            SectionHeader(
-              title: 'Friends',
-              subtitle:
-                  'Build better movie nights from people, preferences, and clear votes.',
-              trailing: FilledButton.icon(
-                onPressed: _openCreateMovieNight,
-                icon: const Icon(Icons.local_movies_outlined),
-                label: const Text('Create Movie Night'),
-                style: safeButtonStyle, // Applicato per evitare il crash
-              ),
-            ),
-            const SizedBox(height: 18),
-            AgreeoSearchBar(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              hintText: 'Search friends by name',
-              onChanged: _onSearchChanged,
-            ),
-            if (searchQuery.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 14),
-              _SearchResults(
-                results: socialState.searchResults,
-                socialState: socialState,
-                onAccept: (requestId) {
-                  controller.acceptFriendRequest(requestId);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Friend request accepted.')),
-                  );
-                },
-                onAdd: (friend) {
-                  controller.sendFriendRequest(friend.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Friend request sent to ${friend.name}.'),
-                    ),
-                  );
-                },
-              ),
-            ],
-            const SizedBox(height: 24),
-            _RequestsSection(
-              requests: socialState.incomingRequests,
-              onAccept: (requestId) {
-                controller.acceptFriendRequest(requestId);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Friend request accepted.')),
-                );
-              },
-              onDecline: (requestId) {
-                controller.declineFriendRequest(requestId);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Friend request declined.')),
-                );
-              },
-            ),
-            const SizedBox(height: 26),
-            const SectionHeader(
-              title: 'Your friends',
-              subtitle: 'People available for future Movie Nights.',
-            ),
-            const SizedBox(height: 14),
-            _FriendsListSection(
-              friends: socialState.friends,
-              onFriendTap: _openFriend,
-              onRemoveFriend: (friend) async {
-                final confirmed = await _confirmRemoveFriend(friend);
-                if (!confirmed || !context.mounted) {
-                  return;
-                }
-                controller.removeFriend(friend.id);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${friend.name} removed.')),
-                );
-              },
-              onBlockFriend: (friend) async {
-                final confirmed = await _confirmBlockFriend(friend);
-                if (!confirmed || !context.mounted) {
-                  return;
-                }
-                controller.blockFriend(friend.id);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${friend.name} blocked.')),
-                );
-              },
-              onFindFriendsTap: () {
-                _searchFocusNode.requestFocus(); // Apre la tastiera
-                final searchContext = _searchFocusNode.context;
-                if (searchContext != null) {
-                  Scrollable.ensureVisible(
-                    searchContext,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 26),
-            SectionHeader(
-              title: 'Movie Nights',
-              subtitle: 'Active and completed group decisions stay here.',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  IconButton.filledTonal(
-                    onPressed: _openJoinMovieNightDialog,
-                    icon: const Icon(Icons.link_rounded),
-                    tooltip: 'Join via Invite Link',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: _openCreateMovieNight,
-                    icon: const Icon(Icons.add_rounded),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            if (socialState.movieNights.isEmpty)
-              EmptyState(
-                icon: Icons.nightlight_round,
-                title: 'No Movie Nights yet',
-                message:
-                    'Create one, invite friends, generate a shortlist, then vote together.',
-                action: FilledButton(
-                  onPressed: _openCreateMovieNight,
-                  style: safeButtonStyle, // Applicato per evitare il crash
-                  child: const Text('Create Movie Night'),
-                ),
-              )
-            else ...[
-              // Active Movie Nights
-              ..._buildActiveMovieNights(socialState.movieNights),
-              // Past Movie Nights
-              ..._buildPastMovieNights(socialState.movieNights),
-            ],
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-  List<Widget> _buildActiveMovieNights(List<MovieNightEvent> allEvents) {
-    final active = allEvents
-        .where(
-          (e) =>
-              e.status == MovieNightStatus.waiting ||
-              e.status == MovieNightStatus.voting ||
-              e.status == MovieNightStatus.draft,
-        )
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-    if (active.isEmpty) {
-      return [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Text(
-            'No active movie nights. Create one!',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ];
-    }
-
-    return [
-      ...active.map(
-        (event) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _MovieNightCard(
-            event: event,
-            onTap: () => _openEvent(event),
-          ),
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildPastMovieNights(List<MovieNightEvent> allEvents) {
-    final past = allEvents
-        .where((e) => e.status == MovieNightStatus.completed)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-    if (past.isEmpty) return const [];
-
-    return [
-      const SizedBox(height: 8),
-      Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: EdgeInsets.zero,
-          initiallyExpanded: false,
-          title: Row(
-            children: [
-              Icon(
-                Icons.history_rounded,
-                size: 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Past Movie Nights (${past.length})',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          children: past
-              .map(
-                (event) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Opacity(
-                    opacity: 0.75,
-                    child: _MovieNightCard(
-                      event: event,
-                      onTap: () => _openEvent(event),
-                    ),
-                  ),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      ),
-    ];
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _openFriend(Friend friend) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FriendProfileScreen(friendId: friend.id),
-      ),
+      MaterialPageRoute<void>(builder: (_) => FriendProfileScreen(friendId: friend.id)),
     );
   }
 
   void _openCreateMovieNight() {
+    HapticFeedback.mediumImpact();
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const MovieNightWizardScreen()),
     );
-  }
-
-  Future<bool> _confirmRemoveFriend(Friend friend) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('Remove ${friend.name}?'),
-          content: const Text(
-            'You will no longer see each other\'s profiles or invite each other directly.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Remove'),
-            ),
-          ],
-        );
-      },
-    );
-    return confirmed == true;
-  }
-
-  Future<bool> _confirmBlockFriend(Friend friend) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('Block ${friend.name}?'),
-          content: const Text(
-            'They will be removed from friends and blocked from interacting with you.',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Block'),
-            ),
-          ],
-        );
-      },
-    );
-    return confirmed == true;
-  }
-
-  void _openJoinMovieNightDialog() {
-    final linkController = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Join Movie Night'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Text(
-                'Paste the invite link or event ID shared by a friend to join their Movie Night.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: linkController,
-                decoration: const InputDecoration(
-                  labelText: 'Invite link or ID',
-                  hintText: 'agreeo://invite/mn_...',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.link),
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final raw = linkController.text.trim();
-                if (raw.isEmpty) return;
-                // Extract event ID from link format "agreeo://invite/<eventId>" or raw ID
-                String eventId = raw;
-                if (raw.contains('agreeo://invite/')) {
-                  eventId = raw.split('agreeo://invite/').last;
-                }
-                if (raw.contains('/invite/')) {
-                  eventId = raw.split('/invite/').last;
-                }
-                Navigator.of(dialogContext).pop();
-                _joinMovieNightById(eventId);
-              },
-              child: const Text('Join'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _joinMovieNightById(String eventId) async {
-    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
-    final event = await controller.resolveMovieNightInvite(eventId);
-    if (!mounted) return;
-    if (event != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Joined "${event.name}"!')));
-      _openEvent(event);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not join Movie Night. Check the link and try again.',
-          ),
-        ),
-      );
-    }
   }
 
   void _openEvent(MovieNightEvent event) {
@@ -455,361 +71,146 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     };
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => route));
   }
-}
-
-class _FriendsListSection extends StatelessWidget {
-  const _FriendsListSection({
-    required this.friends,
-    required this.onFriendTap,
-    required this.onRemoveFriend,
-    required this.onBlockFriend,
-    required this.onFindFriendsTap,
-  });
-
-  final List<Friend> friends;
-  final ValueChanged<Friend> onFriendTap;
-  final ValueChanged<Friend> onRemoveFriend;
-  final ValueChanged<Friend> onBlockFriend;
-  final VoidCallback onFindFriendsTap;
 
   @override
   Widget build(BuildContext context) {
-    if (friends.isEmpty) {
-      return EmptyState(
-        icon: Icons.people_outline_rounded,
-        title: 'No friends yet',
-        message:
-            'Search for friends and start building better movie nights together.',
-        action: FilledButton(
-          onPressed: onFindFriendsTap,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 40),
-            maximumSize: const Size(200, 48),
-          ),
-          child: const Text('Find friends'),
-        ),
-      );
-    }
+    final t = context.tokens;
+    final social = ref.watch(friendsMovieNightControllerProvider);
+    final controller = ref.read(friendsMovieNightControllerProvider.notifier);
+    final appState = ref.watch(agreeoAppControllerProvider);
+    final query = _searchController.text.trim();
+    final friends = [...social.friends]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final requests = social.incomingRequests;
+    final activeNights = social.movieNights
+        .where((e) => e.status != MovieNightStatus.completed)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        ...(List<Friend>.from(friends)..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()))).map(
-          (friend) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _FriendCard(
-              friend: friend,
-              onTap: () => onFriendTap(friend),
-              onRemove: () => onRemoveFriend(friend),
-              onBlock: () => onBlockFriend(friend),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FriendCard extends StatelessWidget {
-  const _FriendCard({
-    required this.friend,
-    required this.onTap,
-    required this.onRemove,
-    required this.onBlock,
-  });
-
-  final Friend friend;
-  final VoidCallback onTap;
-  final VoidCallback onRemove;
-  final VoidCallback onBlock;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Material(
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: <Widget>[
-              UserAvatar(initials: friend.initials, size: 50),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      friend.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: <Widget>[
-                        _MiniPill(
-                          icon: Icons.visibility_rounded,
-                          value: friend.watchedCount.toString(),
-                          color: AgreeoColors.popcornWhite,
-                        ),
-                        const SizedBox(width: 8),
-                        _MiniPill(
-                          icon: Icons.rate_review_rounded,
-                          value: friend.reviewsCount.toString(),
-                          color: AgreeoColors.kernelGold,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded,
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.4), size: 22),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded,
-                    color: cs.onSurfaceVariant, size: 20),
-                onSelected: (value) {
-                  if (value == 'remove') {
-                    onRemove();
-                  } else if (value == 'block') {
-                    onBlock();
-                  }
-                },
-                itemBuilder: (context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
-                    value: 'remove',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_remove_rounded,
-                            size: 18, color: AgreeoColors.cinematicRed),
-                        SizedBox(width: 8),
-                        Text('Remove friend'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'block',
-                    child: Row(
-                      children: [
-                        Icon(Icons.block_rounded,
-                            size: 18, color: AgreeoColors.cinematicRed),
-                        SizedBox(width: 8),
-                        Text('Block friend'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniPill extends StatelessWidget {
-  const _MiniPill({
-    required this.icon,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: color.withValues(alpha: 0.1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RequestsSection extends StatelessWidget {
-  const _RequestsSection({
-    required this.requests,
-    required this.onAccept,
-    required this.onDecline,
-  });
-
-  final List<FriendRequest> requests;
-  final ValueChanged<String> onAccept;
-  final ValueChanged<String> onDecline;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  Icons.mark_email_unread_outlined,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Friend requests',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      requests.isEmpty
-                          ? 'No pending requests right now.'
-                          : '${requests.length} pending request${requests.length == 1 ? '' : 's'} to review.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              InfoBadge(label: '${requests.length}'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (requests.isEmpty)
-            Text(
-              'Incoming requests will appear here with Accept and Decline actions.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            )
-          else
-            ...requests.map(
-              (request) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _FriendRequestCard(
-                  request: request,
-                  onAccept: () => onAccept(request.id),
-                  onDecline: () => onDecline(request.id),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FriendRequestCard extends StatelessWidget {
-  const _FriendRequestCard({
-    required this.request,
-    required this.onAccept,
-    required this.onDecline,
-  });
-
-  final FriendRequest request;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Material(
-      color: colorScheme.surface,
-      borderRadius: BorderRadius.circular(22),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                UserAvatar(initials: request.fromUser.initials, size: 48),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        request.fromUser.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+    return Scaffold(
+      backgroundColor: t.bg,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: controller.refreshSocialLayer,
+              color: t.red,
+              backgroundColor: t.surface,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 180),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Friends',
+                          style: TextStyle(
+                            fontFamily: 'Bricolage Grotesque',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 27,
+                            letterSpacing: -0.6,
+                            color: t.text,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${request.fromUser.watchedCount} watched • ${request.fromUser.reviewsCount} reviews',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
                         ),
+                        child: AgAvatar(name: appState.session?.displayName ?? 'You', color: t.red, size: 42),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  AgSearchField(
+                    controller: _searchController,
+                    hint: 'Find friends by name…',
+                    onChanged: _onSearchChanged,
+                  ),
+                  if (query.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _SearchResults(
+                      results: social.searchResults,
+                      social: social,
+                      onAccept: (id) {
+                        controller.acceptFriendRequest(id);
+                        _toast('Friend request accepted.');
+                      },
+                      onAdd: (f) {
+                        controller.sendFriendRequest(f.id);
+                        _toast('Friend request sent to ${f.name}.');
+                      },
+                    ),
+                  ],
+                  if (requests.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        Text(
+                          'Requests',
+                          style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 20,
+                          height: 20,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: t.red, shape: BoxShape.circle),
+                          child: Text(
+                            '${requests.length}',
+                            style: const TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    for (final r in requests)
+                      _RequestRow(
+                        request: r,
+                        onAccept: () {
+                          controller.acceptFriendRequest(r.id);
+                          _toast('Friend request accepted.');
+                        },
+                        onDecline: () {
+                          controller.declineFriendRequest(r.id);
+                          _toast('Friend request declined.');
+                        },
+                      ),
+                  ],
+                  const SizedBox(height: 18),
+                  Text(
+                    'All friends · ${friends.length}',
+                    style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                  ),
+                  const SizedBox(height: 12),
+                  if (friends.isEmpty)
+                    Text(
+                      'No friends yet — search above to connect.',
+                      style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
+                    )
+                  else
+                    for (final f in friends)
+                      _FriendRow(friend: f, onTap: () => _openFriend(f), onInvite: _openCreateMovieNight),
+                  if (activeNights.isNotEmpty) ...[
+                    const SizedBox(height: 22),
+                    Text(
+                      'Movie Nights',
+                      style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                    ),
+                    const SizedBox(height: 12),
+                    for (final e in activeNights)
+                      _MovieNightRow(event: e, onTap: () => _openEvent(e)),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDecline,
-                    child: const Text('Decline'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onAccept,
-                    child: const Text('Accept'),
-                  ),
-                ),
-              ],
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 96,
+              child: AgButton(label: 'Start a Movie Night', icon: AgIcons.film, onPressed: _openCreateMovieNight),
             ),
           ],
         ),
@@ -818,302 +219,275 @@ class _FriendRequestCard extends StatelessWidget {
   }
 }
 
+class _FriendRow extends StatelessWidget {
+  const _FriendRow({required this.friend, required this.onTap, required this.onInvite});
+  final Friend friend;
+  final VoidCallback onTap;
+  final VoidCallback onInvite;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+        child: Row(
+          children: [
+            AgAvatar(name: friend.name, imageUrl: friend.avatarUrl, size: 46),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    friend.name,
+                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '${friend.watchedCount} watched · ${friend.reviewsCount} reviews',
+                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: onInvite,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: t.gradSoft,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(color: t.line2),
+                ),
+                child: Text(
+                  'Invite',
+                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, color: t.text),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RequestRow extends StatelessWidget {
+  const _RequestRow({required this.request, required this.onAccept, required this.onDecline});
+  final FriendRequest request;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final f = request.fromUser;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.line),
+      ),
+      child: Row(
+        children: [
+          AgAvatar(name: f.name, imageUrl: f.avatarUrl, size: 46),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  f.name,
+                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '${f.watchedCount} watched · ${f.reviewsCount} reviews',
+                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onAccept,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(11)),
+              child: const Icon(AgIcons.check, size: 19, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onDecline,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: t.surface2,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: t.line2),
+              ),
+              child: Icon(AgIcons.close, size: 18, color: t.sub),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SearchResults extends StatelessWidget {
   const _SearchResults({
     required this.results,
-    required this.socialState,
+    required this.social,
     required this.onAccept,
     required this.onAdd,
   });
-
   final List<Friend> results;
-  final FriendsMovieNightState socialState;
+  final FriendsMovieNightState social;
   final ValueChanged<String> onAccept;
   final ValueChanged<Friend> onAdd;
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     if (results.isEmpty) {
-      return const EmptyState(
-        icon: Icons.person_search_outlined,
-        title: 'No matching people',
-        message: 'Try another name or invite friends with a Movie Night link.',
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: t.line),
+        ),
+        child: Text(
+          'No matching people. Try another name.',
+          style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.sub),
+        ),
       );
     }
     return Column(
-      children: results
-          .map((friend) {
-            final isFriend = socialState.isFriend(friend.id);
-            final pending = socialState.isPending(friend.id);
-            final incomingRequestId = socialState.incomingRequestIdFor(
-              friend.id,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Card(
-                child: ListTile(
-                  leading: UserAvatar(initials: friend.initials),
-                  title: Text(friend.name),
-                  subtitle: const Text('Mutual movie taste preview soon'),
-                  trailing: FilledButton.tonal(
-                    onPressed:
-                        isFriend || (pending && incomingRequestId == null)
-                        ? null
-                        : incomingRequestId != null
-                        ? () => onAccept(incomingRequestId)
-                        : () => onAdd(friend),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      maximumSize: const Size(120, 40), // Impedisce crash
-                    ),
+      children: [
+        for (final f in results)
+          Builder(builder: (context) {
+            final isFriend = social.isFriend(f.id);
+            final pending = social.isPending(f.id);
+            final incomingId = social.incomingRequestIdFor(f.id);
+            final label = isFriend
+                ? 'Friends'
+                : incomingId != null
+                    ? 'Accept'
+                    : pending
+                        ? 'Pending'
+                        : 'Add';
+            final enabled = !isFriend && !(pending && incomingId == null);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.line),
+              ),
+              child: Row(
+                children: [
+                  AgAvatar(name: f.name, imageUrl: f.avatarUrl, size: 44),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      isFriend
-                          ? 'Friends'
-                          : incomingRequestId != null
-                          ? 'Accept'
-                          : pending
-                          ? 'Pending'
-                          : 'Add Friend',
+                      f.name,
+                      style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14.5, color: t.text),
                     ),
                   ),
-                ),
+                  GestureDetector(
+                    onTap: enabled
+                        ? () => incomingId != null ? onAccept(incomingId) : onAdd(f)
+                        : null,
+                    child: Opacity(
+                      opacity: enabled ? 1 : 0.5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                        decoration: BoxDecoration(
+                          gradient: enabled ? t.grad : null,
+                          color: enabled ? null : t.surface2,
+                          borderRadius: BorderRadius.circular(11),
+                          border: enabled ? null : Border.all(color: t.line2),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontFamily: 'Manrope',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                            color: enabled ? Colors.white : t.sub,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
-          })
-          .toList(growable: false),
+          }),
+      ],
     );
   }
 }
 
-class _MovieNightCard extends StatefulWidget {
-  const _MovieNightCard({required this.event, required this.onTap});
-
+class _MovieNightRow extends StatelessWidget {
+  const _MovieNightRow({required this.event, required this.onTap});
   final MovieNightEvent event;
   final VoidCallback onTap;
 
   @override
-  State<_MovieNightCard> createState() => _MovieNightCardState();
-}
-
-class _MovieNightCardState extends State<_MovieNightCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-      lowerBound: 0,
-      upperBound: 1,
-    );
-    if (widget.event.status == MovieNightStatus.voting) {
-      _pulseController.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _MovieNightCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.event.status == MovieNightStatus.voting &&
-        !_pulseController.isAnimating) {
-      _pulseController.repeat(reverse: true);
-    } else if (widget.event.status != MovieNightStatus.voting &&
-        _pulseController.isAnimating) {
-      _pulseController.stop();
-      _pulseController.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final event = widget.event;
-    final winner = event.winnerCandidate?.movie;
-    final completedVoterCount = movieNightCompletedVoterIds(event).length;
-    final joinedCount = event.joinedParticipants.length;
-    final votingProgress = joinedCount == 0
-        ? 0.0
-        : completedVoterCount / joinedCount;
-
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final pulse = event.status == MovieNightStatus.voting
-            ? _pulseController.value
-            : 0.0;
-        return Transform.scale(
-          scale: 1 + pulse * 0.012,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: <BoxShadow>[
-                if (event.status == MovieNightStatus.voting)
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(
-                      alpha: 0.12 + pulse * 0.12,
-                    ),
-                    blurRadius: 16 + pulse * 12,
-                    spreadRadius: 1 + pulse * 2,
-                  ),
-              ],
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: t.line),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(14)),
+              child: const Icon(AgIcons.film, size: 24, color: Colors.white),
             ),
-            child: Material(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.56,
-              ),
-              borderRadius: BorderRadius.circular(26),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(26),
-                onTap: widget.onTap,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          if (winner != null) ...<Widget>[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: SizedBox(
-                                width: 62,
-                                height: 92,
-                                child: CachedNetworkImage(
-                                  imageUrl: winner.posterUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      Container(
-                                        color: AgreeoColors.darkSurface,
-                                        child: const Icon(
-                                          Icons.movie_creation_outlined,
-                                        ),
-                                      ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                          ],
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Row(
-                                  children: <Widget>[
-                                    Expanded(
-                                      child: Text(
-                                        event.name,
-                                        style: theme.textTheme.titleLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                      ),
-                                    ),
-                                    InfoBadge(
-                                      label: movieNightStatusLabel(
-                                        event.status,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Host • ${event.participants.length} participants • ${movieNightDateLabel(event.dateTime)}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _ParticipantAvatarStack(
-                                  participants: event.participants,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (event.status == MovieNightStatus.voting) ...<Widget>[
-                        const SizedBox(height: 14),
-                        Text(
-                          '$completedVoterCount/$joinedCount have voted',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        LinearProgressIndicator(
-                          value: votingProgress,
-                          minHeight: 6,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          Chip(label: Text(event.contentTypeLabel)),
-                          if (event.constraints.includedGenres.isNotEmpty)
-                            Chip(
-                              label: Text(
-                                event.constraints.includedGenres.join(', '),
-                              ),
-                            ),
-                          if (event.constraints.maxDurationMinutes != null)
-                            Chip(
-                              label: Text(
-                                'Up to ${event.constraints.maxDurationMinutes}m',
-                              ),
-                            ),
-                          if (winner != null)
-                            Chip(label: Text('Winner: ${winner.title}')),
-                        ],
-                      ),
-                    ],
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 16, color: t.text),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${event.participants.length} participants · ${movieNightStatusLabel(event.status)}',
+                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.sub),
+                  ),
+                ],
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ParticipantAvatarStack extends StatelessWidget {
-  const _ParticipantAvatarStack({required this.participants});
-
-  final List<MovieNightParticipant> participants;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = participants.take(4).toList(growable: false);
-    final overflow = participants.length - visible.length;
-    return SizedBox(
-      height: 34,
-      child: Stack(
-        children: <Widget>[
-          for (var index = 0; index < visible.length; index++)
-            Positioned(
-              left: index * 24,
-              child: UserAvatar(initials: visible[index].initials, size: 34),
-            ),
-          if (overflow > 0)
-            Positioned(
-              left: visible.length * 24,
-              child: CircleAvatar(radius: 17, child: Text('+$overflow')),
-            ),
-        ],
+            Icon(AgIcons.chevron, size: 20, color: t.faint),
+          ],
+        ),
       ),
     );
   }
