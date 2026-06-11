@@ -13,15 +13,20 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Agreeo'), findsNWidgets(2));
+    expect(find.text('Agreeo'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Log In'), findsOneWidget);
+    // Field label plus the hint of the empty input.
+    expect(find.text('Password'), findsNWidgets(2));
+    expect(find.text('Log in'), findsOneWidget);
 
-    await tester.tap(find.byType(GestureDetector).last);
+    // Switch to the sign-up form.
+    final toggle = find.byType(GestureDetector).last;
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
     await tester.pumpAndSettle();
 
-    expect(find.text('Name'), findsOneWidget);
-    expect(find.text('Sign Up'), findsOneWidget);
+    expect(find.text('Display name'), findsOneWidget);
+    expect(find.text('Create account'), findsOneWidget);
   });
 }

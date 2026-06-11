@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:agreeo/config/backend_config.dart';
+import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
@@ -12,8 +13,10 @@ class RealTimeService {
   RealTimeService(this._ref);
 
   final Ref _ref;
+  final AuthService _authService = AuthService();
   io.Socket? _socket;
   String? _currentUserId;
+  bool _retriedWithRefreshedToken = false;
 
   void connect(String userId) {
     if (_socket != null && _currentUserId == userId) {
@@ -25,7 +28,25 @@ class RealTimeService {
     }
 
     _currentUserId = userId;
+    _retriedWithRefreshedToken = false;
     _ref.read(realTimeConnectionProvider.notifier).state = false;
+    _openSocket(userId);
+  }
+
+  Future<void> _openSocket(String userId, {String? token}) async {
+    final authToken = token ?? await _authService.readToken();
+    if (authToken == null || authToken.isEmpty) {
+      debugPrint(
+        '[RealTimeService] No access token available, skipping connection',
+      );
+      return;
+    }
+
+    // The target user changed (or we disconnected) while reading the token.
+    if (_currentUserId != userId) {
+      return;
+    }
+
     final baseUrl = BackendConfig.fromEnv().baseUrl;
 
     debugPrint('[RealTimeService] Connecting to Socket.io at $baseUrl');
@@ -35,13 +56,14 @@ class RealTimeService {
       io.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
+          .setAuth({'token': authToken})
           .build(),
     );
 
     _socket!.onConnect((_) {
-      debugPrint('[RealTimeService] Connected! Authenticating user: $userId');
+      debugPrint('[RealTimeService] Connected as user: $userId');
+      _retriedWithRefreshedToken = false;
       _ref.read(realTimeConnectionProvider.notifier).state = true;
-      _socket!.emit('authenticate', {'userId': userId});
     });
 
     _socket!.onDisconnect((_) {
@@ -52,6 +74,7 @@ class RealTimeService {
     _socket!.onConnectError((data) {
       debugPrint('[RealTimeService] Connection error: $data');
       _ref.read(realTimeConnectionProvider.notifier).state = false;
+      _retryWithRefreshedToken(userId);
     });
 
     // Listen to friend request events
@@ -113,6 +136,28 @@ class RealTimeService {
     }
     _currentUserId = null;
     _ref.read(realTimeConnectionProvider.notifier).state = false;
+  }
+
+  /// Retries the connection once with a freshly refreshed access token, to
+  /// recover from handshakes rejected because the stored token expired.
+  Future<void> _retryWithRefreshedToken(String userId) async {
+    if (_retriedWithRefreshedToken || _currentUserId != userId) {
+      return;
+    }
+    _retriedWithRefreshedToken = true;
+
+    final refreshedToken = await _authService.refreshAccessToken();
+    if (refreshedToken == null ||
+        refreshedToken.isEmpty ||
+        _currentUserId != userId) {
+      return;
+    }
+
+    debugPrint('[RealTimeService] Retrying connection with refreshed token');
+    _socket?.disconnect();
+    _socket?.destroy();
+    _socket = null;
+    await _openSocket(userId, token: refreshedToken);
   }
 
   void _handleFriendRequestReceived(dynamic data) {

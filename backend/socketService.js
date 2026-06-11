@@ -1,27 +1,51 @@
 const socketIo = require('socket.io');
+const { verify } = require('./jwtUtils');
 
 let io = null;
 
-function init(server) {
+function extractToken(socket) {
+  const authToken = socket.handshake.auth && socket.handshake.auth.token;
+  if (authToken) {
+    return authToken;
+  }
+
+  const header = socket.handshake.headers && socket.handshake.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    return header.substring(7);
+  }
+
+  return null;
+}
+
+function authMiddleware(socket, next) {
+  const token = extractToken(socket);
+  const payload = token ? verify(token) : null;
+
+  if (!payload) {
+    return next(new Error('unauthorized'));
+  }
+
+  socket.data.userId = payload.uid || payload.sub;
+  next();
+}
+
+function init(server, { corsOrigins = [] } = {}) {
   io = socketIo(server, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST', 'PATCH', 'DELETE']
-    }
+      origin: corsOrigins.length > 0 ? corsOrigins : true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    },
   });
 
-  io.on('connection', (socket) => {
-    console.log(`[Socket] New connection: ${socket.id}`);
+  io.use(authMiddleware);
 
-    socket.on('authenticate', (data) => {
-      if (data && data.userId) {
-        const userId = data.userId;
-        console.log(`[Socket] User authenticated: ${userId} on socket ${socket.id}`);
-        socket.join(`user_${userId}`);
-      } else {
-        console.log(`[Socket] Authentication failed: missing userId in data`);
-      }
-    });
+  io.on('connection', (socket) => {
+    console.log(`[Socket] New connection: ${socket.id} (user ${socket.data.userId})`);
+    socket.join(`user_${socket.data.userId}`);
+
+    // Legacy no-op: older clients emitted `authenticate` with a raw userId.
+    // The room is now derived from the verified JWT in the handshake.
+    socket.on('authenticate', () => {});
 
     socket.on('disconnect', () => {
       console.log(`[Socket] Disconnected: ${socket.id}`);
@@ -60,4 +84,5 @@ module.exports = {
   getIo,
   emitToUser,
   emitToUsers,
+  authMiddleware,
 };

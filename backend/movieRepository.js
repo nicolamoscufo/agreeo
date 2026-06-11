@@ -75,31 +75,39 @@ function normalizeMovieRecord(record) {
   return movie;
 }
 
-async function mergeTmdbMovie(movie) {
-  await neo4jService.run(
+async function mergeTmdbMovie(movie, tx = null) {
+  // IMPORTANT: only overwrite a property when the incoming payload actually
+  // carries a value. Interaction payloads (like/dislike/watchlist/seen) come
+  // from TMDB and do NOT include MovieLens stats, so an unconditional SET would
+  // wipe the imported movieLensAvgRating/movieLensRatingCount and degrade
+  // recommendations over time. We therefore coalesce against the existing node.
+  const run = (q, p) => (tx ? tx.run(q, p) : neo4jService.run(q, p));
+  const genres = Array.isArray(movie.genres) ? movie.genres.filter(Boolean) : [];
+
+  await run(
     `
     MERGE (m:Movie {tmdbId: $tmdbId})
     SET
-      m.title = $title,
-      m.originalTitle = $originalTitle,
-      m.overview = $overview,
-      m.posterPath = $posterPath,
-      m.backdropPath = $backdropPath,
-      m.posterUrl = $posterUrl,
-      m.backdropUrl = $backdropUrl,
-      m.releaseDate = $releaseDate,
-      m.runtime = $runtime,
-      m.director = $director,
-      m.voteAverage = $voteAverage,
-      m.movieLensAvgRating = $movieLensAvgRating,
-      m.movieLensRatingCount = $movieLensRatingCount,
-      m.genres = $genres,
-      m.tmdbHydrated = $tmdbHydrated
+      m.title = coalesce($title, m.title),
+      m.originalTitle = coalesce($originalTitle, m.originalTitle),
+      m.overview = CASE WHEN $overview <> '' THEN $overview ELSE coalesce(m.overview, '') END,
+      m.posterPath = coalesce($posterPath, m.posterPath),
+      m.backdropPath = coalesce($backdropPath, m.backdropPath),
+      m.posterUrl = CASE WHEN $posterUrl <> '' THEN $posterUrl ELSE coalesce(m.posterUrl, '') END,
+      m.backdropUrl = CASE WHEN $backdropUrl <> '' THEN $backdropUrl ELSE coalesce(m.backdropUrl, '') END,
+      m.releaseDate = CASE WHEN $releaseDate <> '' THEN $releaseDate ELSE coalesce(m.releaseDate, '') END,
+      m.runtime = coalesce($runtime, m.runtime),
+      m.director = CASE WHEN $director <> '' THEN $director ELSE coalesce(m.director, '') END,
+      m.voteAverage = coalesce($voteAverage, m.voteAverage),
+      m.movieLensAvgRating = coalesce($movieLensAvgRating, m.movieLensAvgRating),
+      m.movieLensRatingCount = coalesce($movieLensRatingCount, m.movieLensRatingCount),
+      m.genres = CASE WHEN size($genres) > 0 THEN $genres ELSE coalesce(m.genres, []) END,
+      m.tmdbHydrated = coalesce(m.tmdbHydrated, false) OR $tmdbHydrated
     `,
     {
       tmdbId: movie.tmdbId,
-      title: movie.title || '',
-      originalTitle: movie.originalTitle || movie.title || '',
+      title: movie.title || null,
+      originalTitle: movie.originalTitle || movie.title || null,
       overview: movie.overview || '',
       posterPath: movie.posterPath || null,
       backdropPath: movie.backdropPath || null,
@@ -112,9 +120,9 @@ async function mergeTmdbMovie(movie) {
       movieLensAvgRating:
         movie.movieLensAvgRating == null ? null : Number(movie.movieLensAvgRating),
       movieLensRatingCount:
-        movie.movieLensRatingCount == null ? 0 : toNativeNumber(movie.movieLensRatingCount),
-      genres: Array.isArray(movie.genres) ? movie.genres : [],
-      tmdbHydrated: movie.tmdbHydrated === true || (Array.isArray(movie.genres) && movie.genres.length > 0) || false,
+        movie.movieLensRatingCount == null ? null : toNativeNumber(movie.movieLensRatingCount),
+      genres,
+      tmdbHydrated: movie.tmdbHydrated === true || genres.length > 0,
     }
   );
 }
@@ -266,101 +274,72 @@ async function setMovieRuntime(tmdbId, runtime) {
 
   return true;
 }
+// Relationship types interpolated into Cypher must come from this whitelist:
+// they cannot be parameterized, so this guard is the defense in depth against
+// accidental injection if a caller ever forwards user-controlled values.
+const INTERACTION_REL_TYPES = new Set([
+  'LIKED',
+  'DISLIKED',
+  'WATCHLISTED',
+  'ALREADY_SEEN',
+  'SELECTED_FAVORITE',
+]);
+
+function assertInteractionRelTypes(...types) {
+  for (const type of types) {
+    if (!INTERACTION_REL_TYPES.has(type)) {
+      throw new Error(`Unsupported interaction relationship type: ${type}`);
+    }
+  }
+}
+
+// Sets a single exclusive preference relationship for a user/movie pair,
+// removing any conflicting relationships first. All steps run inside one write
+// transaction so the graph never ends up in a half-updated state.
+async function setMovieInteraction(uid, movie, { newRel, removeRels }) {
+  assertInteractionRelTypes(newRel, ...removeRels);
+  return neo4jService.executeWrite(async (tx) => {
+    if (removeRels.length > 0) {
+      await tx.run(
+        `
+        MATCH (u:AppUser {uid: $uid})-[old:${removeRels.join('|')}]->(m:Movie {tmdbId: $tmdbId})
+        DELETE old
+        `,
+        { uid, tmdbId: movie.tmdbId }
+      );
+    }
+
+    await mergeTmdbMovie(movie, tx);
+
+    const result = await tx.run(
+      `
+      MATCH (u:AppUser {uid: $uid})
+      MATCH (m:Movie {tmdbId: $tmdbId})
+      MERGE (u)-[r:${newRel}]->(m)
+      ON CREATE SET r.createdAt = datetime()
+      RETURN m.tmdbId AS tmdbId
+      `,
+      { uid, tmdbId: movie.tmdbId }
+    );
+
+    return result.records.length > 0;
+  });
+}
+
 async function likeMovie(uid, movie) {
-  await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})-[old:DISLIKED]->(m:Movie {tmdbId: $tmdbId})
-    DELETE old
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  await mergeTmdbMovie(movie);
-  const result = await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})
-    MATCH (m:Movie {tmdbId: $tmdbId})
-    MERGE (u)-[r:LIKED]->(m)
-    ON CREATE SET r.createdAt = datetime()
-    RETURN m.tmdbId AS tmdbId
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  return result.records.length > 0;
+  return setMovieInteraction(uid, movie, { newRel: 'LIKED', removeRels: ['DISLIKED'] });
 }
 
 async function dislikeMovie(uid, movie) {
-  await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})-[old:LIKED|WATCHLISTED]->(m:Movie {tmdbId: $tmdbId})
-    DELETE old
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  await mergeTmdbMovie(movie);
-
-  const result = await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})
-    MATCH (m:Movie {tmdbId: $tmdbId})
-    MERGE (u)-[r:DISLIKED]->(m)
-    ON CREATE SET r.createdAt = datetime()
-    RETURN m.tmdbId AS tmdbId
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  return result.records.length > 0;
+  return setMovieInteraction(uid, movie, { newRel: 'DISLIKED', removeRels: ['LIKED', 'WATCHLISTED'] });
 }
 
 async function watchlistMovie(uid, movie) {
-  await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})-[old:DISLIKED|ALREADY_SEEN]->(m:Movie {tmdbId: $tmdbId})
-    DELETE old
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  await mergeTmdbMovie(movie);
-  const result = await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})
-    MATCH (m:Movie {tmdbId: $tmdbId})
-    MERGE (u)-[r:WATCHLISTED]->(m)
-    ON CREATE SET r.createdAt = datetime()
-    RETURN m.tmdbId AS tmdbId
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  return result.records.length > 0;
+  return setMovieInteraction(uid, movie, { newRel: 'WATCHLISTED', removeRels: ['DISLIKED', 'ALREADY_SEEN'] });
 }
 
 async function markMovieAsSeen(uid, movie) {
-  await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})-[old:WATCHLISTED]->(m:Movie {tmdbId: $tmdbId})
-    DELETE old
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  await mergeTmdbMovie(movie);
-  const result = await neo4jService.run(
-    `
-    MATCH (u:AppUser {uid: $uid})
-    MATCH (m:Movie {tmdbId: $tmdbId})
-    MERGE (u)-[r:ALREADY_SEEN]->(m)
-    ON CREATE SET r.createdAt = datetime()
-    RETURN m.tmdbId AS tmdbId
-    `,
-    { uid, tmdbId: movie.tmdbId }
-  );
-
-  return result.records.length > 0;
+  return setMovieInteraction(uid, movie, { newRel: 'ALREADY_SEEN', removeRels: ['WATCHLISTED'] });
 }
 
 async function saveSelectedFavorites(uid, movies) {
@@ -780,10 +759,8 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
     return [];
   }
 
-  // Normalize the User Taste Vector
-  for (let i = 0; i < 384; i++) {
-    userTasteVector[i] /= totalWeight;
-  }
+  // No magnitude normalization needed: the vector index uses cosine similarity,
+  // which is invariant to scaling the query vector by a positive scalar.
 
   const vectorResult = await neo4jService.run(
     `
@@ -931,9 +908,12 @@ async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 
       RETURN [genre IN rawNegativeGenres WHERE genre IS NOT NULL] AS negativeGenres
     }
 
+    // The bare range predicate (no coalesce) lets the planner use the
+    // movie_ml_rating_count index; with $minRatingCount > 0 it is equivalent
+    // because NULL fails both forms. PROFILE: 19.611 -> 453 db hits.
     MATCH (m:Movie)
-    WHERE m.tmdbId IS NOT NULL
-      AND coalesce(m.movieLensRatingCount, 0) >= $minRatingCount
+    WHERE m.movieLensRatingCount >= $minRatingCount
+      AND m.tmdbId IS NOT NULL
       AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
       AND NOT m.tmdbId IN $excludedTmdbIds
 
@@ -977,13 +957,14 @@ async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 
       explorationBonus DESC,
       finalScore DESC,
       ratingCount DESC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
     {
       uid,
       excludedTmdbIds,
       globalMeanRating: 3.5,
       minRatingCount: 25,
+      limit: safeLimit,
     }
   );
 
@@ -1079,9 +1060,9 @@ async function getTopPositiveGenreSignals(uid, limit = 5) {
       END AS signalWeight
     RETURN genreName AS name, sum(signalWeight) AS score
     ORDER BY score DESC, name ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1101,9 +1082,9 @@ async function getTopNegativeGenreSignals(uid, limit = 5) {
     UNWIND genreNames AS genreName
     RETURN genreName AS name, count(*) AS score
     ORDER BY score DESC, name ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1128,9 +1109,9 @@ async function getTopPositiveMovies(uid, limit = 5) {
         ELSE 1.0
       END AS score
     ORDER BY score DESC, movie.title ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1152,9 +1133,9 @@ async function getTopNegativeMovies(uid, limit = 5) {
       type(signal) AS signalType,
       1.0 AS score
     ORDER BY movie.title ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1180,9 +1161,9 @@ async function getTopPositiveTagSignals(uid, limit = 10) {
       END * coalesce(h.frequency, 1)) AS tagWeight
     RETURN name, sum(tagWeight) AS score
     ORDER BY score DESC, name ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1201,9 +1182,9 @@ async function getTopNegativeTagSignals(uid, limit = 10) {
       (3.0 * coalesce(h.frequency, 1)) AS tagWeight
     RETURN name, sum(tagWeight) AS score
     ORDER BY score DESC, name ASC
-    LIMIT ${safeLimit}
+    LIMIT toInteger($limit)
     `,
-    { uid }
+    { uid, limit: safeLimit }
   );
 
   return result.records.map((record) => ({
@@ -1215,25 +1196,31 @@ async function getTopNegativeTagSignals(uid, limit = 10) {
 async function getCandidatePoolStats(uid) {
   const result = await neo4jService.run(
     `
+    // Aggregates over the user's interaction relationships (small degree)
+    // instead of evaluating three EXISTS{} per Movie node, which required
+    // ~7x the db hits on the full catalog. PROFILE: 68.638 -> 9.809 db hits.
     MATCH (me:AppUser {uid: $uid})
-    MATCH (m:Movie)
+    OPTIONAL MATCH (me)-[r:ALREADY_SEEN|DISLIKED|LIKED|WATCHLISTED|SELECTED_FAVORITE]->(m:Movie)
     WHERE m.tmdbId IS NOT NULL
+    WITH m,
+      max(CASE WHEN type(r) = 'ALREADY_SEEN' THEN 1 ELSE 0 END) AS seen,
+      max(CASE WHEN type(r) = 'DISLIKED' THEN 1 ELSE 0 END) AS disliked,
+      max(CASE WHEN type(r) IN ['LIKED', 'WATCHLISTED', 'SELECTED_FAVORITE'] THEN 1 ELSE 0 END) AS swiped
     WITH
-      me,
-      m,
-      EXISTS { MATCH (me)-[:ALREADY_SEEN]->(m) } AS alreadySeen,
-      EXISTS { MATCH (me)-[:DISLIKED]->(m) } AS disliked,
-      EXISTS { MATCH (me)-[:LIKED|WATCHLISTED|SELECTED_FAVORITE]->(m) } AS alreadySwiped,
-      (
-        false
-      ) AS missingMetadata
+      sum(CASE WHEN m IS NOT NULL AND seen = 1 THEN 1 ELSE 0 END) AS filteredAlreadySeen,
+      sum(CASE WHEN m IS NOT NULL AND seen = 0 AND disliked = 1 THEN 1 ELSE 0 END) AS filteredDisliked,
+      sum(CASE WHEN m IS NOT NULL AND seen = 0 AND disliked = 0 AND swiped = 1 THEN 1 ELSE 0 END) AS filteredAlreadySwiped
+    CALL {
+      MATCH (cand:Movie)
+      WHERE cand.tmdbId IS NOT NULL
+      RETURN count(cand) AS totalCandidatesConsidered
+    }
     RETURN
-      count(m) AS totalCandidatesConsidered,
-      sum(CASE WHEN alreadySeen THEN 1 ELSE 0 END) AS filteredAlreadySeen,
-      sum(CASE WHEN NOT alreadySeen AND disliked THEN 1 ELSE 0 END) AS filteredDisliked,
-      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND alreadySwiped THEN 1 ELSE 0 END) AS filteredAlreadySwiped,
-      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND NOT alreadySwiped AND missingMetadata THEN 1 ELSE 0 END) AS filteredMissingMetadata,
-      sum(CASE WHEN NOT alreadySeen AND NOT disliked AND NOT alreadySwiped AND NOT missingMetadata THEN 1 ELSE 0 END) AS remainingAfterFiltering
+      totalCandidatesConsidered,
+      filteredAlreadySeen,
+      filteredDisliked,
+      filteredAlreadySwiped,
+      totalCandidatesConsidered - filteredAlreadySeen - filteredDisliked - filteredAlreadySwiped AS remainingAfterFiltering
     `,
     { uid }
   );
@@ -1244,7 +1231,6 @@ async function getCandidatePoolStats(uid) {
       filteredAlreadySeen: 0,
       filteredDisliked: 0,
       filteredAlreadySwiped: 0,
-      filteredMissingMetadata: 0,
       remainingAfterFiltering: 0,
     };
   }
@@ -1255,7 +1241,6 @@ async function getCandidatePoolStats(uid) {
     filteredAlreadySeen: toNativeNumber(record.get('filteredAlreadySeen')),
     filteredDisliked: toNativeNumber(record.get('filteredDisliked')),
     filteredAlreadySwiped: toNativeNumber(record.get('filteredAlreadySwiped')),
-    filteredMissingMetadata: toNativeNumber(record.get('filteredMissingMetadata')),
     remainingAfterFiltering: toNativeNumber(record.get('remainingAfterFiltering')),
   };
 }

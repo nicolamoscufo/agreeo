@@ -4,12 +4,24 @@ class Neo4jService {
   constructor() {
     const uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
     const user = process.env.NEO4J_USERNAME || 'neo4j';
-    const password = process.env.NEO4J_PASSWORD || 'password123';
+    let password = process.env.NEO4J_PASSWORD;
     const database = process.env.NEO4J_DATABASE || undefined;
+
+    if (!password) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('NEO4J_PASSWORD must be set in production.');
+      }
+      // Local-dev fallback only; docker compose requires an explicit password.
+      password = 'password123';
+    }
 
     this._uri = uri;
     this._database = database;
-    this._driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    this._driver = neo4j.driver(uri, neo4j.auth.basic(user, password), {
+      maxConnectionPoolSize: 50,
+      connectionAcquisitionTimeout: 30_000,
+      maxTransactionRetryTime: 15_000,
+    });
   }
 
   get uri() {
@@ -48,6 +60,18 @@ class Neo4jService {
 
     try {
       return await session.writeTransaction(async (tx) => {
+        return await actions(tx);
+      });
+    } finally {
+      await session.close();
+    }
+  }
+
+  async executeRead(actions) {
+    const session = this.session();
+
+    try {
+      return await session.readTransaction(async (tx) => {
         return await actions(tx);
       });
     } finally {
@@ -98,14 +122,25 @@ class Neo4jService {
       REQUIRE t.name IS UNIQUE
     `);
 
-    await this.run(`
-      CREATE VECTOR INDEX tag_embeddings IF NOT EXISTS
-      FOR (t:Tag) ON (t.embedding)
-      OPTIONS {indexConfig: {
-        \`vector.dimensions\`: 384,
-        \`vector.similarity_function\`: 'cosine'
-      }}
-    `);
+    // The vector index requires Neo4j 5.11+. Treat its creation as best-effort:
+    // if the deployment doesn't support it, the server should still start
+    // (only semantic mood-search / tag-based recommendations are degraded)
+    // instead of crashing the whole process.
+    try {
+      await this.run(`
+        CREATE VECTOR INDEX tag_embeddings IF NOT EXISTS
+        FOR (t:Tag) ON (t.embedding)
+        OPTIONS {indexConfig: {
+          \`vector.dimensions\`: 384,
+          \`vector.similarity_function\`: 'cosine'
+        }}
+      `);
+    } catch (error) {
+      console.warn(
+        '[Neo4jService] Could not create vector index "tag_embeddings" (semantic search will be unavailable):',
+        error instanceof Error ? error.message : String(error)
+      );
+    }
 
     await this.run(`
       CREATE CONSTRAINT movie_night_id IF NOT EXISTS
@@ -123,6 +158,14 @@ class Neo4jService {
       CREATE INDEX movielens_movie_title IF NOT EXISTS
       FOR (m:MovieLensMovie)
       ON (m.title)
+    `);
+
+    // Speeds up popularity-based filtering/ordering used by the exploratory
+    // and group-shortlist candidate queries.
+    await this.run(`
+      CREATE INDEX movie_ml_rating_count IF NOT EXISTS
+      FOR (m:Movie)
+      ON (m.movieLensRatingCount)
     `);
   }
 

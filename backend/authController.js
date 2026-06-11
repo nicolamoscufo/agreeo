@@ -6,6 +6,13 @@ const DEFAULT_ROLES = ['USER'];
 
 const normalizeEmail = (email) => email.trim().toLowerCase();
 
+// Minimum policy: at least 8 characters with at least one letter and one digit.
+const isWeakPassword = (password) =>
+  typeof password !== 'string' ||
+  password.length < 8 ||
+  !/[a-zA-Z]/.test(password) ||
+  !/[0-9]/.test(password);
+
 const displayNameFromEmail = (email) => {
   const normalized = normalizeEmail(email);
   return normalized.includes('@') ? normalized.split('@')[0] : normalized;
@@ -46,9 +53,10 @@ const userFromRecord = (record) => {
 exports.register = async (req, res) => {
   const { email, password, displayName } = req.body;
 
-  if (!email || !password || password.length < 6) {
+  if (!email || isWeakPassword(password)) {
     return res.status(400).json({
-      error: 'Invalid email or password. Password must be at least 6 characters.',
+      error:
+        'Invalid email or password. Password must be at least 8 characters and contain at least one letter and one digit.',
     });
   }
 
@@ -116,6 +124,14 @@ exports.register = async (req, res) => {
       user,
     });
   } catch (e) {
+    // Two concurrent registrations can both pass the pre-check above; the
+    // emailNormalized uniqueness constraint then rejects the second CREATE.
+    // Surface that as a clean 409 instead of a generic 500.
+    if (e && e.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
+      return res.status(409).json({
+        error: 'User with this email already exists',
+      });
+    }
     console.error('Registration Error:', e);
     return res.status(500).json({
       error: 'An error occurred during registration',

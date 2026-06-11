@@ -2,29 +2,56 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const http = require('http');
 const authController = require('./authController');
 const movieController = require('./movieController');
 const socialController = require('./socialController');
 const neo4jService = require('./neo4jService');
 const socketService = require('./socketService');
-const { verifyMiddleware, verifyRefresh, sign, signRefresh } = require('./jwtUtils');
+const { verifyMiddleware, verifyRefresh, sign, signRefresh, resolveSecret } = require('./jwtUtils');
 
 const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Restrict CORS to an explicit allowlist when CORS_ORIGINS is set
+// (comma-separated). Defaults to open, which is fine for native mobile clients.
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(helmet());
+app.use(cors(corsOrigins.length > 0 ? { origin: corsOrigins } : undefined));
 app.use(express.json());
 
-// Log incoming requests
+// Needed for correct client IP detection behind a reverse proxy (nginx).
+app.set('trust proxy', 1);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(apiLimiter);
+
+// Log incoming requests: method and path only, never query strings,
+// which may contain user input (search text, mood queries, ...).
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-app.post('/auth/register', authController.register);
-app.post('/auth/login', authController.login);
+app.post('/auth/register', authLimiter, authController.register);
+app.post('/auth/login', authLimiter, authController.login);
 
 app.get('/movies/popular', movieController.popular);
 app.get('/movies/random', movieController.random);
@@ -162,28 +189,36 @@ app.get('/movie-nights/:id/result', verifyMiddleware, socialController.movieNigh
 app.get('/notifications', verifyMiddleware, socialController.listNotifications);
 app.post('/notifications/:id/read', verifyMiddleware, socialController.markNotificationAsRead);
 
+// Lightweight liveness probe: no DB round-trip, safe for orchestrators.
+app.get('/health', (_, res) => {
+  return res.status(200).json({ ok: true });
+});
+
+// Readiness probe: verifies the Neo4j connection.
 app.get('/health/db', async (_, res) => {
   try {
     await neo4jService.verifyConnection();
 
     return res.status(200).json({
       ok: true,
-      neo4jUri: neo4jService.uri,
     });
   } catch (error) {
+    console.error('/health/db error:', error);
     return res.status(500).json({
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 async function start() {
   try {
+    // Fail fast on weak/missing JWT secret before accepting any traffic.
+    resolveSecret();
+
     await neo4jService.initialize();
-    
-    // Initialize Socket.io
-    socketService.init(server);
+
+    // Initialize Socket.io with the same CORS allowlist as Express.
+    socketService.init(server, { corsOrigins });
 
     server.listen(port, () => {
       console.log(`Auth server with Socket.io listening on port ${port}`);
@@ -193,6 +228,31 @@ async function start() {
     process.exit(1);
   }
 }
+
+async function shutdown(signal) {
+  console.log(`Received ${signal}, shutting down...`);
+
+  const io = socketService.getIo();
+  if (io) {
+    io.close();
+  }
+
+  server.close(async () => {
+    try {
+      await neo4jService.close();
+    } catch (error) {
+      console.error('Error closing Neo4j driver:', error);
+    }
+    process.exit(0);
+  });
+
+  // Force exit if connections do not drain in time.
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+['SIGTERM', 'SIGINT'].forEach((signal) => {
+  process.on(signal, () => shutdown(signal));
+});
 
 start();
 

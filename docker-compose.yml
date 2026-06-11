@@ -3,7 +3,7 @@ services:
     image: neo4j:latest
     container_name: agreeo_neo4j
     environment:
-      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-password123}
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env or shell}
     ports:
       - "7474:7474" # HTTP
       - "7687:7687" # Bolt
@@ -11,7 +11,7 @@ services:
       - neo4j_data:/data
       - ./backend/data/ml-latest-small:/var/lib/neo4j/import
     healthcheck:
-      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-password123}", "RETURN 1"]
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env or shell}", "RETURN 1"]
       interval: 10s
       timeout: 10s
       retries: 12
@@ -26,10 +26,11 @@ services:
     container_name: agreeo_backend
     restart: unless-stopped
     environment:
+      NODE_ENV: production
       PORT: 3000
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password123}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env or shell}
       NEO4J_DATABASE: neo4j
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env or shell}
       TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?Set TMDB_ACCESS_TOKEN in .env or shell}
@@ -52,7 +53,7 @@ services:
     volumes:
       - ./backend/scripts:/scripts
     entrypoint: >
-      bash -c "cypher-shell -a bolt://neo4j:7687 -u neo4j -p '${NEO4J_PASSWORD:-password123}' -f /scripts/import_movielens.cypher && echo 'Dataset caricato con successo!'"
+      bash -c "cypher-shell -a bolt://neo4j:7687 -u neo4j -p '${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env or shell}' -f /scripts/import_movielens.cypher && echo 'Dataset caricato con successo!'"
     networks:
       - agreeo_net
 

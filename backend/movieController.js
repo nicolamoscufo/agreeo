@@ -168,7 +168,8 @@ function buildDailySuggestionSettings() {
 }
 
 function recommendationDebugEnabled() {
-  return String(process.env.ENABLE_RECOMMENDATION_DEBUG || 'true').toLowerCase() !== 'false';
+  // Disabled by default: opt-in explicitly in development environments.
+  return String(process.env.ENABLE_RECOMMENDATION_DEBUG || 'false').toLowerCase() === 'true';
 }
 
 function dedupeByTmdbId(items) {
@@ -578,23 +579,56 @@ function mapInteractionMovie(tmdbMovie) {
   };
 }
 
+const TMDB_RUNTIME_CONCURRENCY = 5;
+
 async function enrichMovies(tmdbMovies) {
   const tmdbIds = tmdbMovies.map((movie) => movie?.id).filter((id) => Number.isInteger(id));
   const neoMovies = await movieRepository.findMoviesByTmdbIds(tmdbIds);
   const byTmdbId = new Map(neoMovies.map((movie) => [movie.tmdbId, movie]));
 
-  const hydratedMovies = await Promise.all(
-    tmdbMovies.map(async (movie) => {
-      const neoMovie = byTmdbId.get(movie.id) || null;
-      const runtime = await resolveMovieRuntime(movie.id);
-      return mapTmdbMovie(
-        runtime == null ? movie : { ...movie, runtime },
-        neoMovie ? { ...neoMovie, runtime } : null
-      );
-    })
-  );
+  // Resolve runtimes from TMDB only for movies whose runtime isn't already
+  // known (payload or Neo4j cache), with bounded concurrency.
+  const runtimeByTmdbId = new Map();
+  for (const movie of tmdbMovies) {
+    if (!Number.isInteger(movie?.id)) continue;
+    if (Number.isInteger(movie.runtime)) {
+      runtimeByTmdbId.set(movie.id, movie.runtime);
+      continue;
+    }
+    const neoMovie = byTmdbId.get(movie.id);
+    if (neoMovie && neoMovie.runtime != null) {
+      runtimeByTmdbId.set(movie.id, neoMovie.runtime);
+    }
+  }
 
-  return hydratedMovies;
+  const missingRuntimeIds = [
+    ...new Set(
+      tmdbIds.filter((id) => !runtimeByTmdbId.has(id))
+    ),
+  ];
+
+  await socialRepository.runWithConcurrency(missingRuntimeIds, TMDB_RUNTIME_CONCURRENCY, async (tmdbId) => {
+    try {
+      const runtime = await resolveMovieRuntime(tmdbId);
+      if (runtime != null) {
+        runtimeByTmdbId.set(tmdbId, runtime);
+      }
+    } catch (error) {
+      console.warn(
+        `Failed to resolve runtime for movie ${tmdbId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  });
+
+  return tmdbMovies.map((movie) => {
+    const neoMovie = byTmdbId.get(movie.id) || null;
+    const runtime = runtimeByTmdbId.has(movie.id) ? runtimeByTmdbId.get(movie.id) : null;
+    return mapTmdbMovie(
+      runtime == null ? movie : { ...movie, runtime },
+      neoMovie ? { ...neoMovie, runtime } : null
+    );
+  });
 }
 
 async function fetchInteractionMovie(tmdbId) {
@@ -809,8 +843,14 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
 
 function handleError(res, error, fallbackMessage) {
   console.error(fallbackMessage, error);
+  // Never leak internal error details to clients in production.
+  const isProd = process.env.NODE_ENV === 'production';
   return res.status(500).json({
-    error: error instanceof Error ? error.message : fallbackMessage,
+    error: isProd
+      ? fallbackMessage
+      : error instanceof Error
+        ? error.message
+        : fallbackMessage,
   });
 }
 
@@ -891,18 +931,8 @@ exports.search = async (req, res) => {
     const response = await tmdbGet(searchRequest.path, searchRequest.params);
     const results = Array.isArray(response.results) ? response.results : [];
 
-    if (results.length === 0) {
-      console.info('[movies.search] TMDB returned 0 results', {
-        path: searchRequest.path,
-        params: searchRequest.params,
-      });
-    } else {
-      console.info('[movies.search] TMDB returned results', {
-        path: searchRequest.path,
-        params: searchRequest.params,
-        tmdbCount: results.length,
-      });
-    }
+    // Log counts only: search params contain user input.
+    console.info('[movies.search] TMDB results', { tmdbCount: results.length });
 
     const movies = await enrichMovies(results);
     const filteredMovies = movies.filter((movie) => matchesSearchFilters(movie, searchRequest.filters));
@@ -911,7 +941,6 @@ exports.search = async (req, res) => {
       console.info('[movies.search] No movies after enrichment+filtering', {
         tmdbCount: results.length,
         enrichedCount: movies.length,
-        filters: searchRequest.filters,
       });
     }
 
@@ -1236,18 +1265,19 @@ exports.dailySuggestionsAuthenticated = async (req, res) => {
   }
 
   try {
-    // Force effectively unlimited daily swipe capacity for testing.
-    // If a numeric `limit` query param is supplied, respect it; otherwise allow a very large default.
     const settings = buildDailySuggestionSettings();
     const requestedLimit = (function () {
       const raw = req.query && req.query.limit;
       const numeric = Number.parseInt(String(raw), 10);
       if (Number.isInteger(numeric) && numeric > 0) return numeric;
-      return Number.MAX_SAFE_INTEGER;
+      return null;
     })();
 
-    // For testing we ignore the configured daily cap and use the requested limit directly.
-    const queueLimit = requestedLimit;
+    // Honor the configured daily cap when enabled; clients can only narrow it.
+    let queueLimit = requestedLimit || 30;
+    if (settings.limitEnabled) {
+      queueLimit = Math.min(queueLimit, settings.configuredLimit);
+    }
     const response = await loadDailySuggestions(uid, { limit: queueLimit });
     return res.json({
       results: response.results,
@@ -1423,13 +1453,7 @@ exports.moodSearch = async (req, res) => {
     // Refinement: Use wantToFeel primarily to avoid negative emotion contamination, fallback to feeling.
     const searchPrompt = wantToFeelText || feelingText;
 
-    console.log(`\n========================================`);
-    console.log(`[MoodSearch] INCOMING REQUEST`);
-    console.log(`  User: ${uid || 'anonymous'}`);
-    console.log(`  Feeling query: "${feelingText || '<none>'}"`);
-    console.log(`  Want to feel query: "${wantToFeelText || '<none>'}"`);
-    console.log(`  Selected Search Vibe: "${searchPrompt}"`);
-
+    // Mood queries are user input: log only aggregate counts, never the text.
     const isTargetPositive = POSITIVE_MOODS.has(searchPrompt.toLowerCase());
 
     // Increased pool limit to 25 to allow sufficient tags after filtering.
@@ -1437,8 +1461,7 @@ exports.moodSearch = async (req, res) => {
     const rawSimilarTags = await embeddingService.findSimilarTags(searchPrompt, 25, 0.35);
 
     if (rawSimilarTags.length === 0) {
-      console.log(`[MoodSearch] No semantically matching tags found above threshold.`);
-      console.log(`========================================\n`);
+      console.log('[MoodSearch] No semantically matching tags found above threshold.');
       return res.json({ results: [] });
     }
 
@@ -1446,14 +1469,12 @@ exports.moodSearch = async (req, res) => {
     const feelingEmbedding = feelingText ? await embeddingService.getEmbedding(feelingText) : null;
     const filteredTags = [];
 
-    console.log(`[MoodSearch] Filtering matched tags:`);
     for (const t of rawSimilarTags) {
       // 1. Valence tag filtering: filter negative tags out if target is positive
       if (isTargetPositive) {
         const lowercaseTag = t.tag.toLowerCase();
         const matchedNegSub = NEGATIVE_SUBSTRINGS.find(sub => lowercaseTag.includes(sub));
         if (matchedNegSub) {
-          console.log(`  - [Valence Filter] Filtered out tag: "${t.tag}" due to negative content matching "${matchedNegSub}"`);
           continue;
         }
       }
@@ -1463,45 +1484,29 @@ exports.moodSearch = async (req, res) => {
         const tagEmb = t.embedding || await embeddingService.getEmbedding(t.tag, 'passage');
         const simToFeeling = cosineSimilarity(feelingEmbedding, tagEmb);
         if (simToFeeling > t.similarity) {
-          console.log(`  - [Escape Filter] Filtered out tag: "${t.tag}" (similarity to feeling "${feelingText}" is ${simToFeeling.toFixed(4)}, which is greater than similarity to target ${t.similarity.toFixed(4)})`);
           continue;
         }
       }
 
-      console.log(`  - [Kept Tag] "${t.tag}" (similarity: ${t.similarity.toFixed(4)})`);
       filteredTags.push(t);
     }
 
     const similarTags = filteredTags.slice(0, 15);
 
     if (similarTags.length === 0) {
-      console.log(`[MoodSearch] All tags were filtered out by Valence and Escape filters.`);
-      console.log(`========================================\n`);
+      console.log('[MoodSearch] All tags were filtered out by Valence and Escape filters.');
       return res.json({ results: [] });
     }
 
-    console.log(`[MoodSearch] Final Selected Tags (top 15):`);
-    similarTags.forEach(t => {
-      console.log(`  - "${t.tag}" (similarity: ${t.similarity.toFixed(4)})`);
-    });
-
     const rawMovies = await movieRepository.findMoviesBySemanticTags(similarTags, uid);
-    console.log(`[MoodSearch] Neo4j matched ${rawMovies.length} movies.`);
 
     // Tag the source as 'mood' so that hydrateRecommendations preserves it.
     const rawMoviesWithSource = rawMovies.map((m) => ({ ...m, source: 'mood' }));
     const hydratedMovies = await hydrateRecommendations(rawMoviesWithSource, { limit: 15 });
 
-    console.log(`[MoodSearch] Top Ranked Results:`);
-    hydratedMovies.forEach((m, idx) => {
-      console.log(`  ${idx + 1}. "${m.title}" (Score: ${m.tagRelevanceScore?.toFixed(4) || '0.0000'}, Rating: ${m.movieLens?.avgRating || 'null'}, Count: ${m.movieLens?.ratingCount || 0})`);
-      if (Array.isArray(m.matchedTags)) {
-        m.matchedTags.forEach(mt => {
-          console.log(`      * Tag: "${mt.tag}" (freq: ${mt.frequency || 1})`);
-        });
-      }
-    });
-    console.log(`========================================\n`);
+    console.log(
+      `[MoodSearch] tags=${similarTags.length}/${rawSimilarTags.length} movies=${rawMovies.length} results=${hydratedMovies.length}`
+    );
 
     return res.json({
       results: hydratedMovies,

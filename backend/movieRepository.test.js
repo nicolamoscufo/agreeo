@@ -202,7 +202,7 @@ test('getRecommendations does not query a cold-start fallback', async (t) => {
   assert.doesNotMatch(calls[0].query, /coalesce\(m\.movieLensRatingCount, 0\) >= \$minFallbackRatingCount/);
 });
 
-test('getExploratoryCandidates inlines an integer Cypher limit', async (t) => {
+test('getExploratoryCandidates passes the limit as a query parameter', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
 
@@ -220,11 +220,11 @@ test('getExploratoryCandidates inlines an integer Cypher limit', async (t) => {
     limit: 18,
   });
 
-  assert.match(calls[0].query, /LIMIT 18/);
-  assert.equal(Object.prototype.hasOwnProperty.call(calls[0].params, 'limit'), false);
+  assert.match(calls[0].query, /LIMIT toInteger\(\$limit\)/);
+  assert.equal(calls[0].params.limit, 18);
 });
 
-test('debug signal queries inline integer Cypher limits', async (t) => {
+test('debug signal queries pass the limit as a query parameter', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
 
@@ -242,11 +242,10 @@ test('debug signal queries inline integer Cypher limits', async (t) => {
   await movieRepository.getTopPositiveMovies('user-1', 5);
   await movieRepository.getTopNegativeMovies('user-1', 5);
 
-  assert.match(calls[0].query, /LIMIT 5/);
-  assert.match(calls[1].query, /LIMIT 5/);
-  assert.match(calls[2].query, /LIMIT 5/);
-  assert.match(calls[3].query, /LIMIT 5/);
-  assert.deepEqual(calls.map((entry) => Object.prototype.hasOwnProperty.call(entry.params, 'limit')), [false, false, false, false]);
+  for (const call of calls) {
+    assert.match(call.query, /LIMIT toInteger\(\$limit\)/);
+    assert.equal(call.params.limit, 5);
+  }
 });
 
 test('diversifyRecommendations removes duplicates and caps genre repetition', async () => {
@@ -336,15 +335,14 @@ test('getSemanticTagRecommendationCandidates queries user history, calculates ta
   assert.match(calls[0].query, /MATCH \(u:AppUser \{uid: \$uid\}\)-\[r:LIKED\|SELECTED_FAVORITE\|WATCHLISTED\|DISLIKED\]->\(m:Movie\)/);
   assert.match(calls[1].query, /CALL db\.index\.vector\.queryNodes\('tag_embeddings', toInteger\(\$topK\), \$userTasteVector\)/);
   
-  // Taste vector verification
+  // Taste vector verification (weighted sum, NOT magnitude-normalized: the
+  // vector index uses cosine similarity, invariant to positive scaling).
   // LIKED: 0.1 * 3.0 (liked weight) * 2 (frequency) = 0.6
   // DISLIKED: -0.2 * -3.0 (disliked weight) * 1 (frequency) = 0.6
   // Sum = 1.2
-  // TotalWeight = (3 * 2) + (-3 * 1) = 6 - 3 = 3.
-  // Vector dimension value = 1.2 / 3 = 0.4.
   const computedTasteVector = calls[1].params.userTasteVector;
   assert.equal(computedTasteVector.length, 384);
-  assert.ok(Math.abs(computedTasteVector[0] - 0.4) < 0.0001);
+  assert.ok(Math.abs(computedTasteVector[0] - 1.2) < 0.0001);
   assert.equal(calls[1].params.limit, 10);
 });
 
@@ -480,7 +478,9 @@ test('getTopPositiveTagSignals and getTopNegativeTagSignals query and compute ta
 
   assert.equal(calls.length, 2);
   assert.match(calls[0].query, /LIKED\|SELECTED_FAVORITE\|WATCHLISTED/);
-  assert.match(calls[0].query, /LIMIT 5/);
+  assert.match(calls[0].query, /LIMIT toInteger\(\$limit\)/);
+  assert.equal(calls[0].params.limit, 5);
   assert.match(calls[1].query, /DISLIKED/);
-  assert.match(calls[1].query, /LIMIT 5/);
+  assert.match(calls[1].query, /LIMIT toInteger\(\$limit\)/);
+  assert.equal(calls[1].params.limit, 5);
 });

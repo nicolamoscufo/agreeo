@@ -48,6 +48,19 @@ function searchTokens(value) {
   return normalized ? normalized.split(/\s+/).filter(Boolean) : [];
 }
 
+// Diacritic + punctuation folding applied inside Cypher (which has no NFD /
+// regex-replace) so the DB-side searchText matches the JS-normalized tokens.
+// Each entry is [from, to]; input is already lower-cased before folding.
+const CYPHER_ACCENT_MAP = [
+  ['à', 'a'], ['á', 'a'], ['â', 'a'], ['ã', 'a'], ['ä', 'a'], ['å', 'a'],
+  ['è', 'e'], ['é', 'e'], ['ê', 'e'], ['ë', 'e'],
+  ['ì', 'i'], ['í', 'i'], ['î', 'i'], ['ï', 'i'],
+  ['ò', 'o'], ['ó', 'o'], ['ô', 'o'], ['õ', 'o'], ['ö', 'o'], ['ø', 'o'],
+  ['ù', 'u'], ['ú', 'u'], ['û', 'u'], ['ü', 'u'],
+  ['ç', 'c'], ['ñ', 'n'], ['ý', 'y'], ['ÿ', 'y'], ['ß', 'ss'],
+  ['.', ' '], ['-', ' '], ['_', ' '], ["'", ' '], ['`', ' '],
+];
+
 function cleanStringList(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -224,7 +237,7 @@ async function searchFriends(uid, query) {
     MATCH (me:AppUser {uid: $uid})
     MATCH (candidate:AppUser)
     WITH me, candidate, toLower(coalesce(candidate.displayName, candidate.email, '')) AS rawSearchText
-    WITH me, candidate, replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(rawSearchText, 'à', 'a'), 'è', 'e'), 'é', 'e'), 'ì', 'i'), 'ò', 'o'), 'ù', 'u'), '.', ' '), '-', ' '), '_', ' '), "'", ' ') AS searchText
+    WITH me, candidate, reduce(s = rawSearchText, pair IN $accentMap | replace(s, pair[0], pair[1])) AS searchText
     WHERE candidate.uid <> me.uid
       AND NOT (me)-[:BLOCKED]->(candidate)
       AND NOT (candidate)-[:BLOCKED]->(me)
@@ -263,7 +276,7 @@ async function searchFriends(uid, query) {
       toLower(coalesce(candidate.displayName, candidate.email, '')) ASC
     LIMIT 25
     `,
-    { uid, normalized: tokens.join(' '), firstToken: tokens[0] || '', tokens }
+    { uid, normalized: tokens.join(' '), firstToken: tokens[0] || '', tokens, accentMap: CYPHER_ACCENT_MAP }
   );
 
   return result.records.map((record) => normalizeFriend(record.get('friend')));
@@ -593,23 +606,74 @@ async function joinMovieNight(uid, eventId) {
 }
 
 async function leaveMovieNight(uid, eventId) {
-  const result = await neo4jService.run(
-    `
-    MATCH (user:AppUser {uid: $uid})-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
-    WHERE coalesce(part.isHost, false) = false
-    DELETE part
-    WITH event, user
-    OPTIONAL MATCH (user)-[vote:VOTED_IN]->(:Movie)
-    WHERE vote.eventId = $eventId
-    DELETE vote
-    SET event.updatedAt = datetime()
-    RETURN event.id AS eventId
-    LIMIT 1
-    `,
-    { uid, eventId }
-  );
+  return neo4jService.executeWrite(async (tx) => {
+    // 1. Confirm the user participates and capture whether they are the host.
+    const partResult = await tx.run(
+      `
+      MATCH (user:AppUser {uid: $uid})-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
+      RETURN coalesce(part.isHost, false) AS isHost
+      LIMIT 1
+      `,
+      { uid, eventId }
+    );
+    if (partResult.records.length === 0) return false;
+    const wasHost = partResult.records[0].get('isHost') === true;
 
-  return result.records.length > 0;
+    // 2. Remove the user's votes, participation and any HOSTS edge.
+    await tx.run(
+      `
+      MATCH (user:AppUser {uid: $uid})
+      OPTIONAL MATCH (user)-[vote:VOTED_IN]->(:Movie)
+      WHERE vote.eventId = $eventId
+      DELETE vote
+      WITH user
+      MATCH (user)-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
+      OPTIONAL MATCH (user)-[hosts:HOSTS]->(event)
+      DELETE part, hosts
+      SET event.updatedAt = datetime()
+      `,
+      { uid, eventId }
+    );
+
+    // 3. If the host left, hand hosting over to another participant
+    //    (joined first, then earliest joined). If nobody remains, delete the event.
+    if (wasHost) {
+      const promoted = await tx.run(
+        `
+        MATCH (event:MovieNight {id: $eventId})<-[part:PARTICIPATES_IN]-(candidate:AppUser)
+        WITH event, candidate, part
+        ORDER BY CASE WHEN part.status = 'joined' THEN 0 ELSE 1 END ASC,
+                 coalesce(part.createdAt, datetime()) ASC
+        LIMIT 1
+        MERGE (candidate)-[h:HOSTS]->(event)
+        ON CREATE SET h.createdAt = datetime()
+        SET part.isHost = true, event.updatedAt = datetime()
+        RETURN candidate.uid AS newHostId
+        `,
+        { eventId }
+      );
+
+      if (promoted.records.length === 0) {
+        await tx.run(
+          `
+          OPTIONAL MATCH (:AppUser)-[vote:VOTED_IN]->(:Movie)
+          WHERE vote.eventId = $eventId
+          DELETE vote
+          `,
+          { eventId }
+        );
+        await tx.run(
+          `
+          MATCH (event:MovieNight {id: $eventId})
+          DETACH DELETE event
+          `,
+          { eventId }
+        );
+      }
+    }
+
+    return true;
+  });
 }
 
 function assembleMovieNightData(event, participants, shortlist, votes) {
@@ -721,7 +785,14 @@ async function listMovieNights(uid) {
 }
 
 async function getMovieNight(uid, eventId, tx = null) {
-  const run = (q, p) => tx ? tx.run(q, p) : neo4jService.run(q, p);
+  // Without an ambient transaction, run all four reads (event + participants +
+  // shortlist + votes) inside a single read transaction so the assembled event
+  // is a consistent snapshot rather than four independently-timed queries.
+  if (!tx) {
+    return neo4jService.executeRead((readTx) => getMovieNight(uid, eventId, readTx));
+  }
+
+  const run = (q, p) => tx.run(q, p);
   const eventResult = await run(
     `
     MATCH (:AppUser {uid: $uid})-[:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
@@ -927,6 +998,72 @@ async function createInviteLink(uid, eventId) {
   return { inviteLink: result.records[0].get('inviteLink'), event: await getMovieNight(uid, eventId) };
 }
 
+const TMDB_ENRICH_CONCURRENCY = 4;
+
+// Runs `worker` over `items` with at most `limit` promises in flight at once.
+async function runWithConcurrency(items, limit, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      await worker(item);
+    }
+  });
+  await Promise.all(runners);
+}
+
+// Fetches missing details for a single shortlist candidate from TMDB and
+// persists them back onto the Movie node. Mutates candidate.movie in place.
+async function enrichCandidateFromTmdb(candidate) {
+  try {
+    console.info(`[generateShortlist] Enriching movie tmdbId=${candidate.movie.tmdbId} from TMDB...`);
+    const tmdbMovie = await tmdbGet(`/movie/${candidate.movie.tmdbId}`, { language: 'en-US' });
+    if (!tmdbMovie) return;
+
+    const posterUrl = tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.poster_path}` : '';
+    const backdropUrl = tmdbMovie.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.backdrop_path}` : '';
+    const genres = Array.isArray(tmdbMovie.genres)
+      ? tmdbMovie.genres.map((g) => g?.name).filter((n) => typeof n === 'string' && n.trim() !== '')
+      : [];
+    const runtime = Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null;
+
+    candidate.movie.posterPath = tmdbMovie.poster_path || null;
+    candidate.movie.backdropPath = tmdbMovie.backdrop_path || null;
+    candidate.movie.posterUrl = posterUrl;
+    candidate.movie.backdropUrl = backdropUrl;
+    if (tmdbMovie.overview) candidate.movie.overview = tmdbMovie.overview;
+    candidate.movie.genres = genres;
+    candidate.movie.runtime = runtime || 0;
+    candidate.movie.tmdbHydrated = true;
+
+    await neo4jService.run(
+      `
+      MATCH (m:Movie {tmdbId: $tmdbId})
+      SET m.posterPath = $posterPath,
+          m.backdropPath = $backdropPath,
+          m.posterUrl = $posterUrl,
+          m.backdropUrl = $backdropUrl,
+          m.overview = coalesce($overview, m.overview),
+          m.genres = $genres,
+          m.runtime = $runtime,
+          m.tmdbHydrated = true
+      `,
+      {
+        tmdbId: candidate.movie.tmdbId,
+        posterPath: tmdbMovie.poster_path || null,
+        backdropPath: tmdbMovie.backdrop_path || null,
+        posterUrl,
+        backdropUrl,
+        overview: tmdbMovie.overview || null,
+        genres,
+        runtime
+      }
+    );
+  } catch (e) {
+    console.error(`[generateShortlist] Failed to enrich movie tmdbId=${candidate.movie.tmdbId}:`, e.message);
+  }
+}
+
 async function generateShortlist(uid, eventId) {
   const event = await getMovieNight(uid, eventId);
   if (!event) return null;
@@ -979,10 +1116,9 @@ async function generateShortlist(uid, eventId) {
         totalWeight += weight;
       }
 
+      // No magnitude normalization needed: the vector index uses cosine
+      // similarity, invariant to scaling the query vector by a positive scalar.
       if (totalWeight > 0) {
-        for (let i = 0; i < 384; i++) {
-          sumVector[i] /= totalWeight;
-        }
         groupTasteVector = sumVector;
       }
     }
@@ -995,59 +1131,15 @@ async function generateShortlist(uid, eventId) {
   );
   const shortlist = buildShortlist({ constraints, participants: joinedParticipants, movies, states, limit: 10 });
 
-  // Enrich shortlist candidate movies with TMDB details if they are missing poster data or not hydrated
-  await Promise.all(
-    shortlist.map(async (candidate) => {
-      if (candidate.movie && candidate.movie.tmdbId && (!candidate.movie.tmdbHydrated || !candidate.movie.posterPath)) {
-        try {
-          console.info(`[generateShortlist] Enriching movie tmdbId=${candidate.movie.tmdbId} from TMDB...`);
-          const tmdbMovie = await tmdbGet(`/movie/${candidate.movie.tmdbId}`, { language: 'en-US' });
-          if (tmdbMovie) {
-            const posterUrl = tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.poster_path}` : '';
-            const backdropUrl = tmdbMovie.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdbMovie.backdrop_path}` : '';
-            const genres = Array.isArray(tmdbMovie.genres)
-              ? tmdbMovie.genres.map((g) => g?.name).filter((n) => typeof n === 'string' && n.trim() !== '')
-              : [];
-            const runtime = Number.isInteger(tmdbMovie.runtime) ? tmdbMovie.runtime : null;
-            
-            candidate.movie.posterPath = tmdbMovie.poster_path || null;
-            candidate.movie.backdropPath = tmdbMovie.backdrop_path || null;
-            candidate.movie.posterUrl = posterUrl;
-            candidate.movie.backdropUrl = backdropUrl;
-            if (tmdbMovie.overview) candidate.movie.overview = tmdbMovie.overview;
-            candidate.movie.genres = genres;
-            candidate.movie.runtime = runtime || 0;
-            candidate.movie.tmdbHydrated = true;
-
-            await neo4jService.run(
-              `
-              MATCH (m:Movie {tmdbId: $tmdbId})
-              SET m.posterPath = $posterPath,
-                  m.backdropPath = $backdropPath,
-                  m.posterUrl = $posterUrl,
-                  m.backdropUrl = $backdropUrl,
-                  m.overview = coalesce($overview, m.overview),
-                  m.genres = $genres,
-                  m.runtime = $runtime,
-                  m.tmdbHydrated = true
-              `,
-              {
-                tmdbId: candidate.movie.tmdbId,
-                posterPath: tmdbMovie.poster_path || null,
-                backdropPath: tmdbMovie.backdrop_path || null,
-                posterUrl,
-                backdropUrl,
-                overview: tmdbMovie.overview || null,
-                genres,
-                runtime
-              }
-            );
-          }
-        } catch (e) {
-          console.error(`[generateShortlist] Failed to enrich movie tmdbId=${candidate.movie.tmdbId}:`, e.message);
-        }
-      }
-    })
+  // Enrich shortlist candidate movies with TMDB details if they are missing
+  // poster data or not hydrated. Bounded concurrency keeps us well under TMDB
+  // rate limits instead of firing one request per candidate simultaneously.
+  const candidatesToEnrich = shortlist.filter(
+    (candidate) => candidate.movie && candidate.movie.tmdbId &&
+      (!candidate.movie.tmdbHydrated || !candidate.movie.posterPath)
+  );
+  await runWithConcurrency(candidatesToEnrich, TMDB_ENRICH_CONCURRENCY, (candidate) =>
+    enrichCandidateFromTmdb(candidate)
   );
 
   await neo4jService.run(
@@ -1215,13 +1307,14 @@ async function loadCandidateMovies(constraints, limit = 150, groupTasteVector = 
         movieLensRatingCount: coalesce(m.movieLensRatingCount, 0)
       } AS movie
       ORDER BY tagScore DESC, coalesce(m.movieLensRatingCount, 0) DESC, m.title ASC
-      LIMIT ${safeLimit}
+      LIMIT toInteger($limit)
       `,
       {
         ...constraints,
         groupTasteVector,
         topK: 25,
         similarityThreshold: 0.35,
+        limit: safeLimit,
       }
     );
   } else {
@@ -1253,9 +1346,9 @@ async function loadCandidateMovies(constraints, limit = 150, groupTasteVector = 
         movieLensRatingCount: coalesce(m.movieLensRatingCount, 0)
       } AS movie
       ORDER BY coalesce(m.movieLensRatingCount, 0) DESC, coalesce(m.voteAverage, m.movieLensAvgRating * 2.0, 0.0) DESC, m.title ASC
-      LIMIT ${safeLimit}
+      LIMIT toInteger($limit)
       `,
-      constraints
+      { ...constraints, limit: safeLimit }
     );
   }
   return result.records.map((record) => normalizeMovie(record.get('movie')));
@@ -1458,20 +1551,13 @@ async function startTieBreaker(eventId, tiedTmdbIds, tx = null) {
 
 async function submitVote(uid, eventId, movieId, voteValue) {
   return await neo4jService.executeWrite(async (tx) => {
-    // 1. Pessimistic lock on the MovieNight node to serialize concurrent votes on the same movie night
-    await tx.run(
-      `
-      MATCH (event:MovieNight {id: $eventId})
-      SET event.lock = timestamp()
-      `,
-      { eventId }
-    );
-
     const tmdbId = Number.parseInt(String(movieId).replace('tmdb-', ''), 10);
     if (!Number.isInteger(tmdbId) || tmdbId <= 0) return null;
     const vote = ['like', 'dislike', 'alreadySeen', 'neutral'].includes(voteValue) ? voteValue : 'neutral';
-    
-    // 2. Insert/update the vote
+
+    // Insert/update the vote. The SET on `event` below takes a write lock on the
+    // MovieNight node, which serializes concurrent votes on the same event (and
+    // the subsequent winner computation) without needing a separate lock prop.
     const result = await tx.run(
       `
       MATCH (user:AppUser {uid: $uid})-[part:PARTICIPATES_IN]->(event:MovieNight {id: $eventId})
@@ -1637,6 +1723,7 @@ async function getUserDisplayName(uid) {
 
 module.exports = {
   normalizeConstraints,
+  runWithConcurrency,
   getFriends,
   searchFriends,
   sendFriendRequest,

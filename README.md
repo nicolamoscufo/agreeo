@@ -1,47 +1,32 @@
 # Agreeo
 
-Agreeo is a Flutter app for lightweight group movie decisions.
+Agreeo is a Flutter app for lightweight group movie decisions, backed by a
+Node.js/Express API and a Neo4j graph database. Authentication uses backend
+JWTs; there is no Firebase dependency.
 
-## Step 1 Setup
+## Architecture
 
-The app shell now uses Riverpod and initializes Firebase on startup. The code is written so the app still opens during early UI work even if Firebase is not configured yet, but the backend features in later steps require the native Firebase files below.
+- **Frontend**: Flutter (Riverpod state management), feature-first layout.
+- **Backend**: Express + Socket.IO (`backend/`), owns all TMDB reads and Neo4j
+  movie/social interactions. See `docs/BACKEND_CONTRACT.md`.
+- **Database**: Neo4j 5 with the MovieLens dataset for recommendations. See
+  `docs/NEO4J_TMDB_MOVIELENS_ARCHITECTURE.md`.
 
-### Firebase configuration
+Main API surface:
 
-1. Run `flutterfire configure` from the project root to generate Firebase options for your platforms.
-2. Add `android/app/google-services.json` for Android.
-3. Add `ios/Runner/GoogleService-Info.plist` for iOS.
-4. Rebuild the app after adding the platform files.
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`
+- `GET /movies/popular`, `GET /movies/search?query=...`, `GET /movies/:tmdbId`
+- authenticated `/me/movies/...`, `/me/library`, `/me/recommendations`
+- authenticated `/friends/...`, `/movie-nights/...`, `/notifications`
+- `GET /health` (liveness), `GET /health/db` (readiness)
 
-### Optional TMDb configuration
+## Backend environment
 
-Agreeo falls back to the bundled demo catalog when TMDb is not configured. To enable remote discovery, pass a TMDb API key at build time:
-
-```bash
-flutter run --dart-define=TMDB_API_KEY=your_key_here
-```
-
-## Backend Movie MVP
-
-The backend now owns TMDB movie reads and Neo4j movie interactions for the MVP. Use the backend for:
-
-- `GET /movies/popular`
-- `GET /movies/search?query=matrix`
-- `GET /movies/:tmdbId`
-- authenticated `/me/movies/...`, `/me/library`, and `/me/recommendations`
-
-### Backend environment
-
-The backend loads `backend/.env` automatically through `dotenv`. For local `npm start`, create it from the tracked template:
+The backend loads `backend/.env` automatically through `dotenv`. For local
+`npm start`, create it from the tracked template:
 
 ```bash
 cp backend/.env.example backend/.env
-```
-
-Keep `backend/.env.example` as the tracked template. The critical new variable is:
-
-```txt
-TMDB_ACCESS_TOKEN=your_tmdb_bearer_token
 ```
 
 For Docker Compose local development, create the root env file as well:
@@ -50,36 +35,47 @@ For Docker Compose local development, create the root env file as well:
 cp .env.example .env
 ```
 
-Set real values for `JWT_SECRET` and `TMDB_ACCESS_TOKEN` before starting the stack. Do not edit secrets directly into `docker-compose.yml`.
+Required variables (the server refuses to start otherwise):
 
-### MovieLens import
+- `JWT_SECRET` — cryptographically random, at least 32 characters
+  (`openssl rand -base64 48`).
+- `NEO4J_PASSWORD` — strong password; docker compose has no default.
+- `TMDB_ACCESS_TOKEN` — TMDB API bearer token.
 
-Place `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv` in `backend/data/movielens/`.
+Do not edit secrets directly into `docker-compose.yml`.
 
-For Docker local development, the repo expects those files under `backend/data/ml-latest-small/` and imports them with:
+## MovieLens import
+
+Place `movies.csv`, `links.csv`, `ratings.csv`, and `tags.csv` in
+`backend/data/movielens/`.
+
+For Docker local development, the repo expects those files under
+`backend/data/ml-latest-small/` and imports them with:
 
 ```bash
 docker compose up neo4j-init
 ```
 
-Without this import, authenticated swipe suggestions can be empty because Neo4j has no `MovieLensMovie`, `MATCHES_TMDB`, or `RATED` recommendation data.
+Without this import, authenticated swipe suggestions can be empty because
+Neo4j has no `MovieLensMovie`, `MATCHES_TMDB`, or `RATED` recommendation data.
 
-The import workflow, Docker command, graph schema, and verification queries are documented in:
+## Project structure
 
-- `docs/NEO4J_TMDB_MOVIELENS_ARCHITECTURE.md`
+The app follows a feature-first `lib/` layout:
 
-### Project structure
+- `lib/features/` — one folder per feature (`auth`, `home`, `swipe`,
+  `library`, `friends`, `movie_details`, `onboarding`, `profile`, `shell`,
+  `bootstrap`), each with its `presentation/` (and where needed `state/`).
+- `lib/shared/` — shared models, state (`agreeo_app_controller.dart`), theme
+  tokens, widgets, and utilities.
+- `lib/services/` — backend API clients (auth, movies, social, realtime).
+- `lib/providers/` — global Riverpod providers.
+- `lib/config/` — backend endpoints configuration (`BACKEND_BASE_URL`).
+- `lib/models/` — data models shared with the backend contract.
 
-The app follows this `lib/` layout:
+Navigation is documented in `docs/ROUTING_MAP.md`.
 
-- `models/`
-- `providers/`
-- `screens/`
-- `services/`
-- `utils/`
-- `widgets/`
-
-## Getting Started
+## Getting started
 
 Use the usual Flutter commands to run the app and tests:
 
@@ -89,18 +85,22 @@ flutter test
 flutter run
 ```
 
-Run the backend from `backend/` with the Neo4j and TMDB environment variables set:
+Run the backend from `backend/` with the Neo4j and TMDB environment variables
+set:
 
 ```bash
-npm start
+npm start          # or: npm test for the unit suite
 ```
 
-### Azure test deployment
+## Continuous integration
 
-For an Azure for Students test deployment, use the VM + Docker Compose path documented in:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every PR:
+`flutter analyze` + `flutter test` for the app, `npm audit
+--audit-level=high` + `npm test` for the backend.
+
+## Azure test deployment
+
+For an Azure for Students test deployment, use the VM + Docker Compose path
+documented in:
 
 - `deploy/azure/README.md`
-
-
-netstat -ano | findstr :3000
-taskkill //PID 15212 //F

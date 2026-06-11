@@ -3,33 +3,48 @@ const fs = require('fs');
 const neo4jService = require('./neo4jService');
 
 const CACHE_FILE = path.join(__dirname, 'data', 'tag_embeddings_multilingual_cache.json');
-let extractor = null;
 let tagEmbeddings = {};
-let pipeline = null;
+// We cache the in-flight promises (not the resolved values) so that concurrent
+// first requests share a single import/model-load instead of each starting their
+// own — the model load takes seconds and is far too expensive to duplicate.
+let pipelinePromise = null;
+let extractorPromise = null;
 
 /**
- * Dynamically imports and configures @xenova/transformers.
+ * Dynamically imports and configures @xenova/transformers (once).
  */
-async function loadTransformers() {
-  if (!pipeline) {
-    console.log('[EmbeddingService] Dynamically importing @xenova/transformers...');
-    const transformers = await import('@xenova/transformers');
-    pipeline = transformers.pipeline;
-    transformers.env.allowLocalModels = false;
+function loadTransformers() {
+  if (!pipelinePromise) {
+    pipelinePromise = (async () => {
+      console.log('[EmbeddingService] Dynamically importing @xenova/transformers...');
+      const transformers = await import('@xenova/transformers');
+      transformers.env.allowLocalModels = false;
+      return transformers.pipeline;
+    })().catch((err) => {
+      pipelinePromise = null; // allow a later retry instead of caching the failure
+      throw err;
+    });
   }
+  return pipelinePromise;
 }
 
 /**
  * Returns the feature extraction pipeline instance, caching it after creation.
  */
-async function getExtractor() {
-  await loadTransformers();
-  if (!extractor) {
-    console.log('[EmbeddingService] Loading Xenova/multilingual-e5-small model...');
-    extractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
-    console.log('[EmbeddingService] Model loaded successfully.');
+function getExtractor() {
+  if (!extractorPromise) {
+    extractorPromise = (async () => {
+      const pipeline = await loadTransformers();
+      console.log('[EmbeddingService] Loading Xenova/multilingual-e5-small model...');
+      const ext = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+      console.log('[EmbeddingService] Model loaded successfully.');
+      return ext;
+    })().catch((err) => {
+      extractorPromise = null; // allow a later retry instead of caching the failure
+      throw err;
+    });
   }
-  return extractor;
+  return extractorPromise;
 }
 
 /**

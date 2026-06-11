@@ -3,12 +3,15 @@ import 'dart:convert';
 import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/models/neo4j/neo4j_models.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
   static const String _tokenKey = 'auth_accessToken';
   static const String _refreshTokenKey = 'auth_refreshToken';
+  static const Duration _requestTimeout = Duration(seconds: 20);
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
 
   AuthService({BackendConfig? config})
     : _config = config ?? BackendConfig.fromEnv();
@@ -38,7 +41,7 @@ class AuthService {
           if (normalizedDisplayName != null && normalizedDisplayName.isNotEmpty)
             'displayName': normalizedDisplayName,
         }),
-      );
+      ).timeout(_requestTimeout);
 
       debugPrint('[AuthService] Register response: ${response.statusCode}');
 
@@ -81,7 +84,7 @@ class AuthService {
         Uri.parse(_config.loginUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
-      );
+      ).timeout(_requestTimeout);
 
       debugPrint('[AuthService] Login response: ${response.statusCode}');
 
@@ -116,8 +119,15 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+    } catch (e) {
+      debugPrint('[AuthService] Secure storage delete failed: $e');
+    }
 
+    // Also clear any legacy copies left in SharedPreferences.
+    final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshTokenKey);
 
@@ -125,20 +135,54 @@ class AuthService {
   }
 
   Future<void> _storeTokens(String accessToken, String refreshToken) async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      await _secureStorage.write(key: _tokenKey, value: accessToken);
+      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      return;
+    } catch (e) {
+      // Platforms without secure storage (e.g. tests) fall back to prefs.
+      debugPrint('[AuthService] Secure storage write failed, using prefs: $e');
+    }
 
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, accessToken);
     await prefs.setString(_refreshTokenKey, refreshToken);
   }
 
-  Future<String?> readToken() async {
+  /// Reads [key] from secure storage, transparently migrating any legacy
+  /// value still stored in SharedPreferences (and wiping it from there).
+  Future<String?> _readSecureWithMigration(String key) async {
+    try {
+      final secureValue = await _secureStorage.read(key: key);
+      if (secureValue != null && secureValue.isNotEmpty) {
+        return secureValue;
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Secure storage read failed: $e');
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    final legacyValue = prefs.getString(key);
+    if (legacyValue == null || legacyValue.isEmpty) {
+      return null;
+    }
+
+    try {
+      await _secureStorage.write(key: key, value: legacyValue);
+      await prefs.remove(key);
+      debugPrint('[AuthService] Migrated $key to secure storage');
+    } catch (e) {
+      debugPrint('[AuthService] Migration of $key failed: $e');
+    }
+    return legacyValue;
+  }
+
+  Future<String?> readToken() async {
+    return _readSecureWithMigration(_tokenKey);
   }
 
   Future<String?> readRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_refreshTokenKey);
+    return _readSecureWithMigration(_refreshTokenKey);
   }
 
   Future<bool> isTokenValid() async {
@@ -175,6 +219,11 @@ class AuthService {
     }
   }
 
+  /// Attempts to obtain a fresh access token using the stored refresh token.
+  /// Returns the new access token, or null if refresh is not possible.
+  /// Used by the data services to transparently recover from a 401.
+  Future<String?> refreshAccessToken() => _refreshAccessToken();
+
   Future<String?> _refreshAccessToken() async {
     final refreshToken = await readRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return null;
@@ -184,7 +233,7 @@ class AuthService {
         Uri.parse(_config.refreshUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refreshToken': refreshToken}),
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
         debugPrint('[AuthService] Refresh response: ${response.statusCode}');
@@ -236,7 +285,7 @@ class AuthService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(body),
-      );
+      ).timeout(_requestTimeout);
 
       if (resp.statusCode != 200) {
         debugPrint(
@@ -256,7 +305,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
         },
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
         debugPrint('[AuthService] /me response: ${response.statusCode}');

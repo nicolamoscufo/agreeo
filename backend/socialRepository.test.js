@@ -216,10 +216,17 @@ test('blockFriend deletes friendship and creates BLOCKED relationship', async (t
 test('generateShortlist calculates group taste vector and queries candidate movies using vector index', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
+  const originalExecuteRead = neo4jService.executeRead;
 
   t.after(() => {
     neo4jService.run = originalRun;
+    neo4jService.executeRead = originalExecuteRead;
   });
+
+  // getMovieNight (called without an ambient tx) now runs inside a read
+  // transaction; route that tx's run() back through the mocked neo4jService.run.
+  neo4jService.executeRead = async (actions) =>
+    actions({ run: (query, params) => neo4jService.run(query, params) });
 
   neo4jService.run = async (query, params) => {
     calls.push({ query, params });
@@ -387,6 +394,8 @@ test('generateShortlist calculates group taste vector and queries candidate movi
   assert.ok(vectorQueryCall);
   const computedGroupTasteVector = vectorQueryCall.params.groupTasteVector;
   assert.equal(computedGroupTasteVector.length, 384);
-  // Weight is LIKED (3.0) * freq (1) = 3.0. Embedding is 0.2. Normalized vector is 0.2.
-  assert.ok(Math.abs(computedGroupTasteVector[0] - 0.2) < 0.0001);
+  // Weight is LIKED (3.0) * freq (1) = 3.0, embedding component is 0.2, so the
+  // weighted sum is 0.6. The vector is intentionally NOT magnitude-normalized:
+  // the index uses cosine similarity, which is invariant to positive scaling.
+  assert.ok(Math.abs(computedGroupTasteVector[0] - 0.6) < 0.0001);
 });
