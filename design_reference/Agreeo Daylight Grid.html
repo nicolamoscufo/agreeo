@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agreeo — Daylight palette (Light & Dark)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#D6D0C6}
+  body{font-family:'Manrope',system-ui,sans-serif}
+  .pagehead{max-width:1240px;margin:0 auto;padding:46px 40px 8px}
+  .pagehead h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:34px;letter-spacing:-.8px;color:#26221C}
+  .pagehead p{font-size:15px;color:#5E574E;margin:10px 0 0;max-width:680px;line-height:1.55}
+  .panel{max-width:1240px;margin:34px auto;border-radius:28px;padding:30px 34px 40px}
+  .panel.light{background:#ECE7DF}
+  .panel.dark{background:#1A1714}
+  .panel-hd{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .panel-hd .swatch{display:flex;gap:6px}
+  .panel-hd .sw{width:22px;height:22px;border-radius:7px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .panel-hd h2{font-family:'Bricolage Grotesque';font-weight:800;font-size:22px;letter-spacing:-.4px}
+  .panel-hd .sub{font-size:13px;font-weight:600}
+  .panel.light h2{color:#26221C}.panel.light .sub{color:#7A7268}
+  .panel.dark h2{color:#F5EFE6}.panel.dark .sub{color:#A89E90}
+  .grid{display:flex;flex-wrap:wrap;gap:38px 30px}
+</style>
+</head>
+<body>
+  <div class="pagehead">
+    <h1>Agreeo · Daylight palette</h1>
+    <p>The Daylight direction shown both ways — a warm-cream <b>Light mode</b> and a warm-charcoal <b>Dark mode</b> that keeps the same coral→violet identity. Same screens, same components, only the theme tokens change. The original Agreeo file stays on Midnight Coral.</p>
+  </div>
+
+  <div class="panel light">
+    <div class="panel-hd">
+      <div class="swatch">
+        <div class="sw" style="background:#F7F2EA"></div>
+        <div class="sw" style="background:#FFFFFF"></div>
+        <div class="sw" style="background:#EF563B"></div>
+        <div class="sw" style="background:#6B45F0"></div>
+        <div class="sw" style="background:#C9890F"></div>
+      </div>
+      <div>
+        <h2>Light mode</h2>
+        <div class="sub">Warm cream · ink text · coral + violet accents</div>
+      </div>
+    </div>
+    <div class="grid" id="grid-light"></div>
+  </div>
+
+  <div class="panel dark">
+    <div class="panel-hd">
+      <div class="swatch">
+        <div class="sw" style="background:#161310"></div>
+        <div class="sw" style="background:#221D18"></div>
+        <div class="sw" style="background:#FF6F52"></div>
+        <div class="sw" style="background:#9B7BFF"></div>
+        <div class="sw" style="background:#FFC24B"></div>
+      </div>
+      <div>
+        <h2>Dark mode</h2>
+        <div class="sub">Warm charcoal · cream text · brighter coral + violet</div>
+      </div>
+    </div>
+    <div class="grid" id="grid-dark"></div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="ag-shared.jsx"></script>
+  <script type="text/babel" src="ag-auth.jsx"></script>
+  <script type="text/babel" src="ag-main.jsx"></script>
+  <script type="text/babel" src="ag-social.jsx"></script>
+  <script type="text/babel" src="ag-detail.jsx"></script>
+  <script type="text/babel" src="ag-extra.jsx"></script>
+  <script type="text/babel" src="ag-states.jsx"></script>
+
+  <script type="text/babel">
+    // ── Daylight token sets (override the shared T in place) ──
+    const DAYLIGHT_LIGHT = {
+      bg:'#F7F2EA', bg2:'#FCF8F1', surface:'#FFFFFF', surface2:'#F1EADF',
+      line:'rgba(28,22,16,0.09)', line2:'rgba(28,22,16,0.16)',
+      text:'#221A14', sub:'rgba(34,26,20,0.62)', faint:'rgba(34,26,20,0.42)',
+      red:'#EF563B', redDeep:'#D8442B', purple:'#6B45F0', purpleDeep:'#5A33E0',
+      gold:'#C9890F', green:'#1E9E73',
+      onText:'#FFF8F0', glass:'rgba(255,255,255,0.82)', heroBg:'#1A120C',
+      grad:'linear-gradient(135deg, #EF563B 0%, #6B45F0 100%)',
+      gradSoft:'linear-gradient(135deg, rgba(239,86,59,0.10) 0%, rgba(107,69,240,0.10) 100%)',
+    };
+    const DAYLIGHT_DARK = {
+      bg:'#161310', bg2:'#1E1A16', surface:'#221D18', surface2:'#2C251F',
+      line:'rgba(255,255,255,0.08)', line2:'rgba(255,255,255,0.15)',
+      text:'#F7F0E8', sub:'rgba(247,240,232,0.62)', faint:'rgba(247,240,232,0.40)',
+      red:'#FF6F52', redDeep:'#E8542F', purple:'#9B7BFF', purpleDeep:'#7A5AF0',
+      gold:'#FFC24B', green:'#46D4A0',
+      onText:'#1A120C', glass:'rgba(34,29,24,0.82)', heroBg:'#161310',
+      grad:'linear-gradient(135deg, #FF6F52 0%, #9B7BFF 100%)',
+      gradSoft:'linear-gradient(135deg, rgba(255,111,82,0.16) 0%, rgba(155,123,255,0.16) 100%)',
+    };
+
+    const SCREENS = [
+      ['App launch',             () => <SplashScreen />],
+      ['Login',                  () => <LoginScreen />],
+      ['Sign up',                () => <SignupScreen />],
+      ['Onboarding · Genres',    () => <GenreScreen />],
+      ['Onboarding · Favorites',  () => <CalibrateScreen />],
+      ['Home',                   () => <HomeScreen />],
+      ['Filters sheet',          () => <FilterSheetScreen />],
+      ['Mood Matcher',           () => <MoodMatcherScreen />],
+      ['Mood Matcher · Loading',  () => <MoodLoadingScreen />],
+      ['Mood Matcher · Results',  () => <MoodResultsScreen />],
+      ['Random Pick',            () => <RandomPickScreen />],
+      ['Swipe',                  () => <SwipeScreen />],
+      ['Library',                () => <LibraryScreen />],
+      ['Movie details',          () => <DetailScreen />],
+      ['Review editor',          () => <ReviewEditorScreen />],
+      ['Friends',                () => <FriendsScreen />],
+      ['Friend profile · Watched', () => <FriendProfileScreen tab="watched" />],
+      ['Friend profile · Reviews', () => <FriendProfileScreen tab="reviews" />],
+      ['Friend profile · Private', () => <FriendProfileScreen tab="watchlist" />],
+      ['Movie Night · Create',    () => <NightCreateScreen />],
+      ['Movie Night · Waiting',   () => <NightWaitScreen />],
+      ['Movie Night · Voting',    () => <NightVoteScreen />],
+      ['Movie Night · Results',   () => <NightResultScreen />],
+      ['Profile',                () => <ProfileScreen />],
+      ['Edit profile',           () => <EditProfileScreen />],
+      ['Settings',               () => <SettingsScreen />],
+      ['Notifications',          () => <NotificationsScreen />],
+      ['Library · Empty',         () => <LibraryEmptyScreen />],
+      ['Search · No results',     () => <SearchEmptyScreen />],
+      ['Connection error',       () => <OfflineScreen />],
+    ];
+
+    function Grid({ dark, labelColor }) {
+      return (
+        <React.Fragment>
+          {SCREENS.map(([label, Render], i) => (
+            <div key={i} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ fontFamily:"'Manrope',system-ui", fontWeight:700, fontSize:13,
+                letterSpacing:0.1, color:labelColor }}>{label}</div>
+              <IOSDevice dark={dark} width={402} height={874}>{Render()}</IOSDevice>
+            </div>
+          ))}
+        </React.Fragment>
+      );
+    }
+
+    const { flushSync } = ReactDOM;
+
+    // Render LIGHT grid with light tokens committed synchronously…
+    Object.assign(T, DAYLIGHT_LIGHT);
+    flushSync(() => {
+      ReactDOM.createRoot(document.getElementById('grid-light'))
+        .render(<Grid dark={false} labelColor="#4A443C" />);
+    });
+
+    // …then swap tokens and render the DARK grid. The light tree is already
+    // committed (literal style strings in the DOM) so it is unaffected.
+    Object.assign(T, DAYLIGHT_DARK);
+    flushSync(() => {
+      ReactDOM.createRoot(document.getElementById('grid-dark'))
+        .render(<Grid dark={true} labelColor="rgba(247,240,232,0.72)" />);
+    });
+  </script>
+
+  <template id="__bundler_thumbnail">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect width="100" height="100" fill="#F7F2EA"/>
+      <circle cx="50" cy="50" r="20" fill="none" stroke="url(#g)" stroke-width="5"/>
+      <path d="M44 41v18l15-9z" fill="#EF563B"/>
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#EF563B"/><stop offset="1" stop-color="#6B45F0"/>
+      </linearGradient></defs>
+    </svg>
+  </template>
+</body>
+</html>

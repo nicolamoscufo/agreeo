@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "graphify": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "c:\\Users\\Anton\\agreeo\\tools\\mcp\\graphify_server.py"
+      ]
+    }
+  }
+}
