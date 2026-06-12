@@ -204,6 +204,25 @@ class BackendSocialService {
     return _decodeFriends(body['blocked']);
   }
 
+  /// Files an abuse report against [userId]. [context] tags what was reported
+  /// (e.g. 'profile', 'review'); [contentId] optionally pins the exact item.
+  Future<void> reportUser(
+    String userId, {
+    required String reason,
+    String context = 'profile',
+    String? contentId,
+  }) async {
+    await _authorizedRequest(
+      'POST',
+      '/friends/$userId/report',
+      body: <String, dynamic>{
+        'reason': reason,
+        'context': context,
+        if (contentId != null && contentId.isNotEmpty) 'contentId': contentId,
+      },
+    );
+  }
+
   Future<FriendProfile> getFriendProfile(String friendId) async {
     final body = _decodeMap(
       (await _authorizedRequest('GET', '/friends/$friendId/profile')).body,

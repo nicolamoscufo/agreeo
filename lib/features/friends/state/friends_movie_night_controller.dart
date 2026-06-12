@@ -315,6 +315,29 @@ class FriendsMovieNightController
     }
   }
 
+  /// Files an abuse report against [friendId]. Returns true when accepted.
+  /// Reporting does not remove the friendship — the caller can offer to block
+  /// separately. [context] tags what was reported (e.g. 'profile', 'review').
+  Future<bool> reportFriend(
+    String friendId, {
+    required String reason,
+    String context = 'profile',
+    String? contentId,
+  }) async {
+    if (!_usingBackend) return true;
+    try {
+      await _backendSocialService.reportUser(
+        friendId,
+        reason: reason,
+        context: context,
+        contentId: contentId,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _searchFriendsBackend(String query) async {
     final searchKey = _searchTokens(query).join(' ');
     try {

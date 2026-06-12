@@ -57,6 +57,32 @@
 - [ ] **Migrazione UI Daylight** — il lavoro in corso è stato committato
   (commit `fd8ad17`); completare le fasi restanti della migrazione.
 
+## 🟣 Store readiness (App Store / Play Store) — UX/policy
+
+Aggiunto il 2026-06-12 con il giro di completezza dei flussi utente:
+
+- [x] **Segnalazione contenuti/utenti** — azione *Report* nell'action sheet del
+  profilo amico ([friend_profile_screen.dart](../lib/features/friends/presentation/friend_profile_screen.dart))
+  con selettore motivazioni, follow-up di blocco e endpoint
+  `POST /friends/:id/report` (edge `:REPORTED` in Neo4j, audit trail).
+  Richiesto da Apple Guideline 1.2 per app con UGC.
+- [x] **About & Support** in Settings — Privacy Policy, Terms of Service,
+  contatto supporto (mailto), "Rate Agreeo" e versione app
+  (`package_info_plus`). I link sono in
+  [lib/config/app_links.dart](../lib/config/app_links.dart).
+- [ ] **⚠️ Sostituire le URL legali placeholder** in `lib/config/app_links.dart`
+  (`privacyPolicy`, `termsOfService`, `supportEmail`, `storeListing`) con le
+  pagine reali ospitate. Una Privacy Policy raggiungibile è **obbligatoria**
+  sia su App Store sia su Play Store.
+- [ ] **🔴 Reset password ("Password dimenticata")** — unico flusso base ancora
+  mancante. Rimandato in attesa di un provider email (SendGrid/Resend/SMTP).
+  Da implementare: endpoint `POST /auth/password/forgot` (token monouso con
+  hash + scadenza sul nodo `AppUser`) e `POST /auth/password/reset`, invio
+  email del link, UI in-app (link "Forgot password?" in
+  [auth_welcome_screen.dart](../lib/features/auth/presentation/auth_welcome_screen.dart)
+  + schermata di reset via deep link). Senza questo, un utente che dimentica
+  la password resta bloccato fuori.
+
 ## ✅ Già completato (riferimento)
 
 Fase 1 (auth Socket.IO via JWT, `JWT_SECRET` obbligatorio, rate limiting),

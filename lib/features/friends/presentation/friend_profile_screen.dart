@@ -69,10 +69,55 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case _FriendAction.report:
+        await _reportFriend(friend);
       case _FriendAction.remove:
         await _confirmRemove(friend);
       case _FriendAction.block:
         await _confirmBlock(friend);
+    }
+  }
+
+  Future<void> _reportFriend(Friend friend) async {
+    final reason = await showAgSheet<String>(
+      context: context,
+      child: _ReportReasonSheet(friendName: friend.name),
+    );
+    if (!mounted || reason == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .reportFriend(friend.id, reason: reason);
+    if (!mounted) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(ok
+            ? 'Thanks — our team will review this within 24 hours.'
+            : 'Could not submit the report. Try again.'),
+      ));
+    if (!ok) return;
+    // Reporting is usually followed by blocking; offer it as a one-tap follow-up.
+    final block = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Block ${friend.name} too?'),
+        content: const Text(
+          'Blocking removes them from your friends and stops them contacting you.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Not now')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: context.tokens.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (block == true && mounted) {
+      ref.read(friendsMovieNightControllerProvider.notifier).blockFriend(friend.id);
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
@@ -475,7 +520,7 @@ class _ReviewList extends StatelessWidget {
   }
 }
 
-enum _FriendAction { remove, block }
+enum _FriendAction { report, remove, block }
 
 class _FriendActionsSheet extends StatelessWidget {
   const _FriendActionsSheet({required this.friendName});
@@ -500,6 +545,13 @@ class _FriendActionsSheet extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _ActionRow(
+          icon: Icons.flag_outlined,
+          title: 'Report $friendName',
+          subtitle: 'Flag abuse or inappropriate content',
+          color: t.text,
+          onTap: () => Navigator.of(context).pop(_FriendAction.report),
+        ),
+        _ActionRow(
           icon: AgIcons.users,
           title: 'Remove friend',
           subtitle: 'You can send a new request later',
@@ -514,6 +566,79 @@ class _FriendActionsSheet extends StatelessWidget {
           onTap: () => Navigator.of(context).pop(_FriendAction.block),
         ),
         const SizedBox(height: 20),
+      ],
+    );
+  }
+}
+
+/// Reason picker shown after tapping "Report". Returns the chosen reason
+/// string (or null if dismissed) so the caller can file it with the backend.
+class _ReportReasonSheet extends StatelessWidget {
+  const _ReportReasonSheet({required this.friendName});
+  final String friendName;
+
+  static const List<String> _reasons = <String>[
+    'Spam or scam',
+    'Harassment or bullying',
+    'Inappropriate or offensive content',
+    'Impersonation or fake profile',
+    'Something else',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Report ${friendName.split(' ').first}',
+          style: TextStyle(
+            fontFamily: 'Bricolage Grotesque',
+            fontWeight: FontWeight.w800,
+            fontSize: 21,
+            letterSpacing: -0.4,
+            color: t.text,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          "Tell us what's wrong. Reports are confidential.",
+          style: TextStyle(fontFamily: 'Manrope', fontSize: 13, color: t.sub),
+        ),
+        const SizedBox(height: 16),
+        for (final reason in _reasons)
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(reason),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.line),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      reason,
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        color: t.text,
+                      ),
+                    ),
+                  ),
+                  Icon(AgIcons.chevron, size: 20, color: t.faint),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
       ],
     );
   }

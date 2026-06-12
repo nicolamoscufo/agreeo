@@ -480,6 +480,39 @@ async function unblockFriend(uid, targetUserId) {
   return result.records.length > 0;
 }
 
+// Records an abuse report as a :REPORTED edge so moderators can review user
+// or review content flagged by another user (App Store Guideline 1.2 / Play
+// UGC policy). Multiple reports are kept (CREATE, not MERGE) for an audit trail.
+async function reportUser(uid, targetUserId, { reason, context, contentId } = {}) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})
+    MATCH (target:AppUser {uid: $targetUserId})
+    WHERE me.uid <> target.uid
+    CREATE (me)-[report:REPORTED {
+      reportId: $reportId,
+      reason: $reason,
+      context: $context,
+      contentId: $contentId,
+      status: 'open',
+      createdAt: datetime()
+    }]->(target)
+    RETURN report.reportId AS reportId
+    LIMIT 1
+    `,
+    {
+      uid,
+      targetUserId,
+      reportId: randomUUID(),
+      reason: cleanString(reason).slice(0, 500),
+      context: cleanString(context).slice(0, 40),
+      contentId: cleanString(contentId).slice(0, 120),
+    }
+  );
+
+  return result.records.length > 0 ? result.records[0].get('reportId') : null;
+}
+
 async function getFriendProfile(uid, friendId) {
   const friendResult = await neo4jService.run(
     `
@@ -1783,6 +1816,7 @@ module.exports = {
   blockFriend,
   getBlockedUsers,
   unblockFriend,
+  reportUser,
   getFriendProfile,
   createMovieNight,
   inviteFriends,

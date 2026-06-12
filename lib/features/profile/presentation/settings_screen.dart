@@ -1,3 +1,4 @@
+import 'package:agreeo/config/app_links.dart';
 import 'package:agreeo/features/debug/presentation/neo4j_console_screen.dart';
 import 'package:agreeo/features/profile/presentation/blocked_users_screen.dart';
 import 'package:agreeo/features/profile/presentation/change_password_sheet.dart';
@@ -9,6 +10,35 @@ import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Cached once so the version row doesn't re-query the platform on rebuild.
+final Future<PackageInfo> _packageInfoFuture = PackageInfo.fromPlatform();
+
+Future<void> _openExternalUrl(BuildContext context, String url) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final uri = Uri.tryParse(url);
+  final ok = uri != null &&
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok) {
+    messenger.showSnackBar(const SnackBar(content: Text("Couldn't open the link.")));
+  }
+}
+
+Future<void> _openSupportEmail(BuildContext context) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final uri = Uri(
+    scheme: 'mailto',
+    path: AppLinks.supportEmail,
+    queryParameters: const {'subject': 'Agreeo support'},
+  );
+  if (!await launchUrl(uri)) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('No mail app found. Email ${AppLinks.supportEmail}')),
+    );
+  }
+}
 
 /// Profile › Settings. Appearance (theme mode), Privacy, Notifications, Account,
 /// Log out. Reference: `ag-states.jsx` SettingsScreen.
@@ -146,6 +176,36 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                       danger: true,
                       onTap: () => showDeleteAccountSheet(context),
                     ),
+                  ]),
+                  const SizedBox(height: 18),
+                  _SectionTitle(icon: Icons.info_outline_rounded, title: 'About & Support'),
+                  const SizedBox(height: 9),
+                  _Card(rows: [
+                    _NavRow(
+                      icon: AgIcons.shield,
+                      title: 'Privacy Policy',
+                      subtitle: 'How we handle your data',
+                      onTap: () => _openExternalUrl(context, AppLinks.privacyPolicy),
+                    ),
+                    _NavRow(
+                      icon: Icons.description_outlined,
+                      title: 'Terms of Service',
+                      subtitle: 'The rules for using Agreeo',
+                      onTap: () => _openExternalUrl(context, AppLinks.termsOfService),
+                    ),
+                    _NavRow(
+                      icon: AgIcons.mail,
+                      title: 'Contact support',
+                      subtitle: 'Questions, bugs or feedback',
+                      onTap: () => _openSupportEmail(context),
+                    ),
+                    _NavRow(
+                      icon: AgIcons.star,
+                      title: 'Rate Agreeo',
+                      subtitle: 'Leave a review on the store',
+                      onTap: () => _openExternalUrl(context, AppLinks.storeListing),
+                    ),
+                    const _VersionRow(),
                   ]),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.sliders, title: 'Developer'),
@@ -415,6 +475,28 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Read-only row in About & Support showing the installed app version/build.
+class _VersionRow extends StatelessWidget {
+  const _VersionRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: _packageInfoFuture,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        final version =
+            info == null ? '—' : '${info.version} (${info.buildNumber})';
+        return _InfoRow(
+          icon: Icons.info_outline_rounded,
+          title: 'Version',
+          subtitle: version,
+        );
+      },
     );
   }
 }

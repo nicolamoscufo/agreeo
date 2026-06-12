@@ -260,6 +260,28 @@ exports.blockFriend = async (req, res) => {
   }
 };
 
+exports.reportUser = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  const reason = cleanString(req.body && req.body.reason);
+  if (!reason) {
+    return res.status(400).json({ error: 'A reason is required to report a user' });
+  }
+
+  try {
+    const reportId = await socialRepository.reportUser(uid, req.params.id, {
+      reason,
+      context: cleanString(req.body && req.body.context),
+      contentId: cleanString(req.body && req.body.contentId),
+    });
+    if (!reportId) return res.status(404).json({ error: 'Report target not found' });
+    return res.json({ ok: true, reportId });
+  } catch (error) {
+    return handleError(res, error, 'Failed to report user');
+  }
+};
+
 async function hydrateFriendProfileMovies(profile) {
   if (!profile) return profile;
 

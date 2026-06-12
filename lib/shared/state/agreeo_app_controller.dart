@@ -92,6 +92,19 @@ class AgreeoAppState {
         .toList(growable: false);
   }
 
+  /// Movies for the Home "Made for you" rail. Personalized recommendations need
+  /// some swipe/like history before the backend can return picks, so on a cold
+  /// start (first launch, before the user swipes anything) [recommendedForYou]
+  /// is empty. Fall back to the genre-shaped daily suggestions, then trending,
+  /// so the rail is never empty on first launch.
+  List<Movie> get recommendedHomeMovies {
+    final personalized = recommendedForYou;
+    if (personalized.isNotEmpty) return personalized;
+    final daily = remainingDailySuggestions;
+    if (daily.isNotEmpty) return daily;
+    return trendingMovies;
+  }
+
   List<Movie> get trendingMovies {
     return moviesByIds(trendingIds);
   }

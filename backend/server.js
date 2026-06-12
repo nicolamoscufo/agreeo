@@ -185,6 +185,7 @@ app.get('/friends/blocked', verifyMiddleware, socialController.listBlockedUsers)
 app.delete('/friends/:id', verifyMiddleware, socialController.removeFriend);
 app.post('/friends/:id/block', verifyMiddleware, socialController.blockFriend);
 app.delete('/friends/:id/block', verifyMiddleware, socialController.unblockFriend);
+app.post('/friends/:id/report', verifyMiddleware, socialController.reportUser);
 app.get('/friends/:id/profile', verifyMiddleware, socialController.friendProfile);
 
 app.get('/movie-nights', verifyMiddleware, socialController.listMovieNights);

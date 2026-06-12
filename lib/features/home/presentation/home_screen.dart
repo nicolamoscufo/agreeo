@@ -13,6 +13,7 @@ import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/home_refresh_provider.dart';
+import 'package:agreeo/shared/state/nav_index_provider.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -286,11 +287,12 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               AgSectionHeader(
                 title: 'Made for you',
                 actionLabel: 'See all',
-                onAction: () {},
+                onAction: () =>
+                    ref.read(navIndexProvider.notifier).state = AgNavTab.swipe,
               ),
               const SizedBox(height: 14),
               _PosterRail(
-                movies: state.recommendedForYou,
+                movies: state.recommendedHomeMovies,
                 posterWidth: 132,
                 showMeta: true,
                 onTap: _openDetails,

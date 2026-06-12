@@ -213,6 +213,35 @@ test('blockFriend deletes friendship and creates BLOCKED relationship', async (t
   assert.deepEqual(calls[0].params, { uid: 'user-1', friendId: 'friend-4' });
 });
 
+test('reportUser creates a REPORTED edge and returns the report id', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return { records: [record({ reportId: 'report-1' })] };
+  };
+
+  const reportId = await socialRepository.reportUser('user-1', 'friend-7', {
+    reason: 'Harassment or bullying',
+    context: 'profile',
+    contentId: '',
+  });
+
+  assert.equal(reportId, 'report-1');
+  assert.match(calls[0].query, /CREATE \(me\)-\[report:REPORTED/);
+  assert.match(calls[0].query, /status: 'open'/);
+  assert.equal(calls[0].params.uid, 'user-1');
+  assert.equal(calls[0].params.targetUserId, 'friend-7');
+  assert.equal(calls[0].params.reason, 'Harassment or bullying');
+  assert.equal(calls[0].params.context, 'profile');
+  assert.equal(typeof calls[0].params.reportId, 'string');
+});
+
 test('cancelFriendRequest deletes only the pending outgoing request', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
