@@ -1,4 +1,4 @@
-import 'package:agreeo/models/neo4j/neo4j_models.dart';
+import 'package:agreeo/models/api_models.dart';
 import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 

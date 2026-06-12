@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:agreeo/config/backend_config.dart';
-import 'package:agreeo/models/neo4j/neo4j_models.dart';
+import 'package:agreeo/models/api_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
