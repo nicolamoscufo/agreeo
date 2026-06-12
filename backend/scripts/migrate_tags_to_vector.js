@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const neo4jService = require('./neo4jService');
-const embeddingService = require('./embeddingService');
+const neo4jService = require('../neo4jService');
+const embeddingService = require('../embeddingService');
 
-const CACHE_FILE = path.join(__dirname, 'data', 'tag_embeddings_multilingual_cache.json');
+const CACHE_FILE = path.join(__dirname, '..', 'data', 'tag_embeddings_multilingual_cache.json');
 
 async function migrate() {
   console.log('==================================================');

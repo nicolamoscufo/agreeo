@@ -64,10 +64,11 @@ Assicurati di aver installato sul tuo sistema:
 
 ## Seed del Database (Opzionale)
 
-Se hai bisogno di popolare il database con dati mock o script come Movielens dopo il primissimo avvio (quando il database Neo4j è completamente vuoto), il servizio NodeJS (backend) ha una cartella `/scripts` e file `seedInitialUsers.js`. Puoi ad esempio entrare nel terminare del backend NodeJS su docker:
+Se hai bisogno di popolare il database con dati mock o script come Movielens dopo il primissimo avvio (quando il database Neo4j è completamente vuoto), il servizio NodeJS (backend) ha una cartella `scripts/` con gli script one-off (`seedInitialUsers.js` per l'utente demo, `migrate_tags_to_vector.js` per la migrazione degli embedding). Puoi ad esempio entrare nel terminale del backend NodeJS su docker:
 
 ```bash
 docker exec -it agreeo_backend sh
-node seedInitialUsers.js
+npm run seed                 # utente demo (scripts/seedInitialUsers.js)
+npm run migrate:embeddings   # migrazione tag -> nodi vettoriali (scripts/migrate_tags_to_vector.js)
 ```
 Ovvero, assicurati di eseguire import/script di caricamento dati a seconda di quanto previsto dalla cartella `backend/scripts` (es. `import_movielens.cypher` importabile direttamente dal browser Web di Neo4j sulla porta `7474`).

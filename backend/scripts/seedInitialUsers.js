@@ -1,6 +1,6 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
-const neo4jService = require('./neo4jService');
+const neo4jService = require('../neo4jService');
 const bcrypt = require('bcryptjs');
 
 (async () => {
