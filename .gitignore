@@ -51,8 +51,8 @@ node_modules/
 npm-debug.log
 /package-lock.json
 
-# Local MovieLens dataset
-backend/data/movielens/
+# Cache embedding rigenerabili
+backend/data/tag_embeddings*.json
 
 # Local course material / generated structure dumps (keep out of the repo)
 DM2526*.pdf
