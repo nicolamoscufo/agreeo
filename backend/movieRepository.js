@@ -375,9 +375,15 @@ async function savePreferredGenres(uid, genres) {
     ? genres.map((genre) => String(genre).trim()).filter(Boolean)
     : [];
 
+  // Replace semantics: drop preferences no longer selected so the profile
+  // genre editor can remove genres, not only add them.
   const result = await neo4jService.run(
     `
     MATCH (u:AppUser {uid: $uid})
+    OPTIONAL MATCH (u)-[stale:PREFERS_GENRE]->(g:Genre)
+    WHERE NOT g.name IN $genres
+    DELETE stale
+    WITH DISTINCT u
     UNWIND $genres AS genreName
     MERGE (g:Genre {name: genreName})
     MERGE (u)-[r:PREFERS_GENRE]->(g)

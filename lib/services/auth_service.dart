@@ -297,6 +297,186 @@ class AuthService {
     }
   }
 
+  /// Sends an authorized request via [send]; on a 401 it refreshes the access
+  /// token once and retries, mirroring the recovery in [getCurrentNeo4jUser].
+  Future<http.Response?> _authorizedSend(
+    Future<http.Response> Function(String token) send,
+  ) async {
+    var token = await readToken();
+    if (token == null || token.isEmpty) return null;
+
+    var response = await send(token).timeout(_requestTimeout);
+    if (response.statusCode == 401) {
+      token = await _refreshAccessToken();
+      if (token == null || token.isEmpty) return response;
+      response = await send(token).timeout(_requestTimeout);
+    }
+    return response;
+  }
+
+  Map<String, String> _authHeaders(String token) => {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+
+  /// Persists profile fields on the backend. Only non-null fields are sent.
+  /// Returns the updated user, or null on failure (see [lastErrorMessage]).
+  Future<Neo4jUser?> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    try {
+      _lastErrorMessage = null;
+      final response = await _authorizedSend(
+        (token) => http.patch(
+          Uri.parse('${_config.meUrl}/profile'),
+          headers: _authHeaders(token),
+          body: jsonEncode({
+            'displayName': ?displayName,
+            'bio': ?bio,
+            'avatarUrl': ?avatarUrl,
+          }),
+        ),
+      );
+
+      if (response == null) {
+        _lastErrorMessage = 'Not signed in.';
+        return null;
+      }
+
+      if (response.statusCode != 200) {
+        _logBackendError('Update profile', response.body);
+        return null;
+      }
+
+      final data = _decodeBody(response.body);
+      final userMap = data['user'];
+      if (userMap is! Map<String, dynamic>) {
+        _lastErrorMessage = 'Malformed update profile response.';
+        return null;
+      }
+
+      final token = await readToken();
+      return _buildNeo4jUser(
+        email: (userMap['email'] ?? '') as String,
+        accessToken: token ?? '',
+        responseData: {'user': userMap},
+        isNewUser: false,
+      );
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      debugPrint('[AuthService] updateProfile exception: $e');
+      return null;
+    }
+  }
+
+  /// Persists privacy flags on the backend; the social layer reads them when
+  /// serving this user's profile to friends. Only non-null flags are sent.
+  Future<bool> updatePrivacy({
+    bool? canShowWatched,
+    bool? canShowReviews,
+    bool? canShowWatchlist,
+  }) async {
+    try {
+      _lastErrorMessage = null;
+      final response = await _authorizedSend(
+        (token) => http.patch(
+          Uri.parse('${_config.meUrl}/privacy'),
+          headers: _authHeaders(token),
+          body: jsonEncode({
+            'canShowWatched': ?canShowWatched,
+            'canShowReviews': ?canShowReviews,
+            'canShowWatchlist': ?canShowWatchlist,
+          }),
+        ),
+      );
+
+      if (response == null) {
+        _lastErrorMessage = 'Not signed in.';
+        return false;
+      }
+
+      if (response.statusCode != 200) {
+        _logBackendError('Update privacy', response.body);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      debugPrint('[AuthService] updatePrivacy exception: $e');
+      return false;
+    }
+  }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      _lastErrorMessage = null;
+      final response = await _authorizedSend(
+        (token) => http.post(
+          Uri.parse('${_config.meUrl}/password'),
+          headers: _authHeaders(token),
+          body: jsonEncode({
+            'currentPassword': currentPassword,
+            'newPassword': newPassword,
+          }),
+        ),
+      );
+
+      if (response == null) {
+        _lastErrorMessage = 'Not signed in.';
+        return false;
+      }
+
+      if (response.statusCode != 200) {
+        _logBackendError('Change password', response.body);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      debugPrint('[AuthService] changePassword exception: $e');
+      return false;
+    }
+  }
+
+  /// Permanently deletes the account on the backend (password re-check),
+  /// then clears the local tokens.
+  Future<bool> deleteAccount({required String password}) async {
+    try {
+      _lastErrorMessage = null;
+      final response = await _authorizedSend(
+        (token) => http.delete(
+          Uri.parse(_config.meUrl),
+          headers: _authHeaders(token),
+          body: jsonEncode({'password': password}),
+        ),
+      );
+
+      if (response == null) {
+        _lastErrorMessage = 'Not signed in.';
+        return false;
+      }
+
+      if (response.statusCode != 200) {
+        _logBackendError('Delete account', response.body);
+        return false;
+      }
+
+      await logout();
+      return true;
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      debugPrint('[AuthService] deleteAccount exception: $e');
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> _fetchMe(String accessToken) async {
     try {
       final response = await http.get(
@@ -372,6 +552,8 @@ class AuthService {
       displayName: displayName,
       email: resolvedEmail,
       createdAt: createdAt,
+      bio: (userMap['bio'] ?? '').toString(),
+      avatarUrl: (userMap['avatarUrl'] ?? '').toString(),
       onboardingCompleted: isNewUser ? false : onboardingCompletedValue == true,
     );
   }

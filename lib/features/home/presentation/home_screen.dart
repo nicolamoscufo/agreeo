@@ -212,7 +212,12 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
                   ),
-                  child: AgAvatar(name: state.session?.displayName ?? 'You', color: t.red, size: 44),
+                  child: AgAvatar(
+                    name: state.session?.displayName ?? 'You',
+                    color: t.red,
+                    imageUrl: state.session?.avatarUrl,
+                    size: 44,
+                  ),
                 ),
               ],
             ),
@@ -494,6 +499,7 @@ class _MovieNightCta extends StatelessWidget {
                               left: i * 28.0,
                               child: AgAvatar(
                                 name: (friends[i].name as String?) ?? 'Friend',
+                                imageUrl: friends[i].avatarUrl,
                                 size: 42,
                                 ring: true,
                               ),

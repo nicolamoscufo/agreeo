@@ -85,6 +85,57 @@ class _AcceptFailingBackendSocialService extends _RemoteSocialService {
   }
 }
 
+class _PendingRequestSocialService extends BackendSocialService {
+  _PendingRequestSocialService()
+    : super(config: const BackendConfig(baseUrl: 'http://localhost:3000'));
+
+  String? cancelledUserId;
+
+  @override
+  Future<SocialBackendSnapshot> loadSnapshot() async {
+    return const SocialBackendSnapshot(
+      friends: <Friend>[],
+      incomingRequests: <FriendRequest>[],
+      movieNights: <MovieNightEvent>[],
+    );
+  }
+
+  @override
+  Future<FriendSearchResponse> searchFriends(String query) async {
+    return FriendSearchResponse(
+      results: <Friend>[
+        Friend(
+          id: 'friend-pending',
+          name: 'Pending Friend',
+          avatarUrl: '',
+          watchedCount: 0,
+          reviewsCount: 0,
+          privacySettings: PrivacySettings.open(),
+        ),
+      ],
+      pendingIds: const <String>{'friend-pending'},
+      incomingRequestIdsByUserId: const <String, String>{},
+    );
+  }
+
+  @override
+  Future<SocialBackendSnapshot> cancelFriendRequest(String userId) async {
+    cancelledUserId = userId;
+    return const SocialBackendSnapshot(
+      friends: <Friend>[],
+      incomingRequests: <FriendRequest>[],
+      movieNights: <MovieNightEvent>[],
+    );
+  }
+}
+
+class _CancelFailingSocialService extends _PendingRequestSocialService {
+  @override
+  Future<SocialBackendSnapshot> cancelFriendRequest(String userId) async {
+    throw StateError('cancel failed');
+  }
+}
+
 void main() {
   test(
     'controller does not seed local fallback when backend is offline',
@@ -231,5 +282,71 @@ void main() {
     final state = container.read(friendsMovieNightControllerProvider);
     expect(state.friends.any((friend) => friend.id == friendId), false);
     expect(state.searchResults.any((friend) => friend.id == friendId), false);
+  });
+
+  test('cancel friend request clears the pending flag', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final service = _PendingRequestSocialService();
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.searchFriends('pending');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      container.read(friendsMovieNightControllerProvider).isPending('friend-pending'),
+      isTrue,
+    );
+
+    controller.cancelFriendRequest('friend-pending');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(service.cancelledUserId, 'friend-pending');
+    expect(
+      container.read(friendsMovieNightControllerProvider).isPending('friend-pending'),
+      isFalse,
+    );
+  });
+
+  test('cancel failure restores the pending flag', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final container = ProviderContainer(
+      overrides: <Override>[
+        backendSocialServiceProvider.overrideWithValue(
+          _CancelFailingSocialService(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      friendsMovieNightControllerProvider.notifier,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.searchFriends('pending');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.cancelFriendRequest('friend-pending');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(
+      container.read(friendsMovieNightControllerProvider).isPending('friend-pending'),
+      isTrue,
+    );
   });
 }

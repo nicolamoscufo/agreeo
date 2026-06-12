@@ -55,6 +55,23 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     );
   }
 
+  Future<void> _confirmCancelRequest(Friend friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Cancel request to ${friend.name}?'),
+        content: const Text('They will no longer see your friend request.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Keep it')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Cancel request')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    ref.read(friendsMovieNightControllerProvider.notifier).cancelFriendRequest(friend.id);
+    _toast('Friend request cancelled.');
+  }
+
   void _openCreateMovieNight() {
     HapticFeedback.mediumImpact();
     Navigator.of(context).push(
@@ -119,7 +136,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
                         ),
-                        child: AgAvatar(name: appState.session?.displayName ?? 'You', color: t.red, size: 42),
+                        child: AgAvatar(
+                          name: appState.session?.displayName ?? 'You',
+                          color: t.red,
+                          imageUrl: appState.session?.avatarUrl,
+                          size: 42,
+                        ),
                       ),
                     ],
                   ),
@@ -142,6 +164,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                         controller.sendFriendRequest(f.id);
                         _toast('Friend request sent to ${f.name}.');
                       },
+                      onCancelRequest: _confirmCancelRequest,
                     ),
                   ],
                   if (requests.isNotEmpty) ...[
@@ -349,11 +372,13 @@ class _SearchResults extends StatelessWidget {
     required this.social,
     required this.onAccept,
     required this.onAdd,
+    required this.onCancelRequest,
   });
   final List<Friend> results;
   final FriendsMovieNightState social;
   final ValueChanged<String> onAccept;
   final ValueChanged<Friend> onAdd;
+  final ValueChanged<Friend> onCancelRequest;
 
   @override
   Widget build(BuildContext context) {
@@ -379,14 +404,17 @@ class _SearchResults extends StatelessWidget {
             final isFriend = social.isFriend(f.id);
             final pending = social.isPending(f.id);
             final incomingId = social.incomingRequestIdFor(f.id);
+            final pendingOutgoing = pending && incomingId == null && !isFriend;
             final label = isFriend
                 ? 'Friends'
                 : incomingId != null
                     ? 'Accept'
-                    : pending
+                    : pendingOutgoing
                         ? 'Pending'
                         : 'Add';
-            final enabled = !isFriend && !(pending && incomingId == null);
+            // Pending stays tappable: tapping it offers to cancel the request.
+            final enabled = !isFriend;
+            final highlighted = enabled && !pendingOutgoing;
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -407,17 +435,25 @@ class _SearchResults extends StatelessWidget {
                   ),
                   GestureDetector(
                     onTap: enabled
-                        ? () => incomingId != null ? onAccept(incomingId) : onAdd(f)
+                        ? () {
+                            if (incomingId != null) {
+                              onAccept(incomingId);
+                            } else if (pendingOutgoing) {
+                              onCancelRequest(f);
+                            } else {
+                              onAdd(f);
+                            }
+                          }
                         : null,
                     child: Opacity(
                       opacity: enabled ? 1 : 0.5,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                         decoration: BoxDecoration(
-                          gradient: enabled ? t.grad : null,
-                          color: enabled ? null : t.surface2,
+                          gradient: highlighted ? t.grad : null,
+                          color: highlighted ? null : t.surface2,
                           borderRadius: BorderRadius.circular(11),
-                          border: enabled ? null : Border.all(color: t.line2),
+                          border: highlighted ? null : Border.all(color: t.line2),
                         ),
                         child: Text(
                           label,
@@ -425,7 +461,7 @@ class _SearchResults extends StatelessWidget {
                             fontFamily: 'Manrope',
                             fontWeight: FontWeight.w700,
                             fontSize: 12.5,
-                            color: enabled ? Colors.white : t.sub,
+                            color: highlighted ? Colors.white : t.sub,
                           ),
                         ),
                       ),

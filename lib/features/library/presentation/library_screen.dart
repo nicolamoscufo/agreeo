@@ -97,7 +97,12 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
                   ),
-                  child: AgAvatar(name: state.session?.displayName ?? 'You', color: t.red, size: 42),
+                  child: AgAvatar(
+                    name: state.session?.displayName ?? 'You',
+                    color: t.red,
+                    imageUrl: state.session?.avatarUrl,
+                    size: 42,
+                  ),
                 ),
               ],
             ),

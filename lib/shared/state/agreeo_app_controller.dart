@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:agreeo/services/backend_movie_service.dart';
+import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/services/backend_catalog_movie_service.dart';
@@ -230,7 +231,7 @@ class AgreeoAppState {
 
 class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   static const int swipeQueueRefillThreshold = 8;
-  static const int dailySuggestionBatchSize = 15;
+  static const int dailySuggestionBatchSize = 20;
 
   AgreeoAppController(
     this._ref,
@@ -324,6 +325,25 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       _ref.read(realTimeServiceProvider).connect(state.session!.id);
       await _syncLibraryFromBackend();
     }
+
+    unawaited(_syncDailyReminderSchedule());
+  }
+
+  /// Keeps the recurring 24h daily-picks reminder aligned with the session and
+  /// the Settings toggle: scheduled while signed in with the toggle on,
+  /// cancelled otherwise. Re-scheduling on every app open resets the window,
+  /// so the reminder only fires after a full day away from the app.
+  Future<void> _syncDailyReminderSchedule() async {
+    if (state.isAuthenticated &&
+        state.profilePreferences.dailySuggestionReminder) {
+      await NotificationService.instance.scheduleDailySuggestionReminder(
+        title: 'Your daily picks are in',
+        body:
+            "$dailySuggestionBatchSize fresh movies are waiting — swipe to find tonight's watch.",
+      );
+    } else {
+      await NotificationService.instance.cancelDailySuggestionReminder();
+    }
   }
 
   Future<void> _restoreStoredLogin() async {
@@ -367,6 +387,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     await _persist();
     _ref.read(realTimeServiceProvider).connect(session.id);
     await _syncLibraryFromBackend();
+    unawaited(_syncDailyReminderSchedule());
   }
 
   Future<void> logIn({required String email, required String password}) async {
@@ -422,6 +443,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     await _persist();
     _ref.read(realTimeServiceProvider).connect(session.id);
     await _syncLibraryFromBackend();
+    unawaited(_syncDailyReminderSchedule());
   }
 
   Future<void> logOut() async {
@@ -435,6 +457,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       trendingIds: const <String>[],
     );
     await _persist();
+    unawaited(_syncDailyReminderSchedule());
   }
 
   Future<void> _syncLibraryFromBackend() async {
@@ -620,23 +643,72 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     await _persist();
   }
 
+  /// Persists profile fields on the backend, then mirrors the saved values
+  /// into the local session. Pass [avatarUrl] as '' to remove the photo.
+  /// Throws [BackendAuthException] when the backend rejects the update.
   Future<void> updateProfile({
     required String displayName,
     required String bio,
+    String? avatarUrl,
   }) async {
     final currentSession = state.session;
     if (currentSession == null) {
       return;
     }
+
+    final resolvedDisplayName = displayName.trim().isEmpty
+        ? currentSession.displayName
+        : displayName.trim();
+
+    final updated = await _authService.updateProfile(
+      displayName: resolvedDisplayName,
+      bio: bio.trim(),
+      avatarUrl: avatarUrl,
+    );
+
     state = state.copyWith(
       session: currentSession.copyWith(
-        displayName: displayName.trim().isEmpty
-            ? currentSession.displayName
-            : displayName.trim(),
-        bio: bio.trim(),
+        displayName: updated.displayName,
+        bio: updated.bio,
+        avatarUrl: updated.avatarUrl,
       ),
     );
     await _persist();
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _authService.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  /// Deletes the account on the backend (which detaches every relationship in
+  /// Neo4j), then resets the app to the signed-out state.
+  Future<void> deleteAccount({required String password}) async {
+    await _authService.deleteAccount(password: password);
+    _ref.read(realTimeServiceProvider).disconnect();
+    state = AgreeoAppState.initial().copyWith(
+      hydrated: true,
+      catalog: state.catalog,
+    );
+    await _persist();
+    unawaited(_syncDailyReminderSchedule());
+  }
+
+  /// Updates the favorite genres from the profile (post-onboarding) and
+  /// refreshes the discovery feeds, which are shaped by these preferences.
+  Future<void> updateFavoriteGenres(List<String> genres) async {
+    final normalized = genres.toList(growable: false);
+    await _authService.updateFavoriteGenres(normalized);
+    state = state.copyWith(
+      onboarding: state.onboarding.copyWith(favoriteGenres: normalized),
+    );
+    await _persist();
+    unawaited(_refreshDiscoveryFeeds());
   }
 
   Future<void> setPrivacyPreference({
@@ -661,6 +733,25 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       ),
     );
     await _persist();
+
+    // Local-first toggle; mirror the flags the social layer actually enforces
+    // onto the AppUser node in the background (liked has no friend-facing
+    // surface, so it stays local).
+    if (showWatchedToFriends != null ||
+        showReviewsToFriends != null ||
+        showWatchlistToFriends != null) {
+      unawaited(
+        _authService
+            .updatePrivacy(
+              canShowWatched: showWatchedToFriends,
+              canShowReviews: showReviewsToFriends,
+              canShowWatchlist: showWatchlistToFriends,
+            )
+            .catchError((Object e) {
+              debugPrint('[AgreeoAppController] Privacy backend sync failed: $e');
+            }),
+      );
+    }
   }
 
   Future<void> setNotificationPreference({
@@ -683,6 +774,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       ),
     );
     await _persist();
+
+    if (dailySuggestionReminder != null) {
+      unawaited(_syncDailyReminderSchedule());
+    }
   }
 
   Future<String> likeMovie(String movieId) async {

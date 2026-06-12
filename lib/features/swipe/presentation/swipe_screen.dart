@@ -214,6 +214,7 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
                   child: AgAvatar(
                     name: state.session?.displayName ?? 'You',
                     color: t.red,
+                    imageUrl: state.session?.avatarUrl,
                     size: 42,
                   ),
                 ),

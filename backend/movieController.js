@@ -533,8 +533,10 @@ function mapRepositoryMovieToResponse(movie) {
     overview: movie.overview || '',
     posterPath: movie.posterPath,
     backdropPath: movie.backdropPath,
-    posterUrl: movie.posterUrl || '',
-    backdropUrl: movie.backdropUrl || '',
+    // Some Neo4j nodes carry only the raw TMDB path (no prebuilt URL):
+    // fall back so clients never receive a poster-less movie that has one.
+    posterUrl: movie.posterUrl || imageUrl(movie.posterPath, 'w500'),
+    backdropUrl: movie.backdropUrl || imageUrl(movie.backdropPath, 'w780'),
     releaseDate: movie.releaseDate || '',
     runtime: movie.runtime == null ? null : movie.runtime,
     director: movie.director || '',
@@ -1080,6 +1082,8 @@ exports.updateOnboarding = async (req, res) => {
         u.uid AS uid,
         u.email AS email,
         u.displayName AS displayName,
+        coalesce(u.bio, '') AS bio,
+        coalesce(u.avatarUrl, '') AS avatarUrl,
         toString(u.createdAt) AS createdAt,
         coalesce(u.onboardingCompleted, false) AS onboardingCompleted,
         coalesce(u.roles, ['USER']) AS roles
@@ -1096,6 +1100,8 @@ exports.updateOnboarding = async (req, res) => {
         uid: record.get('uid'),
         email: record.get('email'),
         displayName: record.get('displayName'),
+        bio: record.get('bio') || '',
+        avatarUrl: record.get('avatarUrl') || '',
         createdAt: record.get('createdAt'),
         onboardingCompleted: record.get('onboardingCompleted') === true,
         roles: record.get('roles') || ['USER'],
@@ -1236,6 +1242,15 @@ exports.library = async (req, res) => {
   try {
     const library = await movieRepository.getUserLibrary(uid);
     const hydratedLibrary = await hydrateLibraryIfNeeded(library);
+    // The library carries raw node properties: nodes saved with only a TMDB
+    // path (no prebuilt URL) would otherwise reach clients poster-less.
+    for (const key of ['liked', 'disliked', 'watchlist', 'alreadySeen']) {
+      hydratedLibrary[key] = (hydratedLibrary[key] || []).map((movie) => ({
+        ...movie,
+        posterUrl: movie.posterUrl || imageUrl(movie.posterPath, 'w500'),
+        backdropUrl: movie.backdropUrl || imageUrl(movie.backdropPath, 'w780'),
+      }));
+    }
     return res.json(hydratedLibrary);
   } catch (error) {
     return handleError(res, error, 'Failed to load user library');

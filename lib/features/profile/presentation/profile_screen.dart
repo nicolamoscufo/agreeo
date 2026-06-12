@@ -1,4 +1,5 @@
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
+import 'package:agreeo/features/profile/presentation/edit_genres_sheet.dart';
 import 'package:agreeo/features/profile/presentation/edit_profile_sheet.dart';
 import 'package:agreeo/features/profile/presentation/settings_screen.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
@@ -71,7 +72,12 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   onTap: session == null
                       ? null
                       : () => showEditProfileSheet(context, session),
-                  child: AgAvatar(name: name, color: t.red, size: 88),
+                  child: AgAvatar(
+                    name: name,
+                    color: t.red,
+                    imageUrl: session?.avatarUrl,
+                    size: 88,
+                  ),
                 ),
                 const SizedBox(height: 13),
                 Text(
@@ -84,6 +90,20 @@ class AgreeoProfileScreen extends ConsumerWidget {
                     color: t.text,
                   ),
                 ),
+                if (session != null) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(AgIcons.calendar, size: 12, color: t.faint),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Member since ${_memberSince(session.joinedAt)}',
+                        style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 11.5, color: t.faint),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -115,12 +135,39 @@ class AgreeoProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            if (genres.isNotEmpty) ...[
-              Text(
-                'Favorite genres',
-                style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
-              ),
-              const SizedBox(height: 11),
+            Row(
+              children: [
+                Text(
+                  'Favorite genres',
+                  style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => showEditGenresSheet(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      Icon(AgIcons.edit, size: 14, color: t.red),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Edit',
+                        style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, color: t.red),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 11),
+            if (genres.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Text(
+                  'No genres picked yet — tap Edit to shape your recommendations.',
+                  style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
+                ),
+              )
+            else ...[
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -157,6 +204,15 @@ class AgreeoProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  String _memberSince(DateTime joinedAt) {
+    return '${_months[joinedAt.month - 1]} ${joinedAt.year}';
   }
 
   List<_Activity> _recentActivity(AgreeoAppState state) {

@@ -25,7 +25,8 @@ const corsOrigins = (process.env.CORS_ORIGINS || '')
   .filter(Boolean);
 app.use(helmet());
 app.use(cors(corsOrigins.length > 0 ? { origin: corsOrigins } : undefined));
-app.use(express.json());
+// 1mb (default is 100kb) so profile avatars uploaded as base64 data URIs fit.
+app.use(express.json({ limit: '1mb' }));
 
 // Needed for correct client IP detection behind a reverse proxy (nginx).
 app.set('trust proxy', 1);
@@ -114,6 +115,8 @@ app.get('/me', verifyMiddleware, async (req, res) => {
         u.uid AS uid,
         u.email AS email,
         u.displayName AS displayName,
+        coalesce(u.bio, '') AS bio,
+        coalesce(u.avatarUrl, '') AS avatarUrl,
         toString(u.createdAt) AS createdAt,
         coalesce(u.onboardingCompleted, false) AS onboardingCompleted,
         coalesce(u.roles, ['USER']) AS roles
@@ -135,6 +138,8 @@ app.get('/me', verifyMiddleware, async (req, res) => {
         uid: record.get('uid'),
         email: record.get('email'),
         displayName: record.get('displayName'),
+        bio: record.get('bio') || '',
+        avatarUrl: record.get('avatarUrl') || '',
         createdAt: record.get('createdAt'),
         onboardingCompleted: record.get('onboardingCompleted') === true,
         roles: record.get('roles') || ['USER'],
@@ -149,6 +154,12 @@ app.get('/me', verifyMiddleware, async (req, res) => {
 });
 
 app.patch('/me/onboarding', verifyMiddleware, movieController.updateOnboarding);
+app.patch('/me/profile', verifyMiddleware, authController.updateProfile);
+app.patch('/me/privacy', verifyMiddleware, authController.updatePrivacy);
+// Password change and account deletion are credential-sensitive: rate-limit
+// them like login/register to slow down brute-force attempts.
+app.post('/me/password', verifyMiddleware, authLimiter, authController.changePassword);
+app.delete('/me', verifyMiddleware, authLimiter, authController.deleteAccount);
 
 app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
 app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
@@ -169,8 +180,11 @@ app.get('/friends/search', verifyMiddleware, socialController.searchFriends);
 app.post('/friends/requests', verifyMiddleware, socialController.sendFriendRequest);
 app.post('/friends/requests/:id/accept', verifyMiddleware, socialController.acceptFriendRequest);
 app.post('/friends/requests/:id/decline', verifyMiddleware, socialController.declineFriendRequest);
+app.delete('/friends/requests/outgoing/:userId', verifyMiddleware, socialController.cancelFriendRequest);
+app.get('/friends/blocked', verifyMiddleware, socialController.listBlockedUsers);
 app.delete('/friends/:id', verifyMiddleware, socialController.removeFriend);
 app.post('/friends/:id/block', verifyMiddleware, socialController.blockFriend);
+app.delete('/friends/:id/block', verifyMiddleware, socialController.unblockFriend);
 app.get('/friends/:id/profile', verifyMiddleware, socialController.friendProfile);
 
 app.get('/movie-nights', verifyMiddleware, socialController.listMovieNights);

@@ -125,6 +125,60 @@ class _StoredLoginAuthService extends BackendAuthSessionService {
   Future<bool> isOnboardingCompleted() async => onboardingCompleted;
 }
 
+/// Records profile/account calls and answers them locally, so controller
+/// tests never hit the network.
+class _ProfileAuthService extends BackendAuthSessionService {
+  String? updatedDisplayName;
+  String? updatedBio;
+  String? updatedAvatarUrl;
+  List<String>? updatedGenres;
+  String? deletedWithPassword;
+
+  @override
+  Future<AgreeoUserSession> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    updatedDisplayName = displayName;
+    updatedBio = bio;
+    updatedAvatarUrl = avatarUrl;
+    return AgreeoUserSession(
+      id: 'user-1',
+      displayName: displayName ?? 'User',
+      email: 'user@example.com',
+      bio: bio ?? '',
+      joinedAt: DateTime(2026, 4, 11),
+      avatarUrl: avatarUrl ?? '',
+    );
+  }
+
+  @override
+  Future<void> updateFavoriteGenres(List<String> favoriteGenres) async {
+    updatedGenres = favoriteGenres;
+  }
+
+  @override
+  Future<void> deleteAccount({required String password}) async {
+    deletedWithPassword = password;
+  }
+
+  bool? pushedCanShowWatched;
+  bool? pushedCanShowReviews;
+  bool? pushedCanShowWatchlist;
+
+  @override
+  Future<void> updatePrivacy({
+    bool? canShowWatched,
+    bool? canShowReviews,
+    bool? canShowWatchlist,
+  }) async {
+    pushedCanShowWatched = canShowWatched;
+    pushedCanShowReviews = canShowReviews;
+    pushedCanShowWatchlist = canShowWatchlist;
+  }
+}
+
 Movie _movie(String id) {
   return Movie(
     id: id,
@@ -272,5 +326,126 @@ void main() {
 
     expect(controller.state.session?.id, restoredSession.id);
     expect(controller.state.onboardingComplete, isTrue);
+  });
+
+  test('updateProfile persists to the backend and mirrors the session', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final authService = _ProfileAuthService();
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      authService,
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.state = controller.state.copyWith(
+      hydrated: true,
+      session: AgreeoUserSession(
+        id: 'user-1',
+        displayName: 'Old Name',
+        email: 'user@example.com',
+        bio: 'Old bio',
+        joinedAt: DateTime(2026, 4, 11),
+      ),
+    );
+
+    await controller.updateProfile(
+      displayName: 'New Name',
+      bio: 'New bio',
+      avatarUrl: 'data:image/jpeg;base64,AAAA',
+    );
+
+    expect(authService.updatedDisplayName, 'New Name');
+    expect(authService.updatedBio, 'New bio');
+    expect(authService.updatedAvatarUrl, 'data:image/jpeg;base64,AAAA');
+    expect(controller.state.session?.displayName, 'New Name');
+    expect(controller.state.session?.bio, 'New bio');
+    expect(controller.state.session?.avatarUrl, 'data:image/jpeg;base64,AAAA');
+  });
+
+  test('updateFavoriteGenres persists and updates onboarding state', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final authService = _ProfileAuthService();
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      authService,
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    await controller.updateFavoriteGenres(<String>['Drama', 'Sci-Fi', 'Crime']);
+
+    expect(authService.updatedGenres, <String>['Drama', 'Sci-Fi', 'Crime']);
+    expect(
+      controller.state.onboarding.favoriteGenres,
+      <String>['Drama', 'Sci-Fi', 'Crime'],
+    );
+  });
+
+  test('deleteAccount clears the session and resets state', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final authService = _ProfileAuthService();
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      authService,
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    controller.state = controller.state.copyWith(
+      hydrated: true,
+      session: AgreeoUserSession(
+        id: 'user-1',
+        displayName: 'User',
+        email: 'user@example.com',
+        bio: 'Bio',
+        joinedAt: DateTime(2026, 4, 11),
+      ),
+    );
+
+    await controller.deleteAccount(password: 'secret123');
+
+    expect(authService.deletedWithPassword, 'secret123');
+    expect(controller.state.session, isNull);
+    expect(controller.state.hydrated, isTrue);
+  });
+
+  test('setPrivacyPreference mirrors enforced flags to the backend', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final authService = _ProfileAuthService();
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      authService,
+      LocalUserMovieStateService(),
+      BackendMovieService(),
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    await controller.setPrivacyPreference(showWatchlistToFriends: true);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.profilePreferences.showWatchlistToFriends, isTrue);
+    expect(authService.pushedCanShowWatchlist, isTrue);
+    expect(authService.pushedCanShowWatched, isNull);
+    expect(authService.pushedCanShowReviews, isNull);
   });
 }

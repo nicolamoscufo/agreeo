@@ -174,6 +174,36 @@ class BackendSocialService {
     );
   }
 
+  /// Cancels my pending outgoing friend request to [userId].
+  Future<SocialBackendSnapshot> cancelFriendRequest(String userId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest(
+        'DELETE',
+        '/friends/requests/outgoing/$userId',
+      )).body,
+    );
+    return SocialBackendSnapshot(
+      friends: _decodeFriends(body['friends']),
+      incomingRequests: _decodeFriendRequests(body['incomingRequests']),
+      movieNights: const <MovieNightEvent>[],
+    );
+  }
+
+  Future<List<Friend>> getBlockedUsers() async {
+    final body = _decodeMap(
+      (await _authorizedRequest('GET', '/friends/blocked')).body,
+    );
+    return _decodeFriends(body['blocked']);
+  }
+
+  /// Unblocks [userId]; returns the refreshed blocked list.
+  Future<List<Friend>> unblockFriend(String userId) async {
+    final body = _decodeMap(
+      (await _authorizedRequest('DELETE', '/friends/$userId/block')).body,
+    );
+    return _decodeFriends(body['blocked']);
+  }
+
   Future<FriendProfile> getFriendProfile(String friendId) async {
     final body = _decodeMap(
       (await _authorizedRequest('GET', '/friends/$friendId/profile')).body,

@@ -76,6 +76,72 @@ class BackendAuthSessionService {
     );
   }
 
+  /// Persists profile fields on the backend and returns the updated session.
+  /// Only non-null fields are sent.
+  Future<AgreeoUserSession> updateProfile({
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    final user = await _authService.updateProfile(
+      displayName: displayName,
+      bio: bio,
+      avatarUrl: avatarUrl,
+    );
+    if (user == null) {
+      throw BackendAuthException(
+        _authService.lastErrorMessage ?? 'Unable to update the profile.',
+      );
+    }
+    return _toSession(user);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final success = await _authService.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    if (!success) {
+      throw BackendAuthException(
+        _authService.lastErrorMessage ?? 'Unable to change the password.',
+      );
+    }
+  }
+
+  Future<void> deleteAccount({required String password}) async {
+    final success = await _authService.deleteAccount(password: password);
+    if (!success) {
+      throw BackendAuthException(
+        _authService.lastErrorMessage ?? 'Unable to delete the account.',
+      );
+    }
+  }
+
+  Future<void> updateFavoriteGenres(List<String> favoriteGenres) async {
+    await _authService.markOnboardingCompleted(favoriteGenres: favoriteGenres);
+  }
+
+  /// Pushes privacy flags to the backend so friend profiles respect them.
+  Future<void> updatePrivacy({
+    bool? canShowWatched,
+    bool? canShowReviews,
+    bool? canShowWatchlist,
+  }) async {
+    final success = await _authService.updatePrivacy(
+      canShowWatched: canShowWatched,
+      canShowReviews: canShowReviews,
+      canShowWatchlist: canShowWatchlist,
+    );
+    if (!success) {
+      throw BackendAuthException(
+        _authService.lastErrorMessage ?? 'Unable to update privacy settings.',
+      );
+    }
+  }
+
   Future<AgreeoUserSession> _loadSessionFromBackend() async {
     final user = await _authService.getCurrentNeo4jUser();
     if (user == null) {
@@ -92,8 +158,9 @@ class BackendAuthSessionService {
       id: user.uid,
       displayName: user.displayName,
       email: user.email,
-      bio: 'Always looking for the one title everyone says yes to.',
+      bio: user.bio,
       joinedAt: DateTime.tryParse(user.createdAt) ?? DateTime.now(),
+      avatarUrl: user.avatarUrl,
     );
   }
 }

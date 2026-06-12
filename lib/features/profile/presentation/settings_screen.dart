@@ -1,4 +1,7 @@
 import 'package:agreeo/features/debug/presentation/neo4j_console_screen.dart';
+import 'package:agreeo/features/profile/presentation/blocked_users_screen.dart';
+import 'package:agreeo/features/profile/presentation/change_password_sheet.dart';
+import 'package:agreeo/features/profile/presentation/delete_account_sheet.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/theme_mode_provider.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
@@ -83,6 +86,14 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                       value: prefs.showReviewsToFriends,
                       onChanged: (v) => controller.setPrivacyPreference(showReviewsToFriends: v),
                     ),
+                    _NavRow(
+                      icon: AgIcons.shield,
+                      title: 'Blocked users',
+                      subtitle: 'See and unblock people you blocked',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => const BlockedUsersScreen()),
+                      ),
+                    ),
                   ]),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.bell, title: 'Notifications'),
@@ -122,6 +133,19 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                       title: state.session?.email ?? 'you@agreeo.app',
                       subtitle: 'Signed in',
                     ),
+                    _NavRow(
+                      icon: AgIcons.lock,
+                      title: 'Change password',
+                      subtitle: 'Update your sign-in password',
+                      onTap: () => showChangePasswordSheet(context),
+                    ),
+                    _NavRow(
+                      icon: AgIcons.trash,
+                      title: 'Delete account',
+                      subtitle: 'Permanently erase your data',
+                      danger: true,
+                      onTap: () => showDeleteAccountSheet(context),
+                    ),
                   ]),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.sliders, title: 'Developer'),
@@ -139,7 +163,10 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   _LogoutButton(onTap: () async {
                     HapticFeedback.mediumImpact();
+                    final navigator = Navigator.of(context);
                     await controller.logOut();
+                    // Pop Settings/Profile so the signed-out gate is visible.
+                    navigator.popUntil((route) => route.isFirst);
                   }),
                 ],
               ),
@@ -398,11 +425,15 @@ class _NavRow extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.subtitle,
+    this.danger = false,
   });
   final IconData icon;
   final String title;
   final String? subtitle;
   final VoidCallback onTap;
+
+  /// Tints icon and title red for destructive entries (e.g. Delete account).
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
@@ -414,7 +445,7 @@ class _NavRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: t.sub),
+            Icon(icon, size: 20, color: danger ? t.red : t.sub),
             const SizedBox(width: 13),
             Expanded(
               child: Column(
@@ -422,7 +453,7 @@ class _NavRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: t.text),
+                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: danger ? t.red : t.text),
                   ),
                   if (subtitle != null)
                     Text(

@@ -213,6 +213,81 @@ test('blockFriend deletes friendship and creates BLOCKED relationship', async (t
   assert.deepEqual(calls[0].params, { uid: 'user-1', friendId: 'friend-4' });
 });
 
+test('cancelFriendRequest deletes only the pending outgoing request', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return { records: [record({ targetUserId: 'friend-5' })] };
+  };
+
+  const cancelled = await socialRepository.cancelFriendRequest('user-1', 'friend-5');
+
+  assert.equal(cancelled, true);
+  assert.match(
+    calls[0].query,
+    /MATCH \(me:AppUser \{uid: \$uid\}\)-\[r:SENT_FRIEND_REQUEST \{status: 'pending'\}\]->\(target:AppUser \{uid: \$targetUserId\}\)/
+  );
+  assert.match(calls[0].query, /DELETE r/);
+  assert.deepEqual(calls[0].params, { uid: 'user-1', targetUserId: 'friend-5' });
+});
+
+test('cancelFriendRequest reports false when no pending request exists', async (t) => {
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async () => ({ records: [] });
+
+  assert.equal(await socialRepository.cancelFriendRequest('user-1', 'friend-5'), false);
+});
+
+test('getBlockedUsers lists BLOCKED targets and unblockFriend deletes the relationship', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    if (calls.length === 1) {
+      return {
+        records: [
+          record({
+            user: {
+              id: 'friend-6',
+              name: 'Blocked Person',
+              avatarUrl: '',
+              bio: '',
+              blockedAt: '2026-06-12T00:00:00Z',
+            },
+          }),
+        ],
+      };
+    }
+    return { records: [record({ targetUserId: 'friend-6' })] };
+  };
+
+  const blocked = await socialRepository.getBlockedUsers('user-1');
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0].id, 'friend-6');
+  assert.match(calls[0].query, /MATCH \(me:AppUser \{uid: \$uid\}\)-\[blocked:BLOCKED\]->\(target:AppUser\)/);
+
+  const unblocked = await socialRepository.unblockFriend('user-1', 'friend-6');
+  assert.equal(unblocked, true);
+  assert.match(calls[1].query, /DELETE blocked/);
+  assert.deepEqual(calls[1].params, { uid: 'user-1', targetUserId: 'friend-6' });
+});
+
 test('generateShortlist calculates group taste vector and queries candidate movies using vector index', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;

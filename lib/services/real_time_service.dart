@@ -6,6 +6,7 @@ import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/services/notification_service.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
+import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 
@@ -91,6 +92,12 @@ class RealTimeService {
     _socket!.on('friend_request_declined', (data) {
       debugPrint('[RealTimeService] friend_request_declined: $data');
       _handleFriendRequestDeclined(data);
+    });
+
+    _socket!.on('friend_request_cancelled', (data) {
+      debugPrint('[RealTimeService] friend_request_cancelled: $data');
+      // The sender withdrew their request: drop it from incoming lists.
+      _refreshSocial();
     });
 
     // Listen to movie night events
@@ -196,6 +203,16 @@ class RealTimeService {
     _refreshSocial();
   }
 
+  /// Notification toggles from Settings: gate the system banners (the in-app
+  /// notifications list still records everything for history).
+  bool _notificationEnabled(bool Function(ProfilePreferences prefs) select) {
+    try {
+      return select(_ref.read(agreeoAppControllerProvider).profilePreferences);
+    } catch (_) {
+      return true;
+    }
+  }
+
   void _handleMovieNightInvite(dynamic data) {
     String hostName = 'Someone';
     String eventName = 'Movie Night';
@@ -208,11 +225,13 @@ class RealTimeService {
       }
     } catch (_) {}
 
-    NotificationService.instance.showGenericNotification(
-      id: 3001,
-      title: 'Movie Night Invite',
-      body: '$hostName invited you to "$eventName".',
-    );
+    if (_notificationEnabled((prefs) => prefs.movieNightInvites)) {
+      NotificationService.instance.showGenericNotification(
+        id: 3001,
+        title: 'Movie Night Invite',
+        body: '$hostName invited you to "$eventName".',
+      );
+    }
     _refreshAll();
   }
 
@@ -231,11 +250,13 @@ class RealTimeService {
       }
     } catch (_) {}
 
-    NotificationService.instance.showGenericNotification(
-      id: 3002,
-      title: 'Voting Started',
-      body: 'Voting has started for "$eventName"!',
-    );
+    if (_notificationEnabled((prefs) => prefs.votingStarted)) {
+      NotificationService.instance.showGenericNotification(
+        id: 3002,
+        title: 'Voting Started',
+        body: 'Voting has started for "$eventName"!',
+      );
+    }
     if (decodedEvent != null) {
       _ref
           .read(friendsMovieNightControllerProvider.notifier)
@@ -268,11 +289,13 @@ class RealTimeService {
       }
     } catch (_) {}
 
-    NotificationService.instance.showGenericNotification(
-      id: 3003,
-      title: 'Movie Night Completed',
-      body: 'Decision reached for "$eventName"! Winner: $winnerTitle.',
-    );
+    if (_notificationEnabled((prefs) => prefs.finalDecisionReached)) {
+      NotificationService.instance.showGenericNotification(
+        id: 3003,
+        title: 'Movie Night Completed',
+        body: 'Decision reached for "$eventName"! Winner: $winnerTitle.',
+      );
+    }
     if (decodedEvent != null) {
       _ref
           .read(friendsMovieNightControllerProvider.notifier)

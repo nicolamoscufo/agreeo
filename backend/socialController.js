@@ -184,6 +184,28 @@ exports.declineFriendRequest = async (req, res) => {
   }
 };
 
+exports.cancelFriendRequest = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+  const targetUserId = cleanString(req.params.userId);
+  if (!targetUserId) return res.status(400).json({ error: 'userId is required' });
+
+  try {
+    const cancelled = await socialRepository.cancelFriendRequest(uid, targetUserId);
+    if (!cancelled) return res.status(404).json({ error: 'Pending friend request not found' });
+
+    // Let the target drop the request from their incoming list in real time.
+    socketService.emitToUser(targetUserId, 'friend_request_cancelled', {
+      fromUserId: uid,
+    });
+
+    const social = await socialRepository.getFriends(uid);
+    return res.json({ ok: true, ...social });
+  } catch (error) {
+    return handleError(res, error, 'Failed to cancel friend request');
+  }
+};
+
 exports.removeFriend = async (req, res) => {
   const uid = requireUid(req, res);
   if (!uid) return;
@@ -195,6 +217,32 @@ exports.removeFriend = async (req, res) => {
     return res.json({ ok: true, ...social });
   } catch (error) {
     return handleError(res, error, 'Failed to remove friend');
+  }
+};
+
+exports.listBlockedUsers = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const blocked = await socialRepository.getBlockedUsers(uid);
+    return res.json({ blocked });
+  } catch (error) {
+    return handleError(res, error, 'Failed to load blocked users');
+  }
+};
+
+exports.unblockFriend = async (req, res) => {
+  const uid = requireUid(req, res);
+  if (!uid) return;
+
+  try {
+    const unblocked = await socialRepository.unblockFriend(uid, req.params.id);
+    if (!unblocked) return res.status(404).json({ error: 'Blocked user not found' });
+    const blocked = await socialRepository.getBlockedUsers(uid);
+    return res.json({ ok: true, blocked });
+  } catch (error) {
+    return handleError(res, error, 'Failed to unblock user');
   }
 };
 

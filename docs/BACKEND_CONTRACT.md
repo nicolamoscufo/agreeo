@@ -54,8 +54,22 @@ Auth/onboarding: `signUp({...})`, `logIn({email,password})`, `logOut()`,
 `finishOnboarding()`.
 Feeds: `refreshMovieSuggestions()`, `refreshHomeFeed({page})`,
 `ensureSwipeQueueFilled({force})`, `syncLibrary()`.
-Profile: `updateProfile({displayName, bio})` *(no avatar field)*,
-`setPrivacyPreference({...4 bools})`, `setNotificationPreference({...4 bools})`.
+Profile: `updateProfile({displayName, bio, avatarUrl?})` *(persisted via
+`PATCH /me/profile`; avatarUrl is an https URL or base64 data URI, '' removes it)*,
+`updateFavoriteGenres(List<String>)` *(replaces `PREFERS_GENRE` via
+`PATCH /me/onboarding`)*, `changePassword({currentPassword, newPassword})`
+*(`POST /me/password`)*, `deleteAccount({password})` *(`DELETE /me`, DETACH
+DELETE + local sign-out)*, `setPrivacyPreference({...4 bools})` *(local-first;
+mirrors `canShowWatched/canShowReviews/canShowWatchlist` to the AppUser node via
+`PATCH /me/privacy`, which the social layer enforces on friend profiles — the
+"liked" toggle stays local as no friend surface shows likes)*,
+`setNotificationPreference({...4 bools})` *(enforced by `RealTimeService`:
+movie-night invite / voting-started / decision banners are suppressed when the
+matching toggle is off; the in-app notifications list keeps full history.
+`dailySuggestionReminder` schedules a recurring 24h local notification via
+`NotificationService.scheduleDailySuggestionReminder` — re-armed on every app
+open/login so it only fires after a full day away, cancelled on logout/account
+deletion or when the toggle is off)*.
 Movie state (each returns `Future<String>` = toast message):
 `likeMovie(id)`, `dislikeMovie(id)`, `addToWatchlist(id)`, `removeFromWatchlist(id)`,
 `markAsWatched(id)`, `removeFromWatched(id)`, `clearPreference(id)`,
@@ -77,8 +91,13 @@ Movie state (each returns `Future<String>` = toast message):
 ### 2.5 `FriendsMovieNightController` (actions)
 `searchFriends(query)`, `sendFriendRequest(userId)`,
 `acceptFriendRequest(requestId)`, `declineFriendRequest(requestId)`,
+`cancelFriendRequest(userId)` *(withdraws my pending outgoing request —
+`DELETE /friends/requests/outgoing/:userId`, emits `friend_request_cancelled`)*,
 `removeFriend(id)`, `blockFriend(id)`, `loadFriendProfile(userId)`,
 `refreshSocialLayer()`.
+Blocked users (service-level, used by Settings › Blocked users):
+`BackendSocialService.getBlockedUsers()` (`GET /friends/blocked`) and
+`unblockFriend(userId)` (`DELETE /friends/:id/block`).
 Movie night: `createMovieNight({...})`, `updateEventConstraints({...})`,
 `refreshShortlist(eventId)`, `refreshMovieNight(eventId)`,
 `resolveMovieNightInvite(eventId)`, `joinMovieNight(eventId)`,
@@ -125,8 +144,8 @@ status mirrored in `realTimeConnectionProvider`.
 | 22 | Movie Night · Voting | `friendsState.eventById(id)` + socket updates, `currentUserVoteFor()` | `submitVote({...})` (castVote), `deleteVote()` | `MovieNightEvent`, `ShortlistCandidate`, `MovieNightVote` |
 | 23 | Movie Night · Results | `friendsState.eventById(id)` (`winnerMovieId`, `votes`) | — / `startVoting` for new round | `MovieNightEvent`, `ShortlistCandidate` |
 | 24 | Profile | `state.session`, `state.*Count` getters | navigate to Edit/Settings | `AgreeoUserSession` |
-| 25 | Edit profile | `state.session` | `updateProfile({displayName,bio})` | `AgreeoUserSession` |
-| 26 | Settings | `state.profilePreferences`, **theme mode (GAP §4.1)** | `setPrivacyPreference()`, `setNotificationPreference()`, `logOut()` | `ProfilePreferences` |
+| 25 | Edit profile | `state.session` | `updateProfile({displayName,bio,avatarUrl})` (photo picker → base64 data URI) | `AgreeoUserSession` |
+| 26 | Settings | `state.profilePreferences`, **theme mode (GAP §4.1)** | `setPrivacyPreference()`, `setNotificationPreference()`, `changePassword()`, `deleteAccount()`, `logOut()` | `ProfilePreferences` |
 | 27 | Notifications | `notificationsProvider` | `markAsRead()`, `markLessImportantAsRead()`, `refreshNotifications()` | `InAppNotification` |
 | 28 | Library · Empty | `state.movieStates` (empty) | nav to Home/Swipe | — |
 | 29 | Search · No results | `searchMovies()` returns empty | retry | `MovieSearchFilters` |
@@ -153,12 +172,14 @@ status mirrored in `realTimeConnectionProvider`.
    If we adopt the JSX layout, Profile moves to a header-avatar route and the shell's
    `navIndexProvider` index meaning changes.
 
-3. **No avatar/handle on the user session.** `AgreeoUserSession` has
-   `displayName, email, bio` only — no avatar image and no `@handle`. JSX Profile/Edit
-   show an `@handle` and an avatar. `Friend` has `avatarUrl` but the *self* session
-   does not. → Edit-profile avatar upload and `@handle` have **no backend field**.
-   Plan: render initials-avatar (like `AgAvatar`) and omit/derive handle, OR confirm a
-   backend addition is out of scope.
+3. ~~**No avatar/handle on the user session.**~~ **PARTIALLY RESOLVED.** The avatar
+   gap is closed: `AppUser` now stores `bio` + `avatarUrl` (written by
+   `PATCH /me/profile`, returned by `/me`, login, register and onboarding), the self
+   session exposes `avatarUrl`, and the edit-profile sheet uploads a gallery photo as
+   a resized base64 JPEG data URI (`AvatarImageService`). Friends already read
+   `avatarUrl`/`bio` from the same node, so photos show up across social screens.
+   Still omitted by design: the `@handle` (no backend field; initials remain the
+   fallback in `AgAvatar`).
 
 4. ~~**Connection-error screen trigger is partial.**~~ **RESOLVED.** Added
    `lib/shared/state/connectivity_provider.dart` — a presentation-layer

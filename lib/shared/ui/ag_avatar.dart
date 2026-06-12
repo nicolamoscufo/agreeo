@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -5,9 +8,10 @@ import 'package:flutter/material.dart';
 /// Circular avatar: accent gradient + initials, with optional accent ring.
 /// Reference: `ag-shared.jsx` `Avatar`.
 ///
-/// `seed` picks the accent color deterministically from a name when no explicit
-/// [color] / network [imageUrl] is supplied (the user session has no avatar field
-/// — see BACKEND_CONTRACT gap §4.3).
+/// [imageUrl] accepts both http(s) URLs and base64 `data:image/...` URIs (the
+/// format profile photos are stored in on the AppUser node). `seed` picks the
+/// accent color deterministically from a name when no explicit [color] /
+/// [imageUrl] is supplied.
 class AgAvatar extends StatelessWidget {
   const AgAvatar({
     super.key,
@@ -39,6 +43,29 @@ class AgAvatar extends StatelessWidget {
     Color(0xFF5C9BE0),
   ];
 
+  /// Decoded data-URI bytes, memoized so list rebuilds don't re-run base64
+  /// decoding on every frame. Avatars are small (≤ ~40KB), so a handful of
+  /// entries is cheap; the cache resets once it grows past visible-list size.
+  static final Map<String, Uint8List> _dataUriBytesCache =
+      <String, Uint8List>{};
+
+  static Uint8List? _bytesFromDataUri(String? uri) {
+    if (uri == null || !uri.startsWith('data:image/')) return null;
+    final cached = _dataUriBytesCache[uri];
+    if (cached != null) return cached;
+
+    final comma = uri.indexOf(',');
+    if (comma < 0) return null;
+    try {
+      final bytes = base64Decode(uri.substring(comma + 1));
+      if (_dataUriBytesCache.length > 32) _dataUriBytesCache.clear();
+      _dataUriBytesCache[uri] = bytes;
+      return bytes;
+    } on FormatException {
+      return null;
+    }
+  }
+
   Color _seedColor() {
     if (color != null) return color!;
     if (name.isEmpty) return _palette.first;
@@ -48,7 +75,8 @@ class AgAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final hasImage = imageUrl != null && imageUrl!.startsWith('http');
+    final hasNetworkImage = imageUrl != null && imageUrl!.startsWith('http');
+    final dataUriBytes = _bytesFromDataUri(imageUrl);
     final accent = _seedColor();
 
     final placeholder = Container(
@@ -74,18 +102,32 @@ class AgAvatar extends StatelessWidget {
       ),
     );
 
-    final Widget inner = hasImage
-        ? ClipOval(
-            child: CachedNetworkImage(
-              imageUrl: imageUrl!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => placeholder,
-              errorWidget: (context, url, error) => placeholder,
-            ),
-          )
-        : placeholder;
+    final Widget inner;
+    if (dataUriBytes != null) {
+      inner = ClipOval(
+        child: Image.memory(
+          dataUriBytes,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) => placeholder,
+        ),
+      );
+    } else if (hasNetworkImage) {
+      inner = ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: imageUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => placeholder,
+          errorWidget: (context, url, error) => placeholder,
+        ),
+      );
+    } else {
+      inner = placeholder;
+    }
 
     if (!ring) return inner;
     return Container(

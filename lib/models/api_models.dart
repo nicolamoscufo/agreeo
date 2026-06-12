@@ -6,6 +6,8 @@ class Neo4jUser {
     required this.displayName,
     required this.email,
     required this.createdAt,
+    this.bio = '',
+    this.avatarUrl = '',
     this.passwordHash,
     this.onboardingCompleted = false,
   });
@@ -14,6 +16,8 @@ class Neo4jUser {
   final String displayName;
   final String email;
   final String createdAt;
+  final String bio;
+  final String avatarUrl;
   final String? passwordHash;
   final bool onboardingCompleted;
 
@@ -23,6 +27,8 @@ class Neo4jUser {
     'email': email,
     'emailNormalized': email.toLowerCase().trim(),
     'createdAt': createdAt,
+    'bio': bio,
+    'avatarUrl': avatarUrl,
     'onboardingCompleted': onboardingCompleted,
     if (passwordHash != null) 'passwordHash': passwordHash,
   };

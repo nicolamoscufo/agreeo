@@ -62,6 +62,20 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     }
   }
 
+  Future<void> _showActions(Friend friend) async {
+    final action = await showAgSheet<_FriendAction>(
+      context: context,
+      child: _FriendActionsSheet(friendName: friend.name),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _FriendAction.remove:
+        await _confirmRemove(friend);
+      case _FriendAction.block:
+        await _confirmBlock(friend);
+    }
+  }
+
   Future<void> _confirmRemove(Friend friend) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -76,6 +90,29 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     );
     if (confirmed != true || !mounted) return;
     ref.read(friendsMovieNightControllerProvider.notifier).removeFriend(friend.id);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _confirmBlock(Friend friend) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Block ${friend.name}?'),
+        content: const Text(
+          'They will be removed from your friends and will no longer be able to find you or send you requests.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: context.tokens.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    ref.read(friendsMovieNightControllerProvider.notifier).blockFriend(friend.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -124,7 +161,7 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _SquareIcon(icon: AgIcons.chevronLeft, onTap: () => Navigator.of(context).pop()),
-                  _SquareIcon(icon: Icons.more_horiz_rounded, onTap: () => _confirmRemove(friend)),
+                  _SquareIcon(icon: Icons.more_horiz_rounded, onTap: () => _showActions(friend)),
                 ],
               ),
             ),
@@ -434,6 +471,106 @@ class _ReviewList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+enum _FriendAction { remove, block }
+
+class _FriendActionsSheet extends StatelessWidget {
+  const _FriendActionsSheet({required this.friendName});
+  final String friendName;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          friendName,
+          style: TextStyle(
+            fontFamily: 'Bricolage Grotesque',
+            fontWeight: FontWeight.w800,
+            fontSize: 21,
+            letterSpacing: -0.4,
+            color: t.text,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ActionRow(
+          icon: AgIcons.users,
+          title: 'Remove friend',
+          subtitle: 'You can send a new request later',
+          color: t.text,
+          onTap: () => Navigator.of(context).pop(_FriendAction.remove),
+        ),
+        _ActionRow(
+          icon: AgIcons.shield,
+          title: 'Block $friendName',
+          subtitle: "They won't be able to find you or contact you",
+          color: t.red,
+          onTap: () => Navigator.of(context).pop(_FriendAction.block),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: t.line),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14.5, color: color),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                  ),
+                ],
+              ),
+            ),
+            Icon(AgIcons.chevron, size: 20, color: t.faint),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -256,6 +256,7 @@ class AgreeoUserSession {
     required this.email,
     required this.bio,
     required this.joinedAt,
+    this.avatarUrl = '',
   });
 
   final String id;
@@ -263,6 +264,10 @@ class AgreeoUserSession {
   final String email;
   final String bio;
   final DateTime joinedAt;
+
+  /// Either an http(s) URL or a base64 `data:image/...` URI; empty when the
+  /// user has not set a profile photo.
+  final String avatarUrl;
 
   String get initials {
     final parts = displayName
@@ -285,6 +290,7 @@ class AgreeoUserSession {
     String? email,
     String? bio,
     DateTime? joinedAt,
+    String? avatarUrl,
   }) {
     return AgreeoUserSession(
       id: id ?? this.id,
@@ -292,6 +298,7 @@ class AgreeoUserSession {
       email: email ?? this.email,
       bio: bio ?? this.bio,
       joinedAt: joinedAt ?? this.joinedAt,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 
@@ -302,6 +309,7 @@ class AgreeoUserSession {
       'email': email,
       'bio': bio,
       'joinedAt': joinedAt.toIso8601String(),
+      'avatarUrl': avatarUrl,
     };
   }
 
@@ -312,6 +320,7 @@ class AgreeoUserSession {
       email: _stringValue(json['email']),
       bio: _stringValue(json['bio']),
       joinedAt: _dateValue(json['joinedAt']),
+      avatarUrl: _stringValue(json['avatarUrl']),
     );
   }
 }

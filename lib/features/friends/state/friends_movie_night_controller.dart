@@ -284,6 +284,21 @@ class FriendsMovieNightController
     }
   }
 
+  /// Cancels my pending outgoing friend request to [userId] (optimistic:
+  /// the "Pending" badge clears immediately, rolled back on failure).
+  void cancelFriendRequest(String userId) {
+    if (!state.isPending(userId)) return;
+    final previous = state;
+    state = state.copyWith(
+      outgoingPendingIds: <String>{...state.outgoingPendingIds}..remove(userId),
+    );
+    if (_usingBackend) {
+      Future<void>.microtask(
+        () => _cancelFriendRequestBackend(userId, previous),
+      );
+    }
+  }
+
   void removeFriend(String friendId) {
     final previous = state;
     state = _stateWithoutUser(friendId);
@@ -385,6 +400,20 @@ class FriendsMovieNightController
         ),
       );
     } catch (_) {
+      state = previous;
+    }
+  }
+
+  Future<void> _cancelFriendRequestBackend(
+    String userId,
+    FriendsMovieNightState previous,
+  ) async {
+    try {
+      final snapshot = await _backendSocialService.cancelFriendRequest(userId);
+      if (!mounted) return;
+      _applySocialSnapshot(snapshot);
+    } catch (_) {
+      if (!mounted) return;
       state = previous;
     }
   }

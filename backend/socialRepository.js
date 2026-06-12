@@ -431,6 +431,55 @@ async function blockFriend(uid, friendId) {
   return result.records.length > 0;
 }
 
+async function cancelFriendRequest(uid, targetUserId) {
+  // Delete (rather than mark cancelled) so a later MERGE in sendFriendRequest
+  // recreates a clean pending request.
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[r:SENT_FRIEND_REQUEST {status: 'pending'}]->(target:AppUser {uid: $targetUserId})
+    DELETE r
+    RETURN target.uid AS targetUserId
+    LIMIT 1
+    `,
+    { uid, targetUserId }
+  );
+
+  return result.records.length > 0;
+}
+
+async function getBlockedUsers(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[blocked:BLOCKED]->(target:AppUser)
+    RETURN {
+      id: target.uid,
+      name: coalesce(target.displayName, target.email, 'Agreeo user'),
+      avatarUrl: coalesce(target.avatarUrl, ''),
+      bio: coalesce(target.bio, ''),
+      blockedAt: toString(blocked.createdAt)
+    } AS user
+    ORDER BY toLower(coalesce(target.displayName, target.email, '')) ASC
+    `,
+    { uid }
+  );
+
+  return result.records.map((record) => native(record.get('user')));
+}
+
+async function unblockFriend(uid, targetUserId) {
+  const result = await neo4jService.run(
+    `
+    MATCH (me:AppUser {uid: $uid})-[blocked:BLOCKED]->(target:AppUser {uid: $targetUserId})
+    DELETE blocked
+    RETURN target.uid AS targetUserId
+    LIMIT 1
+    `,
+    { uid, targetUserId }
+  );
+
+  return result.records.length > 0;
+}
+
 async function getFriendProfile(uid, friendId) {
   const friendResult = await neo4jService.run(
     `
@@ -1729,8 +1778,11 @@ module.exports = {
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
+  cancelFriendRequest,
   removeFriend,
   blockFriend,
+  getBlockedUsers,
+  unblockFriend,
   getFriendProfile,
   createMovieNight,
   inviteFriends,

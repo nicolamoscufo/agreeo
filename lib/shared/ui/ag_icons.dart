@@ -46,4 +46,8 @@ abstract final class AgIcons {
   static const moon = Icons.dark_mode_rounded;
   static const share = Icons.share_rounded;
   static const back = Icons.arrow_back_rounded;
+  static const camera = Icons.photo_camera_rounded;
+  static const lock = Icons.lock_outline_rounded;
+  static const trash = Icons.delete_outline_rounded;
+  static const calendar = Icons.calendar_today_rounded;
 }

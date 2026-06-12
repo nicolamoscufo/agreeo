@@ -312,6 +312,23 @@ class BackendMovieService {
         .toList(growable: false);
   }
 
+  /// Resolves a usable absolute image URL: prefers the prebuilt URL, falls
+  /// back to building one from the raw TMDB path. Endpoints that return raw
+  /// Neo4j node properties (e.g. /me/library) may carry only `posterPath`.
+  String _resolveImageUrl(Object? url, Object? path, String size) {
+    final resolvedUrl = url?.toString() ?? '';
+    if (resolvedUrl.startsWith('http')) {
+      return resolvedUrl;
+    }
+    final resolvedPath = resolvedUrl.isNotEmpty
+        ? resolvedUrl
+        : path?.toString() ?? '';
+    if (resolvedPath.isEmpty) {
+      return '';
+    }
+    return 'https://image.tmdb.org/t/p/$size$resolvedPath';
+  }
+
   Movie _decodeMovie(Map<String, dynamic> json) {
     final tmdbId = (json['tmdbId'] as num?)?.toInt();
     final releaseDate = json['releaseDate']?.toString() ?? '';
@@ -332,8 +349,8 @@ class BackendMovieService {
       originalTitle:
           json['originalTitle']?.toString() ?? json['title']?.toString() ?? '',
       overview: json['overview']?.toString() ?? '',
-      posterUrl: json['posterUrl']?.toString() ?? '',
-      backdropUrl: json['backdropUrl']?.toString() ?? '',
+      posterUrl: _resolveImageUrl(json['posterUrl'], json['posterPath'], 'w500'),
+      backdropUrl: _resolveImageUrl(json['backdropUrl'], json['backdropPath'], 'w780'),
       releaseYear: year,
       runtime: (json['runtime'] as num?)?.toInt() ?? 0,
       genres: genres,
