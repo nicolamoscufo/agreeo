@@ -29,11 +29,11 @@
   e log JSON. Fatto finora: rimossi input utente e URL completi dai log,
   eliminati i blocchi decorativi del mood-search.
 - [ ] **3.6 Coerenza documentazione** — verifica completa di
-  [docs/BACKEND_CONTRACT.md](docs/BACKEND_CONTRACT.md) e
-  [docs/ROUTING_MAP.md](docs/ROUTING_MAP.md) contro il codice attuale
+  [docs/BACKEND_CONTRACT.md](BACKEND_CONTRACT.md) e
+  [docs/ROUTING_MAP.md](ROUTING_MAP.md) contro il codice attuale
   (il README è già stato riallineato).
 - [ ] **3.8 Contrasto WCAG AA** — controllo dei token tema in
-  [lib/shared/theme/agreeo_tokens.dart](lib/shared/theme/agreeo_tokens.dart)
+  [lib/shared/theme/agreeo_tokens.dart](../lib/shared/theme/agreeo_tokens.dart)
   (testo `faint` su sfondi chiari/scuri, stati disabled). Fatto finora:
   `Semantics` sui poster, tooltip sulle icone interattive, label sui form.
 

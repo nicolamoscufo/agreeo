@@ -2,7 +2,7 @@
 
 > Questo file era una copia troncata del piano. Il piano completo e aggiornato,
 > con lo stato delle checkbox per ogni task, è in
-> [`REMEDIATION_PLAN.md`](../REMEDIATION_PLAN.md) nella root del repository.
+> [`REMEDIATION_PLAN.md`](REMEDIATION_PLAN.md) in `docs/`.
 
 ## Stato (giugno 2026)
 
