@@ -68,6 +68,9 @@ backend/struttura_*.txt
 # Local external MCP clone (keep out of this repo)
 tools/mcp/web-search-mcp/
 
+# Screenshot di lavorazione del design Daylight (usa-e-getta)
+design_reference/scraps/
+
 # Graphify / vexp: ignore generated indexes, caches and local graphs
 vexp/
 .vexp/
