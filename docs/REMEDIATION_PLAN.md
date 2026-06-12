@@ -275,7 +275,7 @@ this._driver = neo4j.driver(uri, neo4j.auth.basic(user, password), {
 - [ ] Bloccare il merge su fallimento test/audit critico.
 
 ## 3.10 â€” Rimuovere `TmdbService` client se dead code
-**File:** [lib/services/tmdb_service.dart](../lib/services/tmdb_service.dart) (istanziato solo nei test; espone `api_key` via `--dart-define`).
+**File:** `lib/services/tmdb_service.dart` (rimosso: era istanziato solo nei test ed esponeva `api_key` via `--dart-define`).
 - [x] Confermare che non sia usato a runtime (il catalogo passa dal backend).
 - [x] Se morto, rimuoverlo (e il relativo test) per evitare il rischio di leak della chiave nel bundle web.
 
