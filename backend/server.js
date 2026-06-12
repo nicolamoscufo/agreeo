@@ -8,6 +8,7 @@ const http = require('http');
 const authController = require('./authController');
 const movieController = require('./movieController');
 const socialController = require('./socialController');
+const neo4jDebugController = require('./neo4jDebugController');
 const neo4jService = require('./neo4jService');
 const socketService = require('./socketService');
 const { verifyMiddleware, verifyRefresh, sign, signRefresh, resolveSecret } = require('./jwtUtils');
@@ -188,6 +189,12 @@ app.get('/movie-nights/:id/result', verifyMiddleware, socialController.movieNigh
 // Notification endpoints
 app.get('/notifications', verifyMiddleware, socialController.listNotifications);
 app.post('/notifications/:id/read', verifyMiddleware, socialController.markNotificationAsRead);
+
+// Neo4j debug console (read-only): opt-in via ENABLE_NEO4J_DEBUG=true.
+app.get('/debug/neo4j/overview', verifyMiddleware, neo4jDebugController.overview);
+app.get('/debug/neo4j/schema', verifyMiddleware, neo4jDebugController.schema);
+app.get('/debug/neo4j/indexes', verifyMiddleware, neo4jDebugController.indexes);
+app.post('/debug/neo4j/query', verifyMiddleware, neo4jDebugController.query);
 
 // Lightweight liveness probe: no DB round-trip, safe for orchestrators.
 app.get('/health', (_, res) => {

@@ -1,3 +1,4 @@
+import 'package:agreeo/features/debug/presentation/neo4j_console_screen.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/theme_mode_provider.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
@@ -120,6 +121,19 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                       icon: AgIcons.mail,
                       title: state.session?.email ?? 'you@agreeo.app',
                       subtitle: 'Signed in',
+                    ),
+                  ]),
+                  const SizedBox(height: 18),
+                  _SectionTitle(icon: AgIcons.sliders, title: 'Developer'),
+                  const SizedBox(height: 9),
+                  _Card(rows: [
+                    _NavRow(
+                      icon: AgIcons.sparkle,
+                      title: 'Neo4j Console',
+                      subtitle: 'Schema, indici e query Cypher live',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => const Neo4jConsoleScreen()),
+                      ),
                     ),
                   ]),
                   const SizedBox(height: 4),
@@ -373,6 +387,54 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: t.sub),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: t.text),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
+                    ),
+                ],
+              ),
+            ),
+            Icon(AgIcons.chevron, size: 20, color: t.faint),
+          ],
+        ),
       ),
     );
   }

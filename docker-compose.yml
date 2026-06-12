@@ -34,6 +34,8 @@ services:
       NEO4J_DATABASE: neo4j
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env or shell}
       TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?Set TMDB_ACCESS_TOKEN in .env or shell}
+      # Console Neo4j read-only nell'app (Settings > Developer): solo demo/dev.
+      ENABLE_NEO4J_DEBUG: ${ENABLE_NEO4J_DEBUG:-false}
     ports:
       - "3000:3000"
     depends_on:
