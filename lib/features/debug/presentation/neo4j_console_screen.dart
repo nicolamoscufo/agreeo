@@ -1,4 +1,5 @@
 import 'package:agreeo/services/neo4j_debug_service.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -51,15 +52,15 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
               child: Row(
                 children: [
-                  _CircleButton(icon: AgIcons.chevronLeft, onTap: () => Navigator.of(context).pop()),
+                  _CircleButton(
+                    icon: AgIcons.chevronLeft,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Neo4j Console',
-                      style: TextStyle(
-                        fontFamily: 'Bricolage Grotesque',
-                        fontWeight: FontWeight.w800,
-                        fontSize: 23,
+                      style: AgText.h2.copyWith(
                         letterSpacing: -0.5,
                         color: t.text,
                       ),
@@ -100,7 +101,11 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
 // Shared building blocks
 // ---------------------------------------------------------------------------
 
-const _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 12.5, height: 1.45);
+const _monoStyle = TextStyle(
+  fontFamily: 'monospace',
+  fontSize: 12.5,
+  height: 1.45,
+);
 
 class _CircleButton extends StatelessWidget {
   const _CircleButton({required this.icon, required this.onTap});
@@ -127,7 +132,11 @@ class _CircleButton extends StatelessWidget {
 }
 
 class _TabSelector extends StatelessWidget {
-  const _TabSelector({required this.tabs, required this.selected, required this.onChanged});
+  const _TabSelector({
+    required this.tabs,
+    required this.selected,
+    required this.onChanged,
+  });
   final List<String> tabs;
   final int selected;
   final ValueChanged<int> onChanged;
@@ -161,10 +170,7 @@ class _TabSelector extends StatelessWidget {
                   ),
                   child: Text(
                     tabs[i],
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                    style: AgText.label.copyWith(
                       color: selected == i ? Colors.white : t.sub,
                     ),
                   ),
@@ -191,9 +197,7 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(width: 9),
         Text(
           title,
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
+          style: AgText.h4.copyWith(
             fontSize: 14.5,
             letterSpacing: -0.3,
             color: t.text,
@@ -246,12 +250,7 @@ class _ErrorCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   'Console non disponibile',
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: t.red,
-                  ),
+                  style: AgText.label.copyWith(fontSize: 14, color: t.red),
                 ),
               ],
             ),
@@ -263,12 +262,7 @@ class _ErrorCard extends StatelessWidget {
                 onTap: onRetry,
                 child: Text(
                   'Riprova',
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: t.purple,
-                  ),
+                  style: AgText.label.copyWith(color: t.purple),
                 ),
               ),
             ],
@@ -292,16 +286,13 @@ class _CountPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: gold ? t.gold.withValues(alpha: 0.14) : t.surface2,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: gold ? t.gold.withValues(alpha: 0.5) : t.line2),
+        border: Border.all(
+          color: gold ? t.gold.withValues(alpha: 0.5) : t.line2,
+        ),
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontFamily: 'Manrope',
-          fontWeight: FontWeight.w700,
-          fontSize: 11.5,
-          color: gold ? t.gold : t.sub,
-        ),
+        style: AgText.labelSm.copyWith(color: gold ? t.gold : t.sub),
       ),
     );
   }
@@ -329,7 +320,10 @@ class _OverviewTab extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _ErrorCard(message: snapshot.error.toString(), onRetry: onRetry);
+          return _ErrorCard(
+            message: snapshot.error.toString(),
+            onRetry: onRetry,
+          );
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -347,24 +341,25 @@ class _OverviewTab extends StatelessWidget {
                       Container(
                         width: 9,
                         height: 9,
-                        decoration: BoxDecoration(color: t.green, shape: BoxShape.circle),
+                        decoration: BoxDecoration(
+                          color: t.green,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '${data.server.name} ${data.server.version}',
-                        style: TextStyle(
-                          fontFamily: 'Bricolage Grotesque',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 17,
-                          color: t.text,
-                        ),
+                        style: AgText.h4.copyWith(fontSize: 17, color: t.text),
                       ),
                       const Spacer(),
                       _CountPill(text: data.server.edition, gold: true),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('bolt  ${data.server.uri}', style: _monoStyle.copyWith(color: t.sub)),
+                  Text(
+                    'bolt  ${data.server.uri}',
+                    style: _monoStyle.copyWith(color: t.sub),
+                  ),
                 ],
               ),
             ),
@@ -373,9 +368,15 @@ class _OverviewTab extends StatelessWidget {
               children: [
                 _StatCard(label: 'Nodi', value: _formatCount(data.nodeCount)),
                 const SizedBox(width: 10),
-                _StatCard(label: 'Relazioni', value: _formatCount(data.relationshipCount)),
+                _StatCard(
+                  label: 'Relazioni',
+                  value: _formatCount(data.relationshipCount),
+                ),
                 const SizedBox(width: 10),
-                _StatCard(label: 'Property key', value: _formatCount(data.propertyKeyCount)),
+                _StatCard(
+                  label: 'Property key',
+                  value: _formatCount(data.propertyKeyCount),
+                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -425,20 +426,9 @@ class _StatCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'Bricolage Grotesque',
-                fontWeight: FontWeight.w800,
-                fontSize: 19,
-                color: t.text,
-              ),
-            ),
+            Text(value, style: AgText.h3.copyWith(color: t.text)),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
-            ),
+            Text(label, style: AgText.micro.copyWith(color: t.faint)),
           ],
         ),
       ),
@@ -458,7 +448,9 @@ class _KeyCountRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Expanded(child: Text(name, style: _monoStyle.copyWith(color: t.text))),
+          Expanded(
+            child: Text(name, style: _monoStyle.copyWith(color: t.text)),
+          ),
           _CountPill(text: _formatCount(count)),
         ],
       ),
@@ -482,7 +474,10 @@ class _SchemaTab extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _ErrorCard(message: snapshot.error.toString(), onRetry: onRetry);
+          return _ErrorCard(
+            message: snapshot.error.toString(),
+            onRetry: onRetry,
+          );
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -493,7 +488,7 @@ class _SchemaTab extends StatelessWidget {
           children: [
             Text(
               'Pattern reali del grafo, con il numero di relazioni per ciascuno.',
-              style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.faint),
+              style: AgText.caption.copyWith(color: t.faint),
             ),
             const SizedBox(height: 10),
             for (final pattern in patterns) ...[
@@ -536,7 +531,10 @@ class _IndexesTab extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _ErrorCard(message: snapshot.error.toString(), onRetry: onRetry);
+          return _ErrorCard(
+            message: snapshot.error.toString(),
+            onRetry: onRetry,
+          );
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -545,14 +543,20 @@ class _IndexesTab extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 30),
           children: [
-            _SectionTitle(icon: AgIcons.sparkle, title: 'Indici (${report.indexes.length})'),
+            _SectionTitle(
+              icon: AgIcons.sparkle,
+              title: 'Indici (${report.indexes.length})',
+            ),
             const SizedBox(height: 9),
             for (final index in report.indexes) ...[
               _IndexCard(index: index),
               const SizedBox(height: 8),
             ],
             const SizedBox(height: 12),
-            _SectionTitle(icon: AgIcons.shield, title: 'Constraint (${report.constraints.length})'),
+            _SectionTitle(
+              icon: AgIcons.shield,
+              title: 'Constraint (${report.constraints.length})',
+            ),
             const SizedBox(height: 9),
             _Card(
               child: Column(
@@ -601,12 +605,7 @@ class _IndexCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   index.name,
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: t.text,
-                  ),
+                  style: AgText.label.copyWith(fontSize: 14, color: t.text),
                 ),
               ),
               _CountPill(text: index.type, gold: isVector),
@@ -635,14 +634,15 @@ class _IndexCard extends StatelessWidget {
                 width: 7,
                 height: 7,
                 decoration: BoxDecoration(
-                  color: index.state.toUpperCase() == 'ONLINE' ? t.green : t.gold,
+                  color:
+                      index.state.toUpperCase() == 'ONLINE' ? t.green : t.gold,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 '${index.state} · ${index.populationPercent.toStringAsFixed(0)}% · ${index.provider}',
-                style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
+                style: AgText.micro.copyWith(color: t.faint),
               ),
             ],
           ),
@@ -715,8 +715,9 @@ class _QueryTab extends StatefulWidget {
 }
 
 class _QueryTabState extends State<_QueryTab> {
-  final TextEditingController _controller =
-      TextEditingController(text: _presetQueries.first.$2);
+  final TextEditingController _controller = TextEditingController(
+    text: _presetQueries.first.$2,
+  );
   String? _mode; // null | 'explain' | 'profile'
   bool _running = false;
   Neo4jQueryResult? _result;
@@ -777,12 +778,7 @@ class _QueryTabState extends State<_QueryTab> {
                   ),
                   child: Text(
                     preset.$1,
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      color: t.sub,
-                    ),
+                    style: AgText.labelSm.copyWith(color: t.sub),
                   ),
                 ),
               );
@@ -814,13 +810,15 @@ class _QueryTabState extends State<_QueryTab> {
             _ModeChip(
               label: 'EXPLAIN',
               active: _mode == 'explain',
-              onTap: () => setState(() => _mode = _mode == 'explain' ? null : 'explain'),
+              onTap: () =>
+                  setState(() => _mode = _mode == 'explain' ? null : 'explain'),
             ),
             const SizedBox(width: 8),
             _ModeChip(
               label: 'PROFILE',
               active: _mode == 'profile',
-              onTap: () => setState(() => _mode = _mode == 'profile' ? null : 'profile'),
+              onTap: () =>
+                  setState(() => _mode = _mode == 'profile' ? null : 'profile'),
             ),
             const Spacer(),
             GestureDetector(
@@ -837,17 +835,22 @@ class _QueryTabState extends State<_QueryTab> {
                     ? const SizedBox(
                         width: 17,
                         height: 17,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : Row(
                         children: [
-                          const Icon(AgIcons.play, size: 19, color: Colors.white),
+                          const Icon(
+                            AgIcons.play,
+                            size: 19,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             'Esegui',
-                            style: TextStyle(
-                              fontFamily: 'Manrope',
-                              fontWeight: FontWeight.w700,
+                            style: AgText.label.copyWith(
                               fontSize: 14,
                               color: Colors.white,
                             ),
@@ -871,7 +874,11 @@ class _QueryTabState extends State<_QueryTab> {
 }
 
 class _ModeChip extends StatelessWidget {
-  const _ModeChip({required this.label, required this.active, required this.onTap});
+  const _ModeChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final bool active;
   final VoidCallback onTap;
@@ -916,16 +923,14 @@ class _QueryResultView extends StatelessWidget {
       '${result.wallTimeMs} ms totali',
       if (result.resultAvailableAfterMs != null)
         '${result.resultAvailableAfterMs} ms disponibile',
-      if (result.resultConsumedAfterMs != null) '${result.resultConsumedAfterMs} ms consumo',
+      if (result.resultConsumedAfterMs != null)
+        '${result.resultConsumedAfterMs} ms consumo',
     ].join(' · ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          timing,
-          style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
-        ),
+        Text(timing, style: AgText.micro.copyWith(color: t.faint)),
         const SizedBox(height: 8),
         if (result.plan != null) ...[
           _SectionTitle(icon: AgIcons.sliders, title: 'Piano di esecuzione'),
@@ -957,7 +962,11 @@ class _QueryResultView extends StatelessWidget {
                           ),
                           Expanded(
                             child: Text(
-                              _formatCell(result.rows[i].length > c ? result.rows[i][c] : null),
+                              _formatCell(
+                                result.rows[i].length > c
+                                    ? result.rows[i][c]
+                                    : null,
+                              ),
                               style: _monoStyle.copyWith(color: t.text),
                             ),
                           ),
@@ -971,7 +980,10 @@ class _QueryResultView extends StatelessWidget {
           ],
         ] else if (result.plan == null)
           _Card(
-            child: Text('Nessuna riga restituita.', style: _monoStyle.copyWith(color: t.sub)),
+            child: Text(
+              'Nessuna riga restituita.',
+              style: _monoStyle.copyWith(color: t.sub),
+            ),
           ),
       ],
     );
@@ -1043,16 +1055,26 @@ class _PlanNode extends StatelessWidget {
             children: [
               Text(
                 '${depth == 0 ? '' : '└ '}${plan.operatorType.split('@').first}',
-                style: _monoStyle.copyWith(color: t.text, fontWeight: FontWeight.w700),
+                style: _monoStyle.copyWith(
+                  color: t.text,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               if (plan.details != null && plan.details!.isNotEmpty)
-                Text(plan.details!, style: _monoStyle.copyWith(color: t.sub, fontSize: 11.5)),
+                Text(
+                  plan.details!,
+                  style: _monoStyle.copyWith(color: t.sub, fontSize: 11.5),
+                ),
               if (metrics.isNotEmpty)
-                Text(metrics, style: _monoStyle.copyWith(color: t.gold, fontSize: 11.5)),
+                Text(
+                  metrics,
+                  style: _monoStyle.copyWith(color: t.gold, fontSize: 11.5),
+                ),
             ],
           ),
         ),
-        for (final child in plan.children) _PlanNode(plan: child, depth: depth + 1),
+        for (final child in plan.children)
+          _PlanNode(plan: child, depth: depth + 1),
       ],
     );
   }

@@ -4,6 +4,7 @@ import 'package:agreeo/features/friends/state/friends_movie_night_controller.dar
 import 'package:agreeo/services/real_time_service.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +17,12 @@ class MovieNightWaitingRoomScreen extends ConsumerStatefulWidget {
   final String eventId;
 
   @override
-  ConsumerState<MovieNightWaitingRoomScreen> createState() => _MovieNightWaitingRoomScreenState();
+  ConsumerState<MovieNightWaitingRoomScreen> createState() =>
+      _MovieNightWaitingRoomScreenState();
 }
 
-class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingRoomScreen> {
+class _MovieNightWaitingRoomScreenState
+    extends ConsumerState<MovieNightWaitingRoomScreen> {
   bool _navigated = false;
   bool _starting = false;
 
@@ -33,41 +36,65 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
   Future<void> _startVoting(MovieNightEvent event) async {
     setState(() => _starting = true);
     final messenger = ScaffoldMessenger.of(context);
-    final updated = await ref.read(friendsMovieNightControllerProvider.notifier).startVoting(event.id);
+    final updated = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .startVoting(event.id);
     if (!mounted) return;
     setState(() => _starting = false);
     if (updated == null) {
-      messenger.showSnackBar(const SnackBar(content: Text('Could not start voting.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not start voting.')),
+      );
     }
   }
 
   Future<void> _join(MovieNightEvent event) async {
     final messenger = ScaffoldMessenger.of(context);
-    final updated = await ref.read(friendsMovieNightControllerProvider.notifier).joinMovieNight(event.id);
+    final updated = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .joinMovieNight(event.id);
     if (!mounted) return;
-    messenger.showSnackBar(SnackBar(content: Text(updated == null ? 'Could not join.' : 'You joined this Movie Night.')));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          updated == null ? 'Could not join.' : 'You joined this Movie Night.',
+        ),
+      ),
+    );
   }
 
   Future<void> _leave(MovieNightEvent event) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final left = await ref.read(friendsMovieNightControllerProvider.notifier).leaveMovieNight(event.id);
+    final left = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .leaveMovieNight(event.id);
     if (!mounted) return;
-    messenger.showSnackBar(SnackBar(content: Text(left ? 'You left this Movie Night.' : 'Could not leave.')));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(left ? 'You left this Movie Night.' : 'Could not leave.'),
+      ),
+    );
     if (left) navigator.pop();
   }
 
   Future<void> _shareLink(MovieNightEvent event) async {
     final messenger = ScaffoldMessenger.of(context);
-    final updated = await ref.read(friendsMovieNightControllerProvider.notifier).createInviteLink(event.id);
+    final updated = await ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .createInviteLink(event.id);
     final link = updated?.inviteLink ?? event.inviteLink;
     if (!mounted) return;
     if (link.isNotEmpty) {
       await Clipboard.setData(ClipboardData(text: link));
       if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Invite link copied to clipboard!')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Invite link copied to clipboard!')),
+      );
     } else {
-      messenger.showSnackBar(const SnackBar(content: Text('Could not create invite link.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not create invite link.')),
+      );
     }
   }
 
@@ -82,19 +109,25 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
     if (event == null) {
       return Scaffold(
         backgroundColor: t.bg,
-        body: Center(child: Text('Movie Night not found', style: TextStyle(color: t.sub))),
+        body: Center(
+          child: Text('Movie Night not found', style: TextStyle(color: t.sub)),
+        ),
       );
     }
 
     // Auto-navigate on status changes.
-    if (!_navigated && (event.status == MovieNightStatus.voting || event.status == MovieNightStatus.completed)) {
+    if (!_navigated &&
+        (event.status == MovieNightStatus.voting ||
+            event.status == MovieNightStatus.completed)) {
       _navigated = true;
       final next = event.status == MovieNightStatus.voting
           ? MovieNightVotingScreen(eventId: event.id)
           : MovieNightResultScreen(eventId: event.id);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => next));
+          Navigator.of(
+            context,
+          ).pushReplacement(MaterialPageRoute<void>(builder: (_) => next));
         }
       });
     }
@@ -102,8 +135,11 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
     final currentUserId = appState.session?.id ?? 'local-host';
     final me = _participantFor(event, currentUserId);
     final isHost = me?.isHost == true || event.hostUserId == currentUserId;
-    final canJoin = event.status == MovieNightStatus.waiting && me?.status == MovieNightParticipantStatus.pending;
-    final joinedCount = event.participants.where((p) => p.status == MovieNightParticipantStatus.joined).length;
+    final canJoin = event.status == MovieNightStatus.waiting &&
+        me?.status == MovieNightParticipantStatus.pending;
+    final joinedCount = event.participants
+        .where((p) => p.status == MovieNightParticipantStatus.joined)
+        .length;
     final inviteCode = event.inviteLink.isNotEmpty
         ? event.inviteLink.split('/').last.toUpperCase()
         : event.id.substring(0, event.id.length.clamp(0, 6)).toUpperCase();
@@ -120,7 +156,10 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => ref.read(friendsMovieNightControllerProvider.notifier).refreshMovieNight(event.id).then((_) {}),
+                onRefresh: () => ref
+                    .read(friendsMovieNightControllerProvider.notifier)
+                    .refreshMovieNight(event.id)
+                    .then((_) {}),
                 color: t.red,
                 backgroundColor: t.surface,
                 child: ListView(
@@ -129,29 +168,54 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
                   children: [
                     // Event card
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                      decoration: BoxDecoration(gradient: t.gradSoft, borderRadius: BorderRadius.circular(20), border: Border.all(color: t.line2)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: t.gradSoft,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: t.line2),
+                      ),
                       child: Row(
                         children: [
                           Container(
                             width: 46,
                             height: 46,
-                            decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(14)),
-                            child: const Icon(AgIcons.film, size: 24, color: Colors.white),
+                            decoration: BoxDecoration(
+                              gradient: t.grad,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              AgIcons.film,
+                              size: 24,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(width: 13),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(event.name, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 16, color: t.text)),
+                                Text(
+                                  event.name,
+                                  style: AgText.h4.copyWith(color: t.text),
+                                ),
                                 const SizedBox(height: 2),
                                 RichText(
                                   text: TextSpan(
-                                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.sub),
+                                    style: AgText.caption.copyWith(
+                                      color: t.sub,
+                                    ),
                                     children: [
                                       const TextSpan(text: 'Invite code '),
-                                      TextSpan(text: inviteCode, style: TextStyle(color: t.text, fontWeight: FontWeight.w700)),
+                                      TextSpan(
+                                        text: inviteCode,
+                                        style: TextStyle(
+                                          color: t.text,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -164,11 +228,14 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
                     const SizedBox(height: 20),
                     Text(
                       '$joinedCount of ${event.participants.length} joined',
-                      style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.3, color: t.faint),
+                      style: AgText.overline.copyWith(color: t.faint),
                     ),
                     const SizedBox(height: 12),
                     for (final p in event.participants)
-                      _ParticipantRow(participant: p, isMe: p.userId == currentUserId),
+                      _ParticipantRow(
+                        participant: p,
+                        isMe: p.userId == currentUserId,
+                      ),
                   ],
                 ),
               ),
@@ -182,7 +249,12 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
                     Row(
                       children: [
                         Expanded(
-                          child: AgButton.secondary(label: 'Share link', icon: AgIcons.share, height: 50, onPressed: () => _shareLink(event)),
+                          child: AgButton.secondary(
+                            label: 'Share link',
+                            icon: AgIcons.share,
+                            height: 50,
+                            onPressed: () => _shareLink(event),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -191,17 +263,29 @@ class _MovieNightWaitingRoomScreenState extends ConsumerState<MovieNightWaitingR
                             label: _starting ? 'Starting…' : 'Start voting now',
                             icon: AgIcons.play,
                             height: 50,
-                            onPressed: _starting ? null : () => _startVoting(event),
+                            onPressed:
+                                _starting ? null : () => _startVoting(event),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text("You can start before everyone's in", style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.faint)),
+                    Text(
+                      "You can start before everyone's in",
+                      style: AgText.caption.copyWith(color: t.faint),
+                    ),
                   ] else if (canJoin)
-                    AgButton(label: 'Join this Movie Night', icon: AgIcons.check, onPressed: () => _join(event))
+                    AgButton(
+                      label: 'Join this Movie Night',
+                      icon: AgIcons.check,
+                      onPressed: () => _join(event),
+                    )
                   else
-                    AgButton.secondary(label: 'Leave event', icon: AgIcons.logout, onPressed: () => _leave(event)),
+                    AgButton.secondary(
+                      label: 'Leave event',
+                      icon: AgIcons.logout,
+                      onPressed: () => _leave(event),
+                    ),
                 ],
               ),
             ),
@@ -221,13 +305,27 @@ class _LiveBadge extends StatelessWidget {
     final color = isLive ? t.green : t.faint;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.35))),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 6),
-          Text(isLive ? 'Live' : 'Offline', style: TextStyle(fontFamily: 'Manrope', color: color, fontWeight: FontWeight.w800, fontSize: 11.5)),
+          Text(
+            isLive ? 'Live' : 'Offline',
+            style: AgText.labelSm.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -244,10 +342,16 @@ class _ParticipantRow extends StatelessWidget {
     final joined = participant.status == MovieNightParticipantStatus.joined;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: t.line)),
+      ),
       child: Row(
         children: [
-          AgAvatar(name: participant.name, imageUrl: participant.avatarUrl, size: 46),
+          AgAvatar(
+            name: participant.name,
+            imageUrl: participant.avatarUrl,
+            size: 46,
+          ),
           const SizedBox(width: 13),
           Expanded(
             child: Row(
@@ -257,12 +361,12 @@ class _ParticipantRow extends StatelessWidget {
                     isMe ? 'You' : participant.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                    style: AgText.label.copyWith(fontSize: 15, color: t.text),
                   ),
                 ),
                 if (participant.isHost) ...[
                   const SizedBox(width: 6),
-                  Text('· Host', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 11, color: t.gold)),
+                  Text('· Host', style: AgText.labelSm.copyWith(color: t.gold)),
                 ],
               ],
             ),
@@ -270,26 +374,46 @@ class _ParticipantRow extends StatelessWidget {
           if (joined)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(color: t.green.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(999)),
+              decoration: BoxDecoration(
+                color: t.green.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(AgIcons.check, size: 14, color: t.green),
                   const SizedBox(width: 5),
-                  Text('Ready', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12, color: t.green)),
+                  Text('Ready', style: AgText.labelSm.copyWith(color: t.green)),
                 ],
               ),
             )
           else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: t.line)),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.line),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(width: 7, height: 7, decoration: BoxDecoration(color: t.gold, shape: BoxShape.circle)),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: t.gold,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 7),
-                  Text('Joining…', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 12, color: t.faint)),
+                  Text(
+                    'Joining…',
+                    style: AgText.micro.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: t.faint,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -301,7 +425,11 @@ class _ParticipantRow extends StatelessWidget {
 
 /// Shared movie-night step header (back + 4 progress dots + eyebrow + title).
 class _NightStepHeader extends StatelessWidget {
-  const _NightStepHeader({required this.step, required this.title, this.trailing});
+  const _NightStepHeader({
+    required this.step,
+    required this.title,
+    this.trailing,
+  });
   final int step;
   final String title;
   final Widget? trailing;
@@ -321,7 +449,11 @@ class _NightStepHeader extends StatelessWidget {
                 child: Container(
                   width: 38,
                   height: 38,
-                  decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.line)),
+                  decoration: BoxDecoration(
+                    color: t.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: t.line),
+                  ),
                   child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
                 ),
               ),
@@ -354,9 +486,15 @@ class _NightStepHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('MOVIE NIGHT · STEP ${step + 1}', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, letterSpacing: 0.4, color: t.red)),
+              Text(
+                'MOVIE NIGHT · STEP ${step + 1}',
+                style: AgText.overline.copyWith(color: t.red),
+              ),
               const SizedBox(height: 4),
-              Text(title, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 25, letterSpacing: -0.6, color: t.text)),
+              Text(
+                title,
+                style: AgText.h1.copyWith(letterSpacing: -0.6, color: t.text),
+              ),
             ],
           ),
         ),

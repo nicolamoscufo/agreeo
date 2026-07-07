@@ -1,6 +1,7 @@
 import 'package:agreeo/features/movie_details/presentation/review_editor_sheet.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -21,12 +22,22 @@ class AgreeoMovieDetailsScreen extends ConsumerStatefulWidget {
 
 class _AgreeoMovieDetailsScreenState
     extends ConsumerState<AgreeoMovieDetailsScreen> {
-  late final Future<Movie?> _movieFuture;
+  late Future<Movie?> _movieFuture;
 
   @override
   void initState() {
     super.initState();
-    _movieFuture = ref.read(movieServiceProvider).getMovieDetails(widget.movieId);
+    _movieFuture = ref
+        .read(movieServiceProvider)
+        .getMovieDetails(widget.movieId);
+  }
+
+  void _retry() {
+    setState(() {
+      _movieFuture = ref
+          .read(movieServiceProvider)
+          .getMovieDetails(widget.movieId);
+    });
   }
 
   Future<void> _run(Future<String> Function() action) async {
@@ -61,9 +72,19 @@ class _AgreeoMovieDetailsScreenState
         builder: (context, snapshot) {
           final movie = snapshot.data;
           if (movie == null) {
-            return Center(child: CircularProgressIndicator(color: t.red));
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator(color: t.red));
+            }
+            // Done with no movie (network error or missing title) → let the
+            // user retry or back out instead of staring at a dead spinner.
+            return _DetailsErrorState(
+              onBack: () => Navigator.of(context).pop(),
+              onRetry: _retry,
+            );
           }
-          final heroUrl = movie.backdropUrl.isNotEmpty ? movie.backdropUrl : movie.posterUrl;
+          final heroUrl = movie.backdropUrl.isNotEmpty
+              ? movie.backdropUrl
+              : movie.posterUrl;
           final liked = us.preference == MoviePreference.liked;
 
           return Stack(
@@ -77,7 +98,9 @@ class _AgreeoMovieDetailsScreenState
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        DecoratedBox(decoration: BoxDecoration(gradient: t.grad)),
+                        DecoratedBox(
+                          decoration: BoxDecoration(gradient: t.grad),
+                        ),
                         if (heroUrl.isNotEmpty)
                           CachedNetworkImage(
                             imageUrl: heroUrl,
@@ -107,13 +130,21 @@ class _AgreeoMovieDetailsScreenState
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _HeroButton(icon: AgIcons.chevronLeft, onTap: () => Navigator.of(context).pop()),
                               _HeroButton(
-                                icon: liked ? AgIcons.heartFilled : AgIcons.heart,
+                                icon: AgIcons.chevronLeft,
+                                label: 'Back',
+                                onTap: () => Navigator.of(context).pop(),
+                              ),
+                              _HeroButton(
+                                icon: liked
+                                    ? AgIcons.heartFilled
+                                    : AgIcons.heart,
+                                label: liked ? 'Liked' : 'Like',
                                 iconColor: liked ? t.green : Colors.white,
                                 onTap: () => _run(
                                   liked
-                                      ? () => controller.clearPreference(movie.id)
+                                      ? () =>
+                                            controller.clearPreference(movie.id)
                                       : () => controller.likeMovie(movie.id),
                                 ),
                               ),
@@ -128,20 +159,24 @@ class _AgreeoMovieDetailsScreenState
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              SizedBox(width: 108, child: AgPoster(imageUrl: movie.posterUrl, title: movie.title)),
+                              SizedBox(
+                                width: 108,
+                                child: AgPoster(
+                                  imageUrl: movie.posterUrl,
+                                  title: movie.title,
+                                ),
+                              ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.only(bottom: 4),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         movie.title,
-                                        style: const TextStyle(
-                                          fontFamily: 'Bricolage Grotesque',
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 25,
+                                        style: AgText.h1.copyWith(
                                           letterSpacing: -0.5,
                                           height: 1.04,
                                           color: Colors.white,
@@ -152,10 +187,8 @@ class _AgreeoMovieDetailsScreenState
                                         movie.runtimeLabel.isEmpty
                                             ? '${movie.releaseYear}'
                                             : '${movie.releaseYear} · ${movie.runtimeLabel}',
-                                        style: const TextStyle(
-                                          fontFamily: 'Manrope',
+                                        style: AgText.caption.copyWith(
                                           fontWeight: FontWeight.w600,
-                                          fontSize: 12.5,
                                           color: Colors.white70,
                                         ),
                                       ),
@@ -163,14 +196,15 @@ class _AgreeoMovieDetailsScreenState
                                       if (movie.rating > 0)
                                         Row(
                                           children: [
-                                            Icon(AgIcons.star, size: 16, color: t.gold),
+                                            Icon(
+                                              AgIcons.star,
+                                              size: 16,
+                                              color: t.gold,
+                                            ),
                                             const SizedBox(width: 4),
                                             Text(
                                               movie.rating.toStringAsFixed(1),
-                                              style: const TextStyle(
-                                                fontFamily: 'Manrope',
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 13,
+                                              style: AgText.label.copyWith(
                                                 color: Colors.white,
                                               ),
                                             ),
@@ -209,9 +243,12 @@ class _AgreeoMovieDetailsScreenState
                                 label: 'Liked',
                                 color: t.green,
                                 active: liked,
-                                onTap: () => _run(liked
-                                    ? () => controller.clearPreference(movie.id)
-                                    : () => controller.likeMovie(movie.id)),
+                                onTap: () => _run(
+                                  liked
+                                      ? () =>
+                                            controller.clearPreference(movie.id)
+                                      : () => controller.likeMovie(movie.id),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -221,9 +258,14 @@ class _AgreeoMovieDetailsScreenState
                                 label: 'Watchlist',
                                 color: t.purple,
                                 active: us.inWatchlist,
-                                onTap: () => _run(us.inWatchlist
-                                    ? () => controller.removeFromWatchlist(movie.id)
-                                    : () => controller.addToWatchlist(movie.id)),
+                                onTap: () => _run(
+                                  us.inWatchlist
+                                      ? () => controller.removeFromWatchlist(
+                                          movie.id,
+                                        )
+                                      : () =>
+                                            controller.addToWatchlist(movie.id),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -233,9 +275,14 @@ class _AgreeoMovieDetailsScreenState
                                 label: 'Watched',
                                 color: t.gold,
                                 active: us.watched,
-                                onTap: () => _run(us.watched
-                                    ? () => controller.removeFromWatched(movie.id)
-                                    : () => controller.markAsWatched(movie.id)),
+                                onTap: () => _run(
+                                  us.watched
+                                      ? () => controller.removeFromWatched(
+                                          movie.id,
+                                        )
+                                      : () =>
+                                            controller.markAsWatched(movie.id),
+                                ),
                               ),
                             ),
                           ],
@@ -252,8 +299,13 @@ class _AgreeoMovieDetailsScreenState
                         _SectionTitle('Synopsis'),
                         const SizedBox(height: 8),
                         Text(
-                          movie.overview.isEmpty ? 'No synopsis available yet.' : movie.overview,
-                          style: TextStyle(fontFamily: 'Manrope', fontSize: 14, height: 1.6, color: t.sub),
+                          movie.overview.isEmpty
+                              ? 'No synopsis available yet.'
+                              : movie.overview,
+                          style: AgText.body.copyWith(
+                            height: 1.6,
+                            color: t.sub,
+                          ),
                         ),
                         if (movie.cast.isNotEmpty) ...[
                           const SizedBox(height: 22),
@@ -261,7 +313,10 @@ class _AgreeoMovieDetailsScreenState
                           const SizedBox(height: 8),
                           Text(
                             movie.cast.take(6).join(' · '),
-                            style: TextStyle(fontFamily: 'Manrope', fontSize: 14, height: 1.6, color: t.sub),
+                            style: AgText.body.copyWith(
+                              height: 1.6,
+                              color: t.sub,
+                            ),
                           ),
                         ],
                         const SizedBox(height: 22),
@@ -286,25 +341,39 @@ class _AgreeoMovieDetailsScreenState
 }
 
 class _HeroButton extends StatelessWidget {
-  const _HeroButton({required this.icon, required this.onTap, this.iconColor});
+  const _HeroButton({
+    required this.icon,
+    required this.onTap,
+    required this.label,
+    this.iconColor,
+  });
   final IconData icon;
   final VoidCallback onTap;
+  final String label;
   final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: t.line2),
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: t.line2),
+            ),
+            child: Icon(icon, size: 20, color: iconColor ?? Colors.white),
+          ),
         ),
-        child: Icon(icon, size: 20, color: iconColor ?? Colors.white),
       ),
     );
   }
@@ -326,7 +395,10 @@ class _GenrePill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 12.5, color: t.sub),
+        style: AgText.caption.copyWith(
+          fontWeight: FontWeight.w600,
+          color: t.sub,
+        ),
       ),
     );
   }
@@ -350,30 +422,33 @@ class _StateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.14) : t.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: active ? color.withValues(alpha: 0.4) : t.line),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22, color: active ? color : t.sub),
-            const SizedBox(height: 7),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontWeight: FontWeight.w700,
-                fontSize: 11.5,
-                color: active ? color : t.sub,
-              ),
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          decoration: BoxDecoration(
+            color: active ? color.withValues(alpha: 0.14) : t.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: active ? color.withValues(alpha: 0.4) : t.line,
             ),
-          ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 22, color: active ? color : t.sub),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                style: AgText.labelSm.copyWith(color: active ? color : t.sub),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -387,15 +462,16 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Text(
-      title,
-      style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 16, color: t.text),
-    );
+    return Text(title, style: AgText.h4.copyWith(color: t.text));
   }
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.userState, required this.authorName, required this.onEdit});
+  const _ReviewCard({
+    required this.userState,
+    required this.authorName,
+    required this.onEdit,
+  });
   final UserMovieState userState;
   final String authorName;
   final VoidCallback onEdit;
@@ -419,16 +495,15 @@ class _ReviewCard extends StatelessWidget {
               AgAvatar(name: authorName, color: t.red, size: 32),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'You',
-                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 13.5, color: t.text),
-                ),
+                child: Text('You', style: AgText.label.copyWith(color: t.text)),
               ),
               if (userState.rating != null)
                 Row(
                   children: List.generate(5, (i) {
                     return Icon(
-                      i < userState.rating! ? AgIcons.star : AgIcons.starOutline,
+                      i < userState.rating!
+                          ? AgIcons.star
+                          : AgIcons.starOutline,
                       size: 14,
                       color: i < userState.rating! ? t.gold : t.line2,
                     );
@@ -440,9 +515,7 @@ class _ReviewCard extends StatelessWidget {
             const SizedBox(height: 9),
             Text(
               '"${userState.review}"',
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontSize: 13.5,
+              style: AgText.caption.copyWith(
                 height: 1.55,
                 fontStyle: FontStyle.italic,
                 color: t.sub,
@@ -450,21 +523,101 @@ class _ReviewCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 11),
-          GestureDetector(
-            onTap: onEdit,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(AgIcons.edit, size: 15, color: t.red),
-                const SizedBox(width: 6),
-                Text(
-                  hasReview ? 'Edit review' : 'Add a review',
-                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, color: t.red),
-                ),
-              ],
+          Semantics(
+            button: true,
+            label: hasReview ? 'Edit review' : 'Add a review',
+            excludeSemantics: true,
+            child: GestureDetector(
+              onTap: onEdit,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(AgIcons.edit, size: 15, color: t.red),
+                  const SizedBox(width: 6),
+                  Text(
+                    hasReview ? 'Edit review' : 'Add a review',
+                    style: AgText.label.copyWith(color: t.red),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen recoverable error for a details deep-link that failed to load
+/// (no cached copy to fall back on). Offers Retry and a clear way back.
+class _DetailsErrorState extends StatelessWidget {
+  const _DetailsErrorState({required this.onBack, required this.onRetry});
+
+  final VoidCallback onBack;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.topLeft,
+              child: Semantics(
+                button: true,
+                label: 'Back',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  onTap: onBack,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: t.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: t.line),
+                    ),
+                    child: Icon(AgIcons.chevronLeft, color: t.text),
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: t.gradSoft,
+                      border: Border.all(color: t.line2),
+                    ),
+                    child: Icon(AgIcons.wifiOff, size: 34, color: t.red),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    "Couldn't load this title",
+                    textAlign: TextAlign.center,
+                    style: AgText.h3.copyWith(color: t.text),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Check your connection and try again.',
+                    textAlign: TextAlign.center,
+                    style: AgText.caption.copyWith(height: 1.5, color: t.sub),
+                  ),
+                  const SizedBox(height: 22),
+                  AgButton(label: 'Retry', expand: false, onPressed: onRetry),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

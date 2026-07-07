@@ -2,6 +2,7 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/services/avatar_image_service.dart';
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Edit-profile sheet: profile photo (gallery picker → base64 data URI),
 /// display name + bio → `updateProfile`, persisted via `PATCH /me/profile`.
 /// Reference: `ag-states.jsx` EditProfileScreen.
-Future<void> showEditProfileSheet(BuildContext context, AgreeoUserSession session) {
+Future<void> showEditProfileSheet(
+  BuildContext context,
+  AgreeoUserSession session,
+) {
   return showAgSheet<void>(
     context: context,
     heightFactor: 0.78,
@@ -98,13 +102,7 @@ class _EditProfileState extends ConsumerState<_EditProfile> {
       children: [
         Text(
           'Edit profile',
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
-            fontSize: 25,
-            letterSpacing: -0.5,
-            color: t.text,
-          ),
+          style: AgText.h1.copyWith(letterSpacing: -0.5, color: t.text),
         ),
         const SizedBox(height: 20),
         Center(
@@ -131,7 +129,11 @@ class _EditProfileState extends ConsumerState<_EditProfile> {
                           shape: BoxShape.circle,
                           border: Border.all(color: t.bg2, width: 2.5),
                         ),
-                        child: const Icon(AgIcons.camera, size: 14, color: Colors.white),
+                        child: const Icon(
+                          AgIcons.camera,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -141,19 +143,14 @@ class _EditProfileState extends ConsumerState<_EditProfile> {
               if (_avatarUrl.isEmpty)
                 Text(
                   'Tap to add a profile photo',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                  style: AgText.micro.copyWith(color: t.faint),
                 )
               else
                 GestureDetector(
                   onTap: _saving ? null : () => setState(() => _avatarUrl = ''),
                   child: Text(
                     'Remove photo',
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      color: t.red,
-                    ),
+                    style: AgText.label.copyWith(color: t.red),
                   ),
                 ),
             ],
@@ -166,7 +163,12 @@ class _EditProfileState extends ConsumerState<_EditProfile> {
         const SizedBox(height: 18),
         _FieldLabel('Bio / status'),
         const SizedBox(height: 8),
-        _Field(controller: _bio, hint: 'Tell friends your taste…', maxLines: 4, focusBorder: true),
+        _Field(
+          controller: _bio,
+          hint: 'Tell friends your taste…',
+          maxLines: 4,
+          focusBorder: true,
+        ),
         const SizedBox(height: 22),
         AgButton(
           label: _saving ? 'Saving…' : 'Save profile',
@@ -186,10 +188,7 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Text(
-      text,
-      style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 13, color: t.text),
-    );
+    return Text(text, style: AgText.label.copyWith(color: t.text));
   }
 }
 
@@ -217,17 +216,22 @@ class _Field extends StatelessWidget {
           width: focusBorder ? 1.5 : 1,
         ),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: maxLines > 1 ? 12 : 0),
+      padding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: maxLines > 1 ? 12 : 0,
+      ),
       child: TextField(
         controller: controller,
         maxLines: maxLines,
         cursorColor: t.red,
-        style: TextStyle(fontFamily: 'Manrope', fontSize: 15, fontWeight: FontWeight.w600, color: t.text),
+        style: AgText.body.copyWith(fontWeight: FontWeight.w600, color: t.text),
         decoration: agBareInput(
           hint: hint,
-          hintStyle: TextStyle(fontFamily: 'Manrope', fontSize: 15, color: t.faint),
+          hintStyle: AgText.body.copyWith(color: t.faint),
           collapsed: maxLines == 1,
-          contentPadding: maxLines == 1 ? const EdgeInsets.symmetric(vertical: 15) : EdgeInsets.zero,
+          contentPadding: maxLines == 1
+              ? const EdgeInsets.symmetric(vertical: 15)
+              : EdgeInsets.zero,
         ),
       ),
     );

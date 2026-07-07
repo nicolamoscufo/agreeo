@@ -1,5 +1,6 @@
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,9 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
   @override
   void initState() {
     super.initState();
-    final state = ref.read(agreeoAppControllerProvider).userMovieStateFor(widget.movie.id);
+    final state = ref
+        .read(agreeoAppControllerProvider)
+        .userMovieStateFor(widget.movie.id);
     _controller = TextEditingController(text: state.review ?? '');
     _rating = state.rating ?? 0;
   }
@@ -75,7 +78,14 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
       children: [
         Row(
           children: [
-            SizedBox(width: 56, child: AgPoster(imageUrl: widget.movie.posterUrl, title: widget.movie.title, radius: 11)),
+            SizedBox(
+              width: 56,
+              child: AgPoster(
+                imageUrl: widget.movie.posterUrl,
+                title: widget.movie.title,
+                radius: 11,
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -84,23 +94,14 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
                 children: [
                   Text(
                     'YOUR REVIEW',
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      letterSpacing: 0.4,
-                      color: t.faint,
-                    ),
+                    style: AgText.overline.copyWith(color: t.faint),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     widget.movie.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'Bricolage Grotesque',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
+                    style: AgText.h3.copyWith(
                       letterSpacing: -0.4,
                       height: 1.1,
                       color: t.text,
@@ -114,14 +115,17 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
         const SizedBox(height: 20),
         Text(
           'Your rating',
-          style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 14.5, color: t.text),
+          style: AgText.h4.copyWith(fontSize: 14.5, color: t.text),
         ),
         const SizedBox(height: 10),
-        AgStarRater(value: _rating, onChanged: (v) => setState(() => _rating = v)),
+        AgStarRater(
+          value: _rating,
+          onChanged: (v) => setState(() => _rating = v),
+        ),
         const SizedBox(height: 20),
         Text(
           'What stuck with you?',
-          style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 14.5, color: t.text),
+          style: AgText.h4.copyWith(fontSize: 14.5, color: t.text),
         ),
         const SizedBox(height: 10),
         Container(
@@ -136,10 +140,10 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
             controller: _controller,
             maxLines: 5,
             cursorColor: t.red,
-            style: TextStyle(fontFamily: 'Manrope', fontSize: 14.5, height: 1.55, color: t.text),
+            style: AgText.body.copyWith(color: t.text),
             decoration: agBareInput(
               hint: 'Cried twice. The docking scene is unreal…',
-              hintStyle: TextStyle(fontFamily: 'Manrope', fontSize: 14.5, color: t.faint),
+              hintStyle: AgText.body.copyWith(color: t.faint),
             ),
           ),
         ),
@@ -147,12 +151,22 @@ class _ReviewEditorState extends ConsumerState<_ReviewEditor> {
         Row(
           children: [
             Expanded(
-              child: AgButton.secondary(label: 'Delete', icon: AgIcons.close, onPressed: _delete, height: 50),
+              child: AgButton.secondary(
+                label: 'Delete',
+                icon: AgIcons.close,
+                onPressed: _delete,
+                height: 50,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               flex: 3,
-              child: AgButton(label: 'Save review', icon: AgIcons.check, onPressed: _save, height: 50),
+              child: AgButton(
+                label: 'Save review',
+                icon: AgIcons.check,
+                onPressed: _save,
+                height: 50,
+              ),
             ),
           ],
         ),

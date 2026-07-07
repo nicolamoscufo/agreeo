@@ -1,5 +1,6 @@
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -11,10 +12,12 @@ class AgreeoAuthWelcomeScreen extends ConsumerStatefulWidget {
   const AgreeoAuthWelcomeScreen({super.key});
 
   @override
-  ConsumerState<AgreeoAuthWelcomeScreen> createState() => _AgreeoAuthWelcomeScreenState();
+  ConsumerState<AgreeoAuthWelcomeScreen> createState() =>
+      _AgreeoAuthWelcomeScreenState();
 }
 
-class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScreen> {
+class _AgreeoAuthWelcomeScreenState
+    extends ConsumerState<AgreeoAuthWelcomeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -64,11 +67,16 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
           password: _passwordController.text,
         );
       } else {
-        await controller.logIn(email: _emailController.text, password: _passwordController.text);
+        await controller.logIn(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
       }
     } on BackendAuthException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -86,7 +94,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height - 80),
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.sizeOf(context).height - 80,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -103,7 +113,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                           label: 'Display name',
                           controller: _nameController,
                           hint: 'Your name',
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your name' : null,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Enter your name'
+                              : null,
                         ),
                         const SizedBox(height: 14),
                       ],
@@ -112,7 +124,9 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                         controller: _emailController,
                         hint: 'you@email.com',
                         keyboardType: TextInputType.emailAddress,
-                        validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                        validator: (v) => (v == null || !v.contains('@'))
+                            ? 'Enter a valid email'
+                            : null,
                       ),
                       const SizedBox(height: 14),
                       _Field(
@@ -120,13 +134,16 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                         controller: _passwordController,
                         hint: _isSignUp ? 'At least 8 characters' : 'Password',
                         obscure: _obscure,
-                        onToggleObscure: () => setState(() => _obscure = !_obscure),
+                        onToggleObscure: () =>
+                            setState(() => _obscure = !_obscure),
                         validator: _validatePassword,
                         onSubmitted: (_) => _submit(),
                       ),
                       const SizedBox(height: 20),
                       AgButton(
-                        label: _submitting ? 'Please wait…' : (_isSignUp ? 'Create account' : 'Log in'),
+                        label: _submitting
+                            ? 'Please wait…'
+                            : (_isSignUp ? 'Create account' : 'Log in'),
                         icon: AgIcons.arrow,
                         onPressed: _submitting ? null : _submit,
                       ),
@@ -137,12 +154,19 @@ class _AgreeoAuthWelcomeScreenState extends ConsumerState<AgreeoAuthWelcomeScree
                         child: Center(
                           child: RichText(
                             text: TextSpan(
-                              style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
-                              text: _isSignUp ? 'Already have an account? ' : 'New here? ',
+                              style: AgText.caption.copyWith(color: t.faint),
+                              text: _isSignUp
+                                  ? 'Already have an account? '
+                                  : 'New here? ',
                               children: [
                                 TextSpan(
-                                  text: _isSignUp ? 'Log in' : 'Create an account',
-                                  style: TextStyle(color: t.red, fontWeight: FontWeight.w700),
+                                  text: _isSignUp
+                                      ? 'Log in'
+                                      : 'Create an account',
+                                  style: TextStyle(
+                                    color: t.red,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
@@ -172,9 +196,20 @@ class _Headline extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Create your account', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 29, height: 1.05, letterSpacing: -0.7, color: t.text)),
+          Text(
+            'Create your account',
+            style: AgText.display.copyWith(
+              fontSize: 29,
+              height: 1.05,
+              letterSpacing: -0.7,
+              color: t.text,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text("It takes about a minute. We'll tune your taste next.", style: TextStyle(fontFamily: 'Manrope', fontSize: 14, height: 1.45, color: t.sub)),
+          Text(
+            "It takes about a minute. We'll tune your taste next.",
+            style: AgText.body.copyWith(height: 1.45, color: t.sub),
+          ),
         ],
       );
     }
@@ -183,20 +218,26 @@ class _Headline extends StatelessWidget {
       children: [
         RichText(
           text: TextSpan(
-            style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 30, height: 1.05, letterSpacing: -0.8, color: t.text),
+            style: AgText.display.copyWith(height: 1.05, color: t.text),
             children: [
               const TextSpan(text: 'Movie night,\nfinally '),
               WidgetSpan(
                 child: ShaderMask(
                   shaderCallback: (rect) => t.grad.createShader(rect),
-                  child: const Text('agreed.', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 30, letterSpacing: -0.8, color: Colors.white)),
+                  child: Text(
+                    'agreed.',
+                    style: AgText.display.copyWith(color: Colors.white),
+                  ),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 10),
-        Text('Discover films, build your taste, and decide together — no more endless scrolling.', style: TextStyle(fontFamily: 'Manrope', fontSize: 14.5, height: 1.45, color: t.sub)),
+        Text(
+          'Discover films, build your taste, and decide together — no more endless scrolling.',
+          style: AgText.body.copyWith(height: 1.45, color: t.sub),
+        ),
       ],
     );
   }
@@ -218,12 +259,22 @@ class _Wordmark extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: t.grad,
             borderRadius: BorderRadius.circular(size * 0.34),
-            boxShadow: [BoxShadow(color: t.purple.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6), spreadRadius: -4)],
+            boxShadow: [
+              BoxShadow(
+                color: t.purple.withValues(alpha: 0.5),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+                spreadRadius: -4,
+              ),
+            ],
           ),
           child: Icon(AgIcons.play, size: size * 0.6, color: Colors.white),
         ),
         const SizedBox(width: 9),
-        Text('Agreeo', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: size, letterSpacing: -0.8, color: t.text)),
+        Text(
+          'Agreeo',
+          style: AgText.display.copyWith(fontSize: size, color: t.text),
+        ),
       ],
     );
   }
@@ -236,10 +287,22 @@ class _PosterFan extends StatelessWidget {
   // fanned in 4 columns × 2 rows. Reference: `ag-auth.jsx` PosterFan.
   static const String _tmdb = 'https://image.tmdb.org/t/p/w500';
   static const List<List<String>> _cols = <List<String>>[
-    ['$_tmdb/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg', '$_tmdb/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg'],
-    ['$_tmdb/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg', '$_tmdb/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg'],
-    ['$_tmdb/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', '$_tmdb/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg'],
-    ['$_tmdb/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg', '$_tmdb/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg'],
+    [
+      '$_tmdb/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+      '$_tmdb/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg',
+    ],
+    [
+      '$_tmdb/czembW0Rk1Ke7lCJGahbOhdCuhV.jpg',
+      '$_tmdb/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+    ],
+    [
+      '$_tmdb/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+      '$_tmdb/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg',
+    ],
+    [
+      '$_tmdb/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg',
+      '$_tmdb/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg',
+    ],
   ];
 
   @override
@@ -273,12 +336,29 @@ class _PosterFan extends StatelessWidget {
                       children: [
                         for (var col = 0; col < _cols.length; col++)
                           Padding(
-                            padding: EdgeInsets.only(left: col == 0 ? 0 : 10, top: col.isOdd ? 28 : 0),
+                            padding: EdgeInsets.only(
+                              left: col == 0 ? 0 : 10,
+                              top: col.isOdd ? 28 : 0,
+                            ),
                             child: Column(
                               children: [
-                                SizedBox(width: 104, child: AgPoster(imageUrl: _cols[col][0], radius: 12, shadow: false)),
+                                SizedBox(
+                                  width: 104,
+                                  child: AgPoster(
+                                    imageUrl: _cols[col][0],
+                                    radius: 12,
+                                    shadow: false,
+                                  ),
+                                ),
                                 const SizedBox(height: 10),
-                                SizedBox(width: 104, child: AgPoster(imageUrl: _cols[col][1], radius: 12, shadow: false)),
+                                SizedBox(
+                                  width: 104,
+                                  child: AgPoster(
+                                    imageUrl: _cols[col][1],
+                                    radius: 12,
+                                    shadow: false,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -295,7 +375,11 @@ class _PosterFan extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [t.bg.withValues(alpha: 0.2), t.bg.withValues(alpha: 0.7), t.bg],
+                  colors: [
+                    t.bg.withValues(alpha: 0.2),
+                    t.bg.withValues(alpha: 0.7),
+                    t.bg,
+                  ],
                   stops: const [0, 0.55, 0.92],
                 ),
               ),
@@ -336,7 +420,13 @@ class _Field extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 3, bottom: 7),
-          child: Text(label, style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 12.5, color: t.faint)),
+          child: Text(
+            label,
+            style: AgText.caption.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.faint,
+            ),
+          ),
         ),
         TextFormField(
           controller: controller,
@@ -345,13 +435,19 @@ class _Field extends StatelessWidget {
           validator: validator,
           onFieldSubmitted: onSubmitted,
           cursorColor: t.red,
-          style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 15.5, color: t.text),
+          style: AgText.body.copyWith(
+            fontWeight: FontWeight.w600,
+            color: t.text,
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(fontFamily: 'Manrope', fontSize: 15.5, color: t.faint),
+            hintStyle: AgText.body.copyWith(color: t.faint),
             filled: true,
             fillColor: t.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 17,
+            ),
             suffixIcon: onToggleObscure != null
                 ? IconButton(
                     onPressed: onToggleObscure,
@@ -359,11 +455,26 @@ class _Field extends StatelessWidget {
                     icon: Icon(AgIcons.eye, size: 19, color: t.faint),
                   )
                 : null,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: t.line, width: 1.5)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: t.line, width: 1.5)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: t.red, width: 1.5)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: t.redDeep, width: 1.5)),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: t.redDeep, width: 1.5)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.line, width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.line, width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.red, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.redDeep, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.redDeep, width: 1.5),
+            ),
           ),
         ),
       ],

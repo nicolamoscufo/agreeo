@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:agreeo/shared/state/nav_index_provider.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_effects.dart';
 import 'package:agreeo/shared/ui/ag_icons.dart';
@@ -97,28 +98,35 @@ class AgGlassBottomNav extends ConsumerWidget {
       ),
     );
 
-    final fab = GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onCenterTap();
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          gradient: t.grad,
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: t.bg, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: t.purple.withValues(alpha: 0.7),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
-              spreadRadius: -6,
+    final fab = Semantics(
+      button: true,
+      label: 'Start a movie night',
+      child: Tooltip(
+        message: 'Start a movie night',
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            onCenterTap();
+          },
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: t.grad,
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: t.bg, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: t.purple.withValues(alpha: 0.7),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                  spreadRadius: -6,
+                ),
+              ],
             ),
-          ],
+            child: const Icon(AgIcons.film, size: 24, color: Colors.white),
+          ),
         ),
-        child: const Icon(AgIcons.film, size: 24, color: Colors.white),
       ),
     );
 
@@ -161,26 +169,31 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final color = active ? t.red : t.faint;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 54,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 23, color: color),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                fontSize: 10,
-                color: active ? t.text : t.faint,
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 54,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 23, color: color),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: AgText.labelSm.copyWith(
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  fontSize: 10,
+                  color: active ? t.text : t.faint,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

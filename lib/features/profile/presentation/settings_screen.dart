@@ -5,6 +5,7 @@ import 'package:agreeo/features/profile/presentation/change_password_sheet.dart'
 import 'package:agreeo/features/profile/presentation/delete_account_sheet.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/theme_mode_provider.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -19,10 +20,12 @@ final Future<PackageInfo> _packageInfoFuture = PackageInfo.fromPlatform();
 Future<void> _openExternalUrl(BuildContext context, String url) async {
   final messenger = ScaffoldMessenger.of(context);
   final uri = Uri.tryParse(url);
-  final ok = uri != null &&
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+  final ok =
+      uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!ok) {
-    messenger.showSnackBar(const SnackBar(content: Text("Couldn't open the link.")));
+    messenger.showSnackBar(
+      const SnackBar(content: Text("Couldn't open the link.")),
+    );
   }
 }
 
@@ -35,7 +38,9 @@ Future<void> _openSupportEmail(BuildContext context) async {
   );
   if (!await launchUrl(uri)) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('No mail app found. Email ${AppLinks.supportEmail}')),
+      const SnackBar(
+        content: Text('No mail app found. Email ${AppLinks.supportEmail}'),
+      ),
     );
   }
 }
@@ -67,10 +72,7 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Text(
                     'Settings',
-                    style: TextStyle(
-                      fontFamily: 'Bricolage Grotesque',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 23,
+                    style: AgText.h2.copyWith(
                       letterSpacing: -0.5,
                       color: t.text,
                     ),
@@ -86,148 +88,187 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                   const SizedBox(height: 9),
                   _ThemeSelector(
                     mode: themeMode,
-                    onChanged: (m) => ref.read(themeModeProvider.notifier).setMode(m),
+                    onChanged: (m) =>
+                        ref.read(themeModeProvider.notifier).setMode(m),
                   ),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.shield, title: 'Privacy'),
                   const SizedBox(height: 9),
-                  _Card(rows: [
-                    _ToggleRow(
-                      icon: AgIcons.eye,
-                      title: 'Show watched to friends',
-                      value: prefs.showWatchedToFriends,
-                      onChanged: (v) => controller.setPrivacyPreference(showWatchedToFriends: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.heart,
-                      title: 'Show liked to friends',
-                      value: prefs.showLikedToFriends,
-                      onChanged: (v) => controller.setPrivacyPreference(showLikedToFriends: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.bookmark,
-                      title: 'Show watchlist to friends',
-                      value: prefs.showWatchlistToFriends,
-                      onChanged: (v) => controller.setPrivacyPreference(showWatchlistToFriends: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.edit,
-                      title: 'Show reviews to friends',
-                      value: prefs.showReviewsToFriends,
-                      onChanged: (v) => controller.setPrivacyPreference(showReviewsToFriends: v),
-                    ),
-                    _NavRow(
-                      icon: AgIcons.shield,
-                      title: 'Blocked users',
-                      subtitle: 'See and unblock people you blocked',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => const BlockedUsersScreen()),
+                  _Card(
+                    rows: [
+                      _ToggleRow(
+                        icon: AgIcons.eye,
+                        title: 'Show watched to friends',
+                        value: prefs.showWatchedToFriends,
+                        onChanged: (v) => controller.setPrivacyPreference(
+                          showWatchedToFriends: v,
+                        ),
                       ),
-                    ),
-                  ]),
+                      _ToggleRow(
+                        icon: AgIcons.heart,
+                        title: 'Show liked to friends',
+                        value: prefs.showLikedToFriends,
+                        onChanged: (v) => controller.setPrivacyPreference(
+                          showLikedToFriends: v,
+                        ),
+                      ),
+                      _ToggleRow(
+                        icon: AgIcons.bookmark,
+                        title: 'Show watchlist to friends',
+                        value: prefs.showWatchlistToFriends,
+                        onChanged: (v) => controller.setPrivacyPreference(
+                          showWatchlistToFriends: v,
+                        ),
+                      ),
+                      _ToggleRow(
+                        icon: AgIcons.edit,
+                        title: 'Show reviews to friends',
+                        value: prefs.showReviewsToFriends,
+                        onChanged: (v) => controller.setPrivacyPreference(
+                          showReviewsToFriends: v,
+                        ),
+                      ),
+                      _NavRow(
+                        icon: AgIcons.shield,
+                        title: 'Blocked users',
+                        subtitle: 'See and unblock people you blocked',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const BlockedUsersScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.bell, title: 'Notifications'),
                   const SizedBox(height: 9),
-                  _Card(rows: [
-                    _ToggleRow(
-                      icon: AgIcons.bulb,
-                      title: 'Daily suggestion reminder',
-                      value: prefs.dailySuggestionReminder,
-                      onChanged: (v) => controller.setNotificationPreference(dailySuggestionReminder: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.film,
-                      title: 'Movie Night invites',
-                      value: prefs.movieNightInvites,
-                      onChanged: (v) => controller.setNotificationPreference(movieNightInvites: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.vote,
-                      title: 'Voting started',
-                      value: prefs.votingStarted,
-                      onChanged: (v) => controller.setNotificationPreference(votingStarted: v),
-                    ),
-                    _ToggleRow(
-                      icon: AgIcons.trophy,
-                      title: 'Final decision reached',
-                      value: prefs.finalDecisionReached,
-                      onChanged: (v) => controller.setNotificationPreference(finalDecisionReached: v),
-                    ),
-                  ]),
+                  _Card(
+                    rows: [
+                      _ToggleRow(
+                        icon: AgIcons.bulb,
+                        title: 'Daily suggestion reminder',
+                        value: prefs.dailySuggestionReminder,
+                        onChanged: (v) => controller.setNotificationPreference(
+                          dailySuggestionReminder: v,
+                        ),
+                      ),
+                      _ToggleRow(
+                        icon: AgIcons.film,
+                        title: 'Movie Night invites',
+                        value: prefs.movieNightInvites,
+                        onChanged: (v) => controller.setNotificationPreference(
+                          movieNightInvites: v,
+                        ),
+                      ),
+                      _ToggleRow(
+                        icon: AgIcons.vote,
+                        title: 'Voting started',
+                        value: prefs.votingStarted,
+                        onChanged: (v) => controller.setNotificationPreference(
+                          votingStarted: v,
+                        ),
+                      ),
+                      _ToggleRow(
+                        icon: AgIcons.trophy,
+                        title: 'Final decision reached',
+                        value: prefs.finalDecisionReached,
+                        onChanged: (v) => controller.setNotificationPreference(
+                          finalDecisionReached: v,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.settings, title: 'Account'),
                   const SizedBox(height: 9),
-                  _Card(rows: [
-                    _InfoRow(
-                      icon: AgIcons.mail,
-                      title: state.session?.email ?? 'you@agreeo.app',
-                      subtitle: 'Signed in',
-                    ),
-                    _NavRow(
-                      icon: AgIcons.lock,
-                      title: 'Change password',
-                      subtitle: 'Update your sign-in password',
-                      onTap: () => showChangePasswordSheet(context),
-                    ),
-                    _NavRow(
-                      icon: AgIcons.trash,
-                      title: 'Delete account',
-                      subtitle: 'Permanently erase your data',
-                      danger: true,
-                      onTap: () => showDeleteAccountSheet(context),
-                    ),
-                  ]),
+                  _Card(
+                    rows: [
+                      _InfoRow(
+                        icon: AgIcons.mail,
+                        title: state.session?.email ?? 'you@agreeo.app',
+                        subtitle: 'Signed in',
+                      ),
+                      _NavRow(
+                        icon: AgIcons.lock,
+                        title: 'Change password',
+                        subtitle: 'Update your sign-in password',
+                        onTap: () => showChangePasswordSheet(context),
+                      ),
+                      _NavRow(
+                        icon: AgIcons.trash,
+                        title: 'Delete account',
+                        subtitle: 'Permanently erase your data',
+                        danger: true,
+                        onTap: () => showDeleteAccountSheet(context),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
-                  _SectionTitle(icon: Icons.info_outline_rounded, title: 'About & Support'),
+                  _SectionTitle(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About & Support',
+                  ),
                   const SizedBox(height: 9),
-                  _Card(rows: [
-                    _NavRow(
-                      icon: AgIcons.shield,
-                      title: 'Privacy Policy',
-                      subtitle: 'How we handle your data',
-                      onTap: () => _openExternalUrl(context, AppLinks.privacyPolicy),
-                    ),
-                    _NavRow(
-                      icon: Icons.description_outlined,
-                      title: 'Terms of Service',
-                      subtitle: 'The rules for using Agreeo',
-                      onTap: () => _openExternalUrl(context, AppLinks.termsOfService),
-                    ),
-                    _NavRow(
-                      icon: AgIcons.mail,
-                      title: 'Contact support',
-                      subtitle: 'Questions, bugs or feedback',
-                      onTap: () => _openSupportEmail(context),
-                    ),
-                    _NavRow(
-                      icon: AgIcons.star,
-                      title: 'Rate Agreeo',
-                      subtitle: 'Leave a review on the store',
-                      onTap: () => _openExternalUrl(context, AppLinks.storeListing),
-                    ),
-                    const _VersionRow(),
-                  ]),
+                  _Card(
+                    rows: [
+                      _NavRow(
+                        icon: AgIcons.shield,
+                        title: 'Privacy Policy',
+                        subtitle: 'How we handle your data',
+                        onTap: () =>
+                            _openExternalUrl(context, AppLinks.privacyPolicy),
+                      ),
+                      _NavRow(
+                        icon: Icons.description_outlined,
+                        title: 'Terms of Service',
+                        subtitle: 'The rules for using Agreeo',
+                        onTap: () =>
+                            _openExternalUrl(context, AppLinks.termsOfService),
+                      ),
+                      _NavRow(
+                        icon: AgIcons.mail,
+                        title: 'Contact support',
+                        subtitle: 'Questions, bugs or feedback',
+                        onTap: () => _openSupportEmail(context),
+                      ),
+                      _NavRow(
+                        icon: AgIcons.star,
+                        title: 'Rate Agreeo',
+                        subtitle: 'Leave a review on the store',
+                        onTap: () =>
+                            _openExternalUrl(context, AppLinks.storeListing),
+                      ),
+                      const _VersionRow(),
+                    ],
+                  ),
                   const SizedBox(height: 18),
                   _SectionTitle(icon: AgIcons.sliders, title: 'Developer'),
                   const SizedBox(height: 9),
-                  _Card(rows: [
-                    _NavRow(
-                      icon: AgIcons.sparkle,
-                      title: 'Neo4j Console',
-                      subtitle: 'Schema, indici e query Cypher live',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => const Neo4jConsoleScreen()),
+                  _Card(
+                    rows: [
+                      _NavRow(
+                        icon: AgIcons.sparkle,
+                        title: 'Neo4j Console',
+                        subtitle: 'Schema, indici e query Cypher live',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const Neo4jConsoleScreen(),
+                          ),
+                        ),
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
                   const SizedBox(height: 4),
-                  _LogoutButton(onTap: () async {
-                    HapticFeedback.mediumImpact();
-                    final navigator = Navigator.of(context);
-                    await controller.logOut();
-                    // Pop Settings/Profile so the signed-out gate is visible.
-                    navigator.popUntil((route) => route.isFirst);
-                  }),
+                  _LogoutButton(
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      final navigator = Navigator.of(context);
+                      await controller.logOut();
+                      // Pop Settings/Profile so the signed-out gate is visible.
+                      navigator.popUntil((route) => route.isFirst);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -242,17 +283,25 @@ class _BackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: t.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: t.line),
+    return Semantics(
+      button: true,
+      label: 'Back',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Back',
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: t.line),
+            ),
+            child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
+          ),
         ),
-        child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
       ),
     );
   }
@@ -272,9 +321,7 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(width: 9),
         Text(
           title,
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
+          style: AgText.h4.copyWith(
             fontSize: 14.5,
             letterSpacing: -0.3,
             color: t.text,
@@ -309,30 +356,38 @@ class _ThemeSelector extends StatelessWidget {
         children: items.map((item) {
           final on = mode == item.$1;
           return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(item.$1),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                height: 42,
-                decoration: BoxDecoration(
-                  gradient: on ? t.grad : null,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item.$3, size: 18, color: on ? Colors.white : t.sub),
-                    const SizedBox(width: 8),
-                    Text(
-                      item.$2,
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
+            child: Semantics(
+              button: true,
+              selected: on,
+              label: '${item.$2} theme',
+              excludeSemantics: true,
+              child: GestureDetector(
+                onTap: () => onChanged(item.$1),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    gradient: on ? t.grad : null,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        item.$3,
+                        size: 18,
                         color: on ? Colors.white : t.sub,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        item.$2,
+                        style: AgText.label.copyWith(
+                          fontSize: 14,
+                          color: on ? Colors.white : t.sub,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -384,20 +439,27 @@ class _ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: t.sub),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: t.text),
+    // Merge the label + switch into a single accessibility node so screen
+    // readers announce e.g. "Show watched films to friends, switch, on".
+    return MergeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: t.sub),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Text(
+                title,
+                style: AgText.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: t.text,
+                ),
+              ),
             ),
-          ),
-          _GradientSwitch(value: value, onChanged: onChanged),
-        ],
+            _GradientSwitch(value: value, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }
@@ -411,30 +473,39 @@ class _GradientSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onChanged(!value);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 48,
-        height: 29,
-        padding: const EdgeInsets.all(3),
-        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        decoration: BoxDecoration(
-          gradient: value ? t.grad : null,
-          color: value ? null : t.surface2,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: value ? Colors.transparent : t.line2),
-        ),
-        child: Container(
-          width: 23,
-          height: 23,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, offset: Offset(0, 2))],
+    return Semantics(
+      toggled: value,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(!value);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 48,
+          height: 29,
+          padding: const EdgeInsets.all(3),
+          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+          decoration: BoxDecoration(
+            gradient: value ? t.grad : null,
+            color: value ? null : t.surface2,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: value ? Colors.transparent : t.line2),
+          ),
+          child: Container(
+            width: 23,
+            height: 23,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 5,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -463,13 +534,13 @@ class _InfoRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: t.text),
+                  style: AgText.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: t.text,
+                  ),
                 ),
                 if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
-                  ),
+                  Text(subtitle!, style: AgText.micro.copyWith(color: t.faint)),
               ],
             ),
           ),
@@ -535,12 +606,15 @@ class _NavRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 13.5, color: danger ? t.red : t.text),
+                    style: AgText.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: danger ? t.red : t.text,
+                    ),
                   ),
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
+                      style: AgText.micro.copyWith(color: t.faint),
                     ),
                 ],
               ),
@@ -577,7 +651,7 @@ class _LogoutButton extends StatelessWidget {
             const SizedBox(width: 9),
             Text(
               'Log out',
-              style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.red),
+              style: AgText.label.copyWith(fontSize: 15, color: t.red),
             ),
           ],
         ),

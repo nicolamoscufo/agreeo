@@ -126,8 +126,12 @@ class AgreeoTokens extends ThemeExtension<AgreeoTokens> {
     line: Color.fromRGBO(28, 22, 16, 0.09),
     line2: Color.fromRGBO(28, 22, 16, 0.16),
     text: Color(0xFF221A14),
-    sub: Color.fromRGBO(34, 26, 20, 0.62),
-    faint: Color.fromRGBO(34, 26, 20, 0.42),
+    // Two readable secondary tiers. On the cream bg (#F7F2EA) anything lighter
+    // than ~0.62α fails WCAG AA for body text, so `faint` (previously 0.42α →
+    // 2.6:1) is lifted to clear 4.5:1, and `sub` is lifted in step to stay a
+    // visibly stronger tier above it. bg/surface colors are unchanged.
+    sub: Color.fromRGBO(34, 26, 20, 0.72),
+    faint: Color.fromRGBO(34, 26, 20, 0.62),
     red: Color(0xFFEF563B),
     redDeep: Color(0xFFD8442B),
     purple: Color(0xFF6B45F0),
@@ -145,7 +149,10 @@ class AgreeoTokens extends ThemeExtension<AgreeoTokens> {
     gradSoft: LinearGradient(
       begin: _gradBegin,
       end: _gradEnd,
-      colors: [Color.fromRGBO(239, 86, 59, 0.10), Color.fromRGBO(107, 69, 240, 0.10)],
+      colors: [
+        Color.fromRGBO(239, 86, 59, 0.10),
+        Color.fromRGBO(107, 69, 240, 0.10),
+      ],
     ),
   );
 
@@ -158,8 +165,10 @@ class AgreeoTokens extends ThemeExtension<AgreeoTokens> {
     line: Color.fromRGBO(255, 255, 255, 0.08),
     line2: Color.fromRGBO(255, 255, 255, 0.15),
     text: Color(0xFFF7F0E8),
-    sub: Color.fromRGBO(247, 240, 232, 0.62),
-    faint: Color.fromRGBO(247, 240, 232, 0.40),
+    // See light-mode note: lift the two secondary tiers to clear WCAG AA on the
+    // dark bg (#161310) while keeping `sub` visibly stronger than `faint`.
+    sub: Color.fromRGBO(247, 240, 232, 0.74),
+    faint: Color.fromRGBO(247, 240, 232, 0.60),
     red: Color(0xFFFF6F52),
     redDeep: Color(0xFFE8542F),
     purple: Color(0xFF9B7BFF),
@@ -177,7 +186,10 @@ class AgreeoTokens extends ThemeExtension<AgreeoTokens> {
     gradSoft: LinearGradient(
       begin: _gradBegin,
       end: _gradEnd,
-      colors: [Color.fromRGBO(255, 111, 82, 0.16), Color.fromRGBO(155, 123, 255, 0.16)],
+      colors: [
+        Color.fromRGBO(255, 111, 82, 0.16),
+        Color.fromRGBO(155, 123, 255, 0.16),
+      ],
     ),
   );
 

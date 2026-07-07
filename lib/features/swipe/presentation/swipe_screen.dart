@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/features/profile/presentation/profile_screen.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -107,9 +107,17 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
         // memCacheWidth — a bare provider has a different image-cache key,
         // so the precached frame would never be reused by the cards.
         final provider = ResizeImage.resizeIfNeeded(
-            cacheWidth, null, CachedNetworkImageProvider(url));
-        unawaited(precacheImage(provider, context,
-            onError: (Object _, StackTrace? _) {}));
+          cacheWidth,
+          null,
+          CachedNetworkImageProvider(url),
+        );
+        unawaited(
+          precacheImage(
+            provider,
+            context,
+            onError: (Object _, StackTrace? _) {},
+          ),
+        );
       }
     });
   }
@@ -125,10 +133,20 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
     final nextMovie = queue.length > 1 ? queue[1] : null;
 
     if (currentMovie == null) {
+      // Cold start: the deck is empty because data hasn't hydrated yet, not
+      // because the user is caught up. Show loading, not the empty state.
+      if (!state.hydrated) {
+        return Scaffold(
+          backgroundColor: t.bg,
+          body: Center(child: CircularProgressIndicator(color: t.red)),
+        );
+      }
       return _SwipeEmptyState(
         onRefresh: () {
           HapticFeedback.mediumImpact();
-          ref.read(agreeoAppControllerProvider.notifier).refreshMovieSuggestions();
+          ref
+              .read(agreeoAppControllerProvider.notifier)
+              .refreshMovieSuggestions();
         },
         onLibrary: () => widget.onNavigateTab?.call(AgNavTab.library),
       );
@@ -176,47 +194,34 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Discover',
-                        style: TextStyle(
-                          fontFamily: 'Bricolage Grotesque',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 23,
+                        style: AgText.h2.copyWith(
                           letterSpacing: -0.5,
                           color: Colors.white,
-                          shadows: [Shadow(color: Colors.black54, blurRadius: 12)],
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 12),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 1),
+                      const SizedBox(height: 1),
                       Text(
                         'Swipe to build your taste',
-                        style: TextStyle(
-                          fontFamily: 'Manrope',
-                          fontSize: 12.5,
-                          color: Colors.white70,
-                        ),
+                        style: AgText.caption.copyWith(color: Colors.white70),
                       ),
                     ],
                   ),
                 ),
                 _GlassPill(label: '${queue.length} left'),
                 const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const AgreeoProfileScreen(),
-                    ),
-                  ),
-                  child: AgAvatar(
-                    name: state.session?.displayName ?? 'You',
-                    color: t.red,
-                    imageUrl: state.session?.avatarUrl,
-                    size: 42,
-                  ),
+                AgProfileButton(
+                  name: state.session?.displayName ?? 'You',
+                  imageUrl: state.session?.avatarUrl,
+                  color: t.red,
                 ),
               ],
             ),
@@ -243,17 +248,17 @@ class _GlassPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
+        // Darker fill (was white 0.18) so white text keeps contrast even over a
+        // bright poster region, not only over the card's dark scrims.
+        color: Colors.black.withValues(alpha: 0.42),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontFamily: 'Manrope',
-          fontWeight: FontWeight.w700,
-          fontSize: 12.5,
+        style: AgText.label.copyWith(
           color: Colors.white,
+          shadows: const [Shadow(color: Colors.black54, blurRadius: 8)],
         ),
       ),
     );
@@ -296,24 +301,26 @@ class _SwipeEmptyState extends StatelessWidget {
                 const SizedBox(height: 22),
                 Text(
                   'All caught up',
-                  style: TextStyle(
-                    fontFamily: 'Bricolage Grotesque',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
-                    letterSpacing: -0.5,
-                    color: t.text,
-                  ),
+                  style: AgText.h2.copyWith(letterSpacing: -0.5, color: t.text),
                 ),
                 const SizedBox(height: 10),
                 Text(
                   "You've swiped through every suggestion.\nRefresh for new picks or browse your library.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 14, height: 1.5, color: t.sub),
+                  style: AgText.body.copyWith(height: 1.5, color: t.sub),
                 ),
                 const SizedBox(height: 24),
-                AgButton(label: 'Refresh suggestions', icon: AgIcons.refresh, onPressed: onRefresh),
+                AgButton(
+                  label: 'Refresh suggestions',
+                  icon: AgIcons.refresh,
+                  onPressed: onRefresh,
+                ),
                 const SizedBox(height: 12),
-                AgButton.secondary(label: 'Go to Library', icon: AgIcons.library, onPressed: onLibrary),
+                AgButton.secondary(
+                  label: 'Go to Library',
+                  icon: AgIcons.library,
+                  onPressed: onLibrary,
+                ),
               ],
             ),
           ),
@@ -345,26 +352,31 @@ class SwipeableCard extends StatefulWidget {
 
 class _SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
-  static const Duration _programmaticSwipeDuration = Duration(milliseconds: 280);
+  static const Duration _programmaticSwipeDuration = Duration(
+    milliseconds: 280,
+  );
   static const Duration _maxFlingDuration = Duration(milliseconds: 280);
   static const Duration _minFlingDuration = Duration(milliseconds: 170);
 
   late final AnimationController _swipeController;
   Animation<Offset>? _swipeAnimation;
-  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(Offset.zero);
+  final ValueNotifier<Offset> _dragOffsetNotifier = ValueNotifier<Offset>(
+    Offset.zero,
+  );
   bool _isSubmittingSwipe = false;
 
   @override
   void initState() {
     super.initState();
-    _swipeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-    )..addListener(() {
-        if (_swipeAnimation != null) {
-          _dragOffsetNotifier.value = _swipeAnimation!.value;
-        }
-      });
+    _swipeController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 240),
+        )..addListener(() {
+          if (_swipeAnimation != null) {
+            _dragOffsetNotifier.value = _swipeAnimation!.value;
+          }
+        });
   }
 
   @override
@@ -381,8 +393,10 @@ class _SwipeableCardState extends State<SwipeableCard>
   }) async {
     _swipeController.stop();
     _swipeController.duration = duration;
-    final animation = Tween<Offset>(begin: _dragOffsetNotifier.value, end: target)
-        .animate(CurvedAnimation(parent: _swipeController, curve: curve));
+    final animation = Tween<Offset>(
+      begin: _dragOffsetNotifier.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _swipeController, curve: curve));
     _swipeAnimation = animation;
     try {
       await _swipeController.forward(from: 0).orCancel;
@@ -438,38 +452,60 @@ class _SwipeableCardState extends State<SwipeableCard>
     final isHorizontalDominant = dragOffset.dx.abs() >= dragOffset.dy.abs();
 
     if (isHorizontalDominant) {
-      final shouldVote = dragOffset.dx.abs() > size.width * 0.28 || velocityX.abs() > 650;
+      final shouldVote =
+          dragOffset.dx.abs() > size.width * 0.28 || velocityX.abs() > 650;
       if (!shouldVote) {
-        await _animateDragTo(Offset.zero, duration: _snapBackDurationFor(dragOffset));
+        await _animateDragTo(
+          Offset.zero,
+          duration: _snapBackDurationFor(dragOffset),
+        );
         return;
       }
-      final swipeLike = velocityX.abs() > dragOffset.dx.abs() ? velocityX > 0 : dragOffset.dx > 0;
+      final swipeLike = velocityX.abs() > dragOffset.dx.abs()
+          ? velocityX > 0
+          : dragOffset.dx > 0;
       final direction = swipeLike ? SwipeDirection.right : SwipeDirection.left;
       final projectedY = (dragOffset.dy + velocityY * 0.10)
           .clamp(-size.height * 0.42, size.height * 0.42)
           .toDouble();
-      final target = Offset((swipeLike ? 1 : -1) * (size.width + 260), projectedY);
+      final target = Offset(
+        (swipeLike ? 1 : -1) * (size.width + 260),
+        projectedY,
+      );
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
-      await _animateDragTo(target,
-          duration: _flingDurationFor(target, details.velocity.pixelsPerSecond));
+      await _animateDragTo(
+        target,
+        duration: _flingDurationFor(target, details.velocity.pixelsPerSecond),
+      );
       widget.onSwiped(direction);
     } else {
-      final shouldVote = dragOffset.dy.abs() > size.height * 0.18 || velocityY.abs() > 650;
+      final shouldVote =
+          dragOffset.dy.abs() > size.height * 0.18 || velocityY.abs() > 650;
       if (!shouldVote) {
-        await _animateDragTo(Offset.zero, duration: _snapBackDurationFor(dragOffset));
+        await _animateDragTo(
+          Offset.zero,
+          duration: _snapBackDurationFor(dragOffset),
+        );
         return;
       }
-      final swipeUp = velocityY.abs() > dragOffset.dy.abs() ? velocityY < 0 : dragOffset.dy < 0;
+      final swipeUp = velocityY.abs() > dragOffset.dy.abs()
+          ? velocityY < 0
+          : dragOffset.dy < 0;
       final direction = swipeUp ? SwipeDirection.up : SwipeDirection.down;
       final projectedX = (dragOffset.dx + velocityX * 0.10)
           .clamp(-size.width * 0.42, size.width * 0.42)
           .toDouble();
-      final target = Offset(projectedX, (swipeUp ? -1 : 1) * (size.height + 260));
+      final target = Offset(
+        projectedX,
+        (swipeUp ? -1 : 1) * (size.height + 260),
+      );
       HapticFeedback.mediumImpact();
       setState(() => _isSubmittingSwipe = true);
-      await _animateDragTo(target,
-          duration: _flingDurationFor(target, details.velocity.pixelsPerSecond));
+      await _animateDragTo(
+        target,
+        duration: _flingDurationFor(target, details.velocity.pixelsPerSecond),
+      );
       widget.onSwiped(direction);
     }
   }
@@ -502,16 +538,23 @@ class _SwipeableCardState extends State<SwipeableCard>
           ? null
           : (details) => _dragOffsetNotifier.value += details.delta,
       onPanEnd: _handlePanEnd,
-      onPanCancel: () => _animateDragTo(Offset.zero,
-          duration: _snapBackDurationFor(_dragOffsetNotifier.value)),
+      onPanCancel: () => _animateDragTo(
+        Offset.zero,
+        duration: _snapBackDurationFor(_dragOffsetNotifier.value),
+      ),
       child: ValueListenableBuilder<Offset>(
         valueListenable: _dragOffsetNotifier,
         child: movieCard,
         builder: (context, dragOffset, child) {
           final size = MediaQuery.sizeOf(context);
-          final rotation = (dragOffset.dx / size.width).clamp(-1.0, 1.0).toDouble() * 0.18;
-          final hProgress = (dragOffset.dx.abs() / (size.width * 0.42)).clamp(0.0, 1.0).toDouble();
-          final vProgress = (dragOffset.dy.abs() / (size.height * 0.22)).clamp(0.0, 1.0).toDouble();
+          final rotation =
+              (dragOffset.dx / size.width).clamp(-1.0, 1.0).toDouble() * 0.18;
+          final hProgress = (dragOffset.dx.abs() / (size.width * 0.42))
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final vProgress = (dragOffset.dy.abs() / (size.height * 0.22))
+              .clamp(0.0, 1.0)
+              .toDouble();
           final isHoriz = dragOffset.dx.abs() >= dragOffset.dy.abs();
           final overlayProgress = isHoriz ? hProgress : vProgress;
           final transform = Matrix4.identity()
@@ -524,7 +567,10 @@ class _SwipeableCardState extends State<SwipeableCard>
               fit: StackFit.expand,
               children: <Widget>[
                 child!,
-                _SwipeStampOverlay(progress: overlayProgress, dragOffset: dragOffset),
+                _SwipeStampOverlay(
+                  progress: overlayProgress,
+                  dragOffset: dragOffset,
+                ),
               ],
             ),
           );
@@ -545,19 +591,21 @@ class _BackgroundMovieCard extends StatelessWidget {
     // Must mirror the foreground card layout (action bar + info button):
     // the bottom-aligned content shifts and the actions pop in on promotion
     // to front card otherwise.
-    return IgnorePointer(
-      child: KeyedSubtree(
-        key: ValueKey<String>('background-${movie.id}'),
-        child: _ImmersiveMovieCard(
-          movie: movie,
-          onInfoTap: _noop,
-          actions: const _SwipeActionBar(
-            canUndo: true,
-            onUndo: _noop,
-            onDislike: _noop,
-            onSeen: _noop,
-            onLike: _noop,
-            onWatchlist: _noop,
+    return ExcludeSemantics(
+      child: IgnorePointer(
+        child: KeyedSubtree(
+          key: ValueKey<String>('background-${movie.id}'),
+          child: _ImmersiveMovieCard(
+            movie: movie,
+            onInfoTap: _noop,
+            actions: const _SwipeActionBar(
+              canUndo: true,
+              onUndo: _noop,
+              onDislike: _noop,
+              onSeen: _noop,
+              onLike: _noop,
+              onWatchlist: _noop,
+            ),
           ),
         ),
       ),
@@ -622,39 +670,44 @@ class _ImmersiveMovieCard extends StatelessWidget {
                   Wrap(
                     spacing: 7,
                     runSpacing: 7,
-                    children: movie.genres.take(3).map((g) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-                        ),
-                        child: Text(
-                          g,
-                          style: const TextStyle(
-                            fontFamily: 'Manrope',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11.5,
-                            color: Colors.white,
-                          ),
-                        ),
-                      );
-                    }).toList(growable: false),
+                    children: movie.genres
+                        .take(3)
+                        .map((g) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                              ),
+                            ),
+                            child: Text(
+                              g,
+                              style: AgText.labelSm.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        })
+                        .toList(growable: false),
                   ),
                 const SizedBox(height: 12),
                 Text(
                   movie.title,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Bricolage Grotesque',
-                    fontWeight: FontWeight.w800,
+                  style: AgText.display.copyWith(
                     fontSize: 35,
                     height: 1.0,
                     letterSpacing: -0.7,
                     color: Colors.white,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 18)],
+                    shadows: const [
+                      Shadow(color: Colors.black54, blurRadius: 18),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 11),
@@ -663,10 +716,8 @@ class _ImmersiveMovieCard extends StatelessWidget {
                     if (meta.isNotEmpty)
                       Text(
                         meta,
-                        style: const TextStyle(
-                          fontFamily: 'Manrope',
+                        style: AgText.caption.copyWith(
                           fontWeight: FontWeight.w600,
-                          fontSize: 13.5,
                           color: Colors.white,
                         ),
                       ),
@@ -676,27 +727,35 @@ class _ImmersiveMovieCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         movie.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontFamily: 'Manrope',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.5,
-                          color: Colors.white,
-                        ),
+                        style: AgText.label.copyWith(color: Colors.white),
                       ),
                     ],
                     const Spacer(),
                     if (onInfoTap != null)
-                      GestureDetector(
-                        onTap: onInfoTap,
-                        child: Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+                      Semantics(
+                        button: true,
+                        label: 'Movie details',
+                        excludeSemantics: true,
+                        child: Tooltip(
+                          message: 'Movie details',
+                          child: GestureDetector(
+                            onTap: onInfoTap,
+                            child: Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.24),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.info_outline_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
                           ),
-                          child: const Icon(Icons.info_outline_rounded,
-                              color: Colors.white, size: 20),
                         ),
                       ),
                   ],
@@ -707,9 +766,7 @@ class _ImmersiveMovieCard extends StatelessWidget {
                     movie.overview,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontSize: 13.5,
+                    style: AgText.caption.copyWith(
                       height: 1.5,
                       color: Colors.white.withValues(alpha: 0.84),
                     ),
@@ -810,15 +867,43 @@ class _SwipeActionBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _ActButton(icon: AgIcons.undo, color: t.faint, enabled: canUndo, onTap: onUndo),
+        _ActButton(
+          icon: AgIcons.undo,
+          color: t.faint,
+          enabled: canUndo,
+          onTap: onUndo,
+          label: 'Undo last swipe',
+        ),
         const SizedBox(width: 16),
-        _ActButton(icon: AgIcons.close, color: t.red, big: true, onTap: onDislike),
+        _ActButton(
+          icon: AgIcons.close,
+          color: t.red,
+          big: true,
+          onTap: onDislike,
+          label: 'Not interested',
+        ),
         const SizedBox(width: 16),
-        _ActButton(icon: AgIcons.bookmark, color: t.purple, onTap: onWatchlist),
+        _ActButton(
+          icon: AgIcons.bookmark,
+          color: t.purple,
+          onTap: onWatchlist,
+          label: 'Add to watchlist',
+        ),
         const SizedBox(width: 16),
-        _ActButton(icon: AgIcons.heartFilled, color: t.green, big: true, onTap: onLike),
+        _ActButton(
+          icon: AgIcons.heartFilled,
+          color: t.green,
+          big: true,
+          onTap: onLike,
+          label: 'Like',
+        ),
         const SizedBox(width: 16),
-        _ActButton(icon: AgIcons.eye, color: t.gold, onTap: onSeen),
+        _ActButton(
+          icon: AgIcons.eye,
+          color: t.gold,
+          onTap: onSeen,
+          label: 'Mark as seen',
+        ),
       ],
     );
   }
@@ -829,6 +914,7 @@ class _ActButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    required this.label,
     this.big = false,
     this.enabled = true,
   });
@@ -836,6 +922,7 @@ class _ActButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final String label;
   final bool big;
   final bool enabled;
 
@@ -843,31 +930,40 @@ class _ActButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final size = big ? 64.0 : 52.0;
-    return Opacity(
-      opacity: enabled ? 1 : 0.4,
-      child: IgnorePointer(
-        ignoring: !enabled,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              color: t.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: t.line2),
-              boxShadow: [
-                BoxShadow(
-                  color: big
-                      ? color.withValues(alpha: 0.5)
-                      : Colors.black.withValues(alpha: 0.4),
-                  blurRadius: big ? 26 : 18,
-                  offset: const Offset(0, 8),
-                  spreadRadius: -8,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.4,
+          child: IgnorePointer(
+            ignoring: !enabled,
+            child: GestureDetector(
+              onTap: onTap,
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: t.line2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: big
+                          ? color.withValues(alpha: 0.5)
+                          : Colors.black.withValues(alpha: 0.4),
+                      blurRadius: big ? 26 : 18,
+                      offset: const Offset(0, 8),
+                      spreadRadius: -8,
+                    ),
+                  ],
                 ),
-              ],
+                child: Icon(icon, size: big ? 28 : 23, color: color),
+              ),
             ),
-            child: Icon(icon, size: big ? 28 : 23, color: color),
           ),
         ),
       ),

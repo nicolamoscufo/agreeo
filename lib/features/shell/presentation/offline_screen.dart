@@ -1,6 +1,7 @@
 import 'package:agreeo/services/real_time_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/connectivity_provider.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -52,7 +53,7 @@ class _OfflineScreenState extends ConsumerState<OfflineScreen> {
               const SizedBox(height: 18),
               Text(
                 'Saved on this device',
-                style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                style: AgText.micro.copyWith(color: t.faint),
               ),
             ],
           ),

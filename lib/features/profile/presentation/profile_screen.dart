@@ -4,6 +4,7 @@ import 'package:agreeo/features/profile/presentation/edit_profile_sheet.dart';
 import 'package:agreeo/features/profile/presentation/settings_screen.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -33,33 +34,55 @@ class AgreeoProfileScreen extends ConsumerWidget {
             Row(
               children: [
                 if (Navigator.of(context).canPop())
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: t.surface,
-                        borderRadius: BorderRadius.circular(13),
-                        border: Border.all(color: t.line),
+                  Semantics(
+                    button: true,
+                    label: 'Back',
+                    excludeSemantics: true,
+                    child: Tooltip(
+                      message: 'Back',
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: t.surface,
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(color: t.line),
+                          ),
+                          child: Icon(
+                            AgIcons.chevronLeft,
+                            size: 22,
+                            color: t.text,
+                          ),
+                        ),
                       ),
-                      child: Icon(AgIcons.chevronLeft, size: 22, color: t.text),
                     ),
                   ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AgreeoSettingsScreen()),
-                  ),
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: t.surface,
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(color: t.line),
+                Semantics(
+                  button: true,
+                  label: 'Settings',
+                  excludeSemantics: true,
+                  child: Tooltip(
+                    message: 'Settings',
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AgreeoSettingsScreen(),
+                        ),
+                      ),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: t.surface,
+                          borderRadius: BorderRadius.circular(13),
+                          border: Border.all(color: t.line),
+                        ),
+                        child: Icon(AgIcons.settings, size: 21, color: t.text),
+                      ),
                     ),
-                    child: Icon(AgIcons.settings, size: 21, color: t.text),
                   ),
                 ),
               ],
@@ -68,27 +91,26 @@ class AgreeoProfileScreen extends ConsumerWidget {
             // Identity
             Column(
               children: [
-                GestureDetector(
-                  onTap: session == null
-                      ? null
-                      : () => showEditProfileSheet(context, session),
-                  child: AgAvatar(
-                    name: name,
-                    color: t.red,
-                    imageUrl: session?.avatarUrl,
-                    size: 88,
+                Semantics(
+                  button: true,
+                  label: 'Edit profile',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    onTap: session == null
+                        ? null
+                        : () => showEditProfileSheet(context, session),
+                    child: AgAvatar(
+                      name: name,
+                      color: t.red,
+                      imageUrl: session?.avatarUrl,
+                      size: 88,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 13),
                 Text(
                   name,
-                  style: TextStyle(
-                    fontFamily: 'Bricolage Grotesque',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 23,
-                    letterSpacing: -0.4,
-                    color: t.text,
-                  ),
+                  style: AgText.h2.copyWith(letterSpacing: -0.4, color: t.text),
                 ),
                 if (session != null) ...[
                   const SizedBox(height: 5),
@@ -99,7 +121,10 @@ class AgreeoProfileScreen extends ConsumerWidget {
                       const SizedBox(width: 5),
                       Text(
                         'Member since ${_memberSince(session.joinedAt)}',
-                        style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 11.5, color: t.faint),
+                        style: AgText.micro.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: t.faint,
+                        ),
                       ),
                     ],
                   ),
@@ -110,7 +135,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   child: Text(
                     bio,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, height: 1.5, color: t.sub),
+                    style: AgText.caption.copyWith(height: 1.5, color: t.sub),
                   ),
                 ),
               ],
@@ -139,7 +164,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
               children: [
                 Text(
                   'Favorite genres',
-                  style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                  style: AgText.h4.copyWith(fontSize: 15, color: t.text),
                 ),
                 const Spacer(),
                 GestureDetector(
@@ -149,10 +174,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                     children: [
                       Icon(AgIcons.edit, size: 14, color: t.red),
                       const SizedBox(width: 5),
-                      Text(
-                        'Edit',
-                        style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, color: t.red),
-                      ),
+                      Text('Edit', style: AgText.label.copyWith(color: t.red)),
                     ],
                   ),
                 ),
@@ -164,7 +186,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 20),
                 child: Text(
                   'No genres picked yet — tap Edit to shape your recommendations.',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
+                  style: AgText.caption.copyWith(color: t.faint),
                 ),
               )
             else ...[
@@ -172,14 +194,15 @@ class AgreeoProfileScreen extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (var i = 0; i < genres.length; i++) AgChip(label: genres[i], active: i == 0),
+                  for (var i = 0; i < genres.length; i++)
+                    AgChip(label: genres[i], active: i == 0),
                 ],
               ),
               const SizedBox(height: 20),
             ],
             Text(
               'Recent activity',
-              style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+              style: AgText.h4.copyWith(fontSize: 15, color: t.text),
             ),
             const SizedBox(height: 12),
             if (activity.isEmpty)
@@ -187,7 +210,7 @@ class AgreeoProfileScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 child: Text(
                   'No activity yet — like, save, and rate movies to fill this up.',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
+                  style: AgText.caption.copyWith(color: t.faint),
                 ),
               )
             else
@@ -196,7 +219,8 @@ class AgreeoProfileScreen extends ConsumerWidget {
                   entry: a,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => AgreeoMovieDetailsScreen(movieId: a.movieId),
+                      builder: (_) =>
+                          AgreeoMovieDetailsScreen(movieId: a.movieId),
                     ),
                   ),
                 ),
@@ -207,8 +231,18 @@ class AgreeoProfileScreen extends ConsumerWidget {
   }
 
   static const _months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   String _memberSince(DateTime joinedAt) {
@@ -216,8 +250,9 @@ class AgreeoProfileScreen extends ConsumerWidget {
   }
 
   List<_Activity> _recentActivity(AgreeoAppState state) {
-    final entries = state.movieStates.values.where((s) => !s.isUntouched).toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final entries =
+        state.movieStates.values.where((s) => !s.isUntouched).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     final result = <_Activity>[];
     for (final s in entries.take(6)) {
       final movie = state.movieById(s.movieId);
@@ -246,14 +281,14 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(
-            '$value',
-            style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 22, color: t.text),
-          ),
+          Text('$value', style: AgText.h2.copyWith(color: t.text)),
           const SizedBox(height: 1),
           Text(
             label,
-            style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 11.5, color: t.faint),
+            style: AgText.micro.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.faint,
+            ),
           ),
         ],
       ),
@@ -282,7 +317,9 @@ class _ActivityRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: t.line)),
+        ),
         child: Row(
           children: [
             Container(
@@ -300,12 +337,15 @@ class _ActivityRow extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 text: TextSpan(
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 14, color: t.sub),
+                  style: AgText.body.copyWith(color: t.sub),
                   children: [
                     TextSpan(text: '$verb '),
                     TextSpan(
                       text: entry.title,
-                      style: TextStyle(fontWeight: FontWeight.w700, color: t.text),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: t.text,
+                      ),
                     ),
                   ],
                 ),
@@ -314,7 +354,7 @@ class _ActivityRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               _timeAgo(entry.state.updatedAt),
-              style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
+              style: AgText.micro.copyWith(color: t.faint),
             ),
           ],
         ),
@@ -324,7 +364,9 @@ class _ActivityRow extends StatelessWidget {
 
   (IconData, Color, String) _describe(AgreeoTokens t, UserMovieState s) {
     if (s.hasReview) return (AgIcons.edit, t.red, 'Reviewed');
-    if (s.preference == MoviePreference.liked) return (AgIcons.heartFilled, t.green, 'Liked');
+    if (s.preference == MoviePreference.liked) {
+      return (AgIcons.heartFilled, t.green, 'Liked');
+    }
     if (s.watched) return (AgIcons.eye, t.gold, 'Watched');
     if (s.inWatchlist) return (AgIcons.bookmark, t.purple, 'Saved');
     return (AgIcons.dislike, t.faint, 'Hid');

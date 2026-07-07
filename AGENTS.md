@@ -53,7 +53,7 @@ Would an agent likely miss this without help? Yes. Documentation updates:
 - Add a quick reference for common Cypher queries used by the app.
 
 
-## vexp <!-- vexp v2.0.25 -->
+## vexp <!-- vexp v2.1.0 -->
 
 **MANDATORY: use `run_pipeline` - do NOT grep or glob the codebase.**
 vexp returns pre-indexed, graph-ranked context in a single call.

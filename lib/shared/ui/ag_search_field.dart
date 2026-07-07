@@ -1,3 +1,4 @@
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_effects.dart';
 import 'package:agreeo/shared/ui/ag_icons.dart';
@@ -31,7 +32,7 @@ class AgSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Container(
+    final field = Container(
       height: 46,
       padding: const EdgeInsets.symmetric(horizontal: 13),
       decoration: BoxDecoration(
@@ -52,23 +53,28 @@ class AgSearchField extends StatelessWidget {
               readOnly: readOnly,
               autofocus: autofocus,
               cursorColor: t.red,
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontSize: 14.5,
-                color: t.text,
-              ),
+              style: AgText.body.copyWith(color: t.text),
               decoration: agBareInput(
                 hint: hint,
-                hintStyle: TextStyle(
-                  fontFamily: 'Manrope',
-                  fontSize: 14.5,
-                  color: t.faint,
-                ),
+                hintStyle: AgText.body.copyWith(color: t.faint),
               ),
             ),
           ),
         ],
       ),
     );
+
+    // When used as a tap-to-open button (readOnly), announce it as a button
+    // with the hint as its label. Editable mode keeps the native TextField
+    // semantics.
+    if (readOnly && onTap != null) {
+      return Semantics(
+        button: true,
+        label: hint,
+        excludeSemantics: true,
+        child: field,
+      );
+    }
+    return field;
   }
 }

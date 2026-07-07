@@ -5,7 +5,6 @@ import 'package:agreeo/features/friends/state/friends_movie_night_controller.dar
 import 'package:agreeo/features/home/presentation/mood_selector_sheet.dart';
 import 'package:agreeo/features/home/presentation/random_pick_sheet.dart';
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/features/profile/presentation/profile_screen.dart';
 import 'package:agreeo/features/shell/presentation/notifications_page.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
 import 'package:agreeo/shared/components/filter_bottom_sheet.dart';
@@ -14,6 +13,7 @@ import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/state/home_refresh_provider.dart';
 import 'package:agreeo/shared/state/nav_index_provider.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -80,7 +80,9 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
       if (query.isEmpty && !_filters.hasActiveFilters) {
         _searchFuture = null;
       } else {
-        _searchFuture = ref.read(movieServiceProvider).searchMovies(query, _filters);
+        _searchFuture = ref
+            .read(movieServiceProvider)
+            .searchMovies(query, _filters);
       }
     });
   }
@@ -108,7 +110,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
   }
 
   void _surpriseMe() {
-    HapticFeedback.lightImpact();
+    // AgButton.secondary already fires a light-impact haptic on tap.
     showRandomPick(context);
   }
 
@@ -147,8 +149,11 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(0,
-              duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          );
         }
       });
     });
@@ -181,9 +186,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                     children: [
                       Text(
                         '${_greeting()}, $firstName',
-                        style: TextStyle(
-                          fontFamily: 'Manrope',
-                          fontSize: 13,
+                        style: AgText.caption.copyWith(
                           fontWeight: FontWeight.w600,
                           color: t.faint,
                         ),
@@ -191,10 +194,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                       const SizedBox(height: 2),
                       Text(
                         "What's the move?",
-                        style: TextStyle(
-                          fontFamily: 'Bricolage Grotesque',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 25,
+                        style: AgText.h1.copyWith(
                           letterSpacing: -0.6,
                           color: t.text,
                         ),
@@ -205,20 +205,16 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                 _BellButton(
                   unread: unread,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationsPage(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
-                  ),
-                  child: AgAvatar(
-                    name: state.session?.displayName ?? 'You',
-                    color: t.red,
-                    imageUrl: state.session?.avatarUrl,
-                    size: 44,
-                  ),
+                AgProfileButton(
+                  name: state.session?.displayName ?? 'You',
+                  imageUrl: state.session?.avatarUrl,
+                  color: t.red,
                 ),
               ],
             ),
@@ -237,13 +233,18 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                 const SizedBox(width: 10),
                 _SquareButton(
                   icon: AgIcons.sliders,
+                  semanticLabel: _filters.hasActiveFilters
+                      ? 'Filters, active'
+                      : 'Filters',
                   highlighted: _filters.hasActiveFilters,
+                  badge: _filters.hasActiveFilters,
                   onTap: _openFilters,
                 ),
                 const SizedBox(width: 10),
                 _SquareButton(
                   icon: AgIcons.sparkle,
-                  gradient: true,
+                  semanticLabel: 'Pick by mood',
+                  soft: true,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     showMoodSelectorSheet(context);
@@ -252,9 +253,9 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Quick chips
+            // Quick chips — rail height clears the 44pt touch target.
             SizedBox(
-              height: 36,
+              height: 44,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _quickFilters.length,
@@ -282,7 +283,23 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
             _MovieNightCta(onCreate: _openCreateMovieNight, friends: friends),
             const SizedBox(height: 22),
             if (hasRemoteSearch)
-              _SearchResults(future: _searchFuture, onTap: _openDetails)
+              _SearchResults(
+                future: _searchFuture,
+                onTap: _openDetails,
+                onRetry: _refreshSearch,
+              )
+            else if (state.discoveryFeedFailed &&
+                state.recommendedHomeMovies.isEmpty &&
+                state.trendingMovies.isEmpty)
+              // The feed refresh failed with nothing cached to fall back on —
+              // show one honest error + retry, not two "Nothing here yet" rails.
+              _InlineStateCard(
+                icon: AgIcons.wifiOff,
+                title: "Couldn't load your feed",
+                message: 'Check your connection and try again.',
+                actionLabel: 'Retry',
+                onAction: _refreshHome,
+              )
             else ...[
               AgSectionHeader(
                 title: 'Made for you',
@@ -295,6 +312,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
                 movies: state.recommendedHomeMovies,
                 posterWidth: 132,
                 showMeta: true,
+                loading: !state.hydrated,
                 onTap: _openDetails,
               ),
               const SizedBox(height: 18),
@@ -305,6 +323,7 @@ class _AgreeoHomeScreenState extends ConsumerState<AgreeoHomeScreen> {
               _PosterRail(
                 movies: state.trendingMovies,
                 posterWidth: 108,
+                loading: !state.hydrated,
                 onTap: _openDetails,
               ),
             ],
@@ -323,35 +342,43 @@ class _BellButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: t.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: t.line),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(AgIcons.bell, size: 21, color: t.text),
-            if (unread > 0)
-              Positioned(
-                top: 9,
-                right: 10,
-                child: Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: t.red,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: t.surface, width: 2),
+    return Semantics(
+      button: true,
+      label: unread > 0 ? 'Notifications, $unread unread' : 'Notifications',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Notifications',
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: t.line),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(AgIcons.bell, size: 21, color: t.text),
+                if (unread > 0)
+                  Positioned(
+                    top: 9,
+                    right: 10,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: t.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: t.surface, width: 2),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -362,42 +389,71 @@ class _SquareButton extends StatelessWidget {
   const _SquareButton({
     required this.icon,
     required this.onTap,
-    this.gradient = false,
+    required this.semanticLabel,
+    this.soft = false,
     this.highlighted = false,
+    this.badge = false,
   });
   final IconData icon;
   final VoidCallback onTap;
-  final bool gradient;
+  final String semanticLabel;
+
+  /// Soft branded treatment (gradient tint + red glyph) for a secondary accent
+  /// action. The full brand gradient + glow is reserved for the one primary
+  /// surface on the screen (the Movie Night CTA), so it stays the focal point.
+  final bool soft;
   final bool highlighted;
+
+  /// Shows a small accent dot so an active state isn't signalled by glyph color
+  /// alone (which low-vision sighted users can miss).
+  final bool badge;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 46,
-        height: 46,
-        decoration: BoxDecoration(
-          gradient: gradient ? t.grad : null,
-          color: gradient ? null : t.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: gradient ? null : Border.all(color: t.line),
-          boxShadow: gradient
-              ? [
-                  BoxShadow(
-                    color: t.purple.withValues(alpha: 0.5),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                    spreadRadius: -8,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: semanticLabel,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: soft ? t.gradSoft : null,
+              color: soft ? null : t.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: soft ? t.line2 : t.line),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 21,
+                  color: soft ? t.red : (highlighted ? t.red : t.text),
+                ),
+                if (badge)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: t.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: t.surface, width: 1.5),
+                      ),
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: Icon(
-          icon,
-          size: 21,
-          color: gradient ? Colors.white : (highlighted ? t.red : t.text),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -412,107 +468,113 @@ class _MovieNightCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onCreate,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          gradient: t.grad,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: t.purple.withValues(alpha: 0.55),
-              blurRadius: 34,
-              offset: const Offset(0, 16),
-              spreadRadius: -14,
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _DiagonalPatternPainter()),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Start a Movie Night',
-                          style: TextStyle(
-                            fontFamily: 'Bricolage Grotesque',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 19,
-                            letterSpacing: -0.4,
-                            color: Colors.white,
+    return Semantics(
+      button: true,
+      label: 'Start a Movie Night',
+      child: GestureDetector(
+        onTap: onCreate,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: t.grad,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: t.purple.withValues(alpha: 0.55),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
+                spreadRadius: -14,
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _DiagonalPatternPainter()),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Start a Movie Night',
+                            style: AgText.h3.copyWith(
+                              letterSpacing: -0.4,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Invite friends, swipe together, agree in minutes.',
-                          style: TextStyle(
-                            fontFamily: 'Manrope',
-                            fontSize: 12.5,
-                            height: 1.4,
-                            color: Colors.white.withValues(alpha: 0.85),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Invite friends, swipe together, agree in minutes.',
+                            style: AgText.caption.copyWith(
+                              height: 1.4,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            borderRadius: BorderRadius.circular(11),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Pill is always white → use a fixed dark ink in both themes.
-                              Icon(AgIcons.plus, size: 16, color: Color(0xFF1A120C)),
-                              SizedBox(width: 7),
-                              Text(
-                                'New session',
-                                style: TextStyle(
-                                  fontFamily: 'Manrope',
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13.5,
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 15,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.95),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Pill is always white → use a fixed dark ink in both themes.
+                                const Icon(
+                                  AgIcons.plus,
+                                  size: 16,
                                   color: Color(0xFF1A120C),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  if (friends.isNotEmpty)
-                    SizedBox(
-                      width: 42.0 + (friends.length.clamp(1, 3) - 1) * 28,
-                      height: 42,
-                      child: Stack(
-                        children: [
-                          for (var i = 0; i < friends.length.clamp(0, 3); i++)
-                            Positioned(
-                              left: i * 28.0,
-                              child: AgAvatar(
-                                name: (friends[i].name as String?) ?? 'Friend',
-                                imageUrl: friends[i].avatarUrl,
-                                size: 42,
-                                ring: true,
-                              ),
+                                const SizedBox(width: 7),
+                                Text(
+                                  'New session',
+                                  style: AgText.label.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13.5,
+                                    color: const Color(0xFF1A120C),
+                                  ),
+                                ),
+                              ],
                             ),
+                          ),
                         ],
                       ),
                     ),
-                ],
+                    const SizedBox(width: 14),
+                    if (friends.isNotEmpty)
+                      SizedBox(
+                        width: 42.0 + (friends.length.clamp(1, 3) - 1) * 28,
+                        height: 42,
+                        child: Stack(
+                          children: [
+                            for (var i = 0; i < friends.length.clamp(0, 3); i++)
+                              Positioned(
+                                left: i * 28.0,
+                                child: AgAvatar(
+                                  name:
+                                      (friends[i].name as String?) ?? 'Friend',
+                                  imageUrl: friends[i].avatarUrl,
+                                  size: 42,
+                                  ring: true,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -527,7 +589,11 @@ class _DiagonalPatternPainter extends CustomPainter {
       ..strokeWidth = 1;
     const spacing = 9.0;
     for (double x = -size.height; x < size.width; x += spacing) {
-      canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), paint);
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        paint,
+      );
     }
   }
 
@@ -566,42 +632,21 @@ class _RandomPickCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Can't decide?",
-                  style: TextStyle(
-                    fontFamily: 'Bricolage Grotesque',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: t.text,
-                  ),
-                ),
+                Text("Can't decide?", style: AgText.h4.copyWith(color: t.text)),
                 const SizedBox(height: 1),
                 Text(
                   'Pull a random pick from your watchlist',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.sub),
+                  style: AgText.caption.copyWith(color: t.sub),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: onSurprise,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: t.text,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Surprise me',
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: t.onText,
-                ),
-              ),
-            ),
+          AgButton.secondary(
+            label: 'Surprise me',
+            expand: false,
+            height: 46,
+            onPressed: onSurprise,
           ),
         ],
       ),
@@ -615,17 +660,25 @@ class _PosterRail extends StatelessWidget {
     required this.posterWidth,
     required this.onTap,
     this.showMeta = false,
+    this.loading = false,
   });
 
   final List<Movie> movies;
   final double posterWidth;
   final ValueChanged<Movie> onTap;
   final bool showMeta;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     if (movies.isEmpty) {
+      if (loading) {
+        return AgPosterRailSkeleton(
+          posterWidth: posterWidth,
+          showMeta: showMeta,
+        );
+      }
       return Container(
         height: posterWidth * 1.5,
         alignment: Alignment.center,
@@ -636,7 +689,7 @@ class _PosterRail extends StatelessWidget {
         ),
         child: Text(
           'Nothing here yet',
-          style: TextStyle(fontFamily: 'Manrope', color: t.faint),
+          style: AgText.body.copyWith(color: t.faint),
         ),
       );
     }
@@ -654,7 +707,11 @@ class _PosterRail extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AgPoster(imageUrl: m.posterUrl, title: m.title, onTap: () => onTap(m)),
+                AgPoster(
+                  imageUrl: m.posterUrl,
+                  title: m.title,
+                  onTap: () => onTap(m),
+                ),
                 if (showMeta) ...[
                   const SizedBox(height: 9),
                   Row(
@@ -666,7 +723,7 @@ class _PosterRail extends StatelessWidget {
                           '· ${m.releaseYear}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                          style: AgText.micro.copyWith(color: t.faint),
                         ),
                       ),
                     ],
@@ -682,59 +739,53 @@ class _PosterRail extends StatelessWidget {
 }
 
 class _SearchResults extends StatelessWidget {
-  const _SearchResults({required this.future, required this.onTap});
+  const _SearchResults({
+    required this.future,
+    required this.onTap,
+    required this.onRetry,
+  });
   final Future<List<Movie>>? future;
   final ValueChanged<Movie> onTap;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return FutureBuilder<List<Movie>>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 50),
-            child: Center(child: CircularProgressIndicator()),
+            padding: EdgeInsets.only(top: 12),
+            child: AgPosterGridSkeleton(),
+          );
+        }
+        // A failed search must not masquerade as "no results": the user is on a
+        // flaky connection, not searching for the wrong thing.
+        if (snapshot.hasError && !snapshot.hasData) {
+          return _InlineStateCard(
+            icon: AgIcons.wifiOff,
+            title: "Couldn't load results",
+            message: 'Check your connection and try again.',
+            actionLabel: 'Retry',
+            onAction: onRetry,
           );
         }
         final results = snapshot.data ?? const <Movie>[];
         if (results.isEmpty) {
-          return Container(
-            margin: const EdgeInsets.only(top: 12),
-            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-            decoration: BoxDecoration(
-              color: t.surface,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: t.line),
-            ),
-            child: Column(
-              children: [
-                Icon(AgIcons.search, size: 36, color: t.faint),
-                const SizedBox(height: 14),
-                Text(
-                  'No results',
-                  style: TextStyle(
-                    fontFamily: 'Bricolage Grotesque',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: t.text,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Try a different title or loosen your filters.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 13, color: t.sub),
-                ),
-              ],
-            ),
+          return const _InlineStateCard(
+            icon: AgIcons.search,
+            title: 'No results',
+            message: 'Try a different title or loosen your filters.',
           );
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AgSectionHeader(title: 'Results', subtitle: '${results.length} titles'),
+            AgSectionHeader(
+              title: 'Results',
+              subtitle: '${results.length} titles',
+            ),
             const SizedBox(height: 14),
             GridView.builder(
               shrinkWrap: true,
@@ -748,12 +799,68 @@ class _SearchResults extends StatelessWidget {
               ),
               itemBuilder: (context, i) {
                 final m = results[i];
-                return AgPoster(imageUrl: m.posterUrl, title: m.title, onTap: () => onTap(m));
+                return AgPoster(
+                  imageUrl: m.posterUrl,
+                  title: m.title,
+                  onTap: () => onTap(m),
+                );
               },
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Inline empty/error card used by both the search area and the feed rails.
+/// Mirrors the surface-card styling of the rest of Home (radius 28) and relies
+/// on the parent list's horizontal padding, so it stays aligned with the
+/// content above it.
+class _InlineStateCard extends StatelessWidget {
+  const _InlineStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 20),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: t.line),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 36, color: t.faint),
+          const SizedBox(height: 14),
+          Text(title, style: AgText.h3.copyWith(color: t.text)),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AgText.caption.copyWith(color: t.sub),
+          ),
+          if (actionLabel != null) ...[
+            const SizedBox(height: 18),
+            AgButton(label: actionLabel!, expand: false, onPressed: onAction),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:agreeo/models/app_models.dart';
 import 'package:agreeo/providers/notifications_provider.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/nav_index_provider.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -72,7 +73,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
 
   Widget _routeForMovieNight(MovieNightEvent event) {
     return switch (event.status) {
-      MovieNightStatus.draft || MovieNightStatus.waiting =>
+      MovieNightStatus.draft ||
+      MovieNightStatus.waiting =>
         MovieNightWaitingRoomScreen(eventId: event.id),
       MovieNightStatus.voting => MovieNightVotingScreen(eventId: event.id),
       MovieNightStatus.completed => MovieNightResultScreen(eventId: event.id),
@@ -83,14 +85,18 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     final id = n.entityId;
     if (id == null || id.isEmpty) return;
     await ref.read(notificationsProvider.notifier).markAsRead(n.id);
-    ref.read(friendsMovieNightControllerProvider.notifier).acceptFriendRequest(id);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .acceptFriendRequest(id);
   }
 
   Future<void> _declineRequest(InAppNotification n) async {
     final id = n.entityId;
     if (id == null || id.isEmpty) return;
     await ref.read(notificationsProvider.notifier).markAsRead(n.id);
-    ref.read(friendsMovieNightControllerProvider.notifier).declineFriendRequest(id);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .declineFriendRequest(id);
   }
 
   @override
@@ -110,26 +116,35 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
               padding: const EdgeInsets.fromLTRB(20, 2, 20, 16),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: t.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: t.line),
+                  Semantics(
+                    button: true,
+                    label: 'Back',
+                    excludeSemantics: true,
+                    child: Tooltip(
+                      message: 'Back',
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: t.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: t.line),
+                          ),
+                          child: Icon(
+                            AgIcons.chevronLeft,
+                            size: 20,
+                            color: t.text,
+                          ),
+                        ),
                       ),
-                      child: Icon(AgIcons.chevronLeft, size: 20, color: t.text),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     'Activity',
-                    style: TextStyle(
-                      fontFamily: 'Bricolage Grotesque',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 27,
+                    style: AgText.h1.copyWith(
                       letterSpacing: -0.6,
                       color: t.text,
                     ),
@@ -139,10 +154,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                     onTap: hasUnread ? _markAllRead : null,
                     child: Text(
                       'Mark all read',
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                      style: AgText.label.copyWith(
                         color: hasUnread ? t.red : t.faint,
                       ),
                     ),
@@ -151,14 +163,17 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
               ),
             ),
             if (state.isLoading && notifications.isEmpty)
-              Expanded(child: Center(child: CircularProgressIndicator(color: t.red)))
+              Expanded(
+                child: Center(child: CircularProgressIndicator(color: t.red)),
+              )
             else if (notifications.isEmpty)
               const Expanded(
                 child: Center(
                   child: AgStateCard(
                     icon: AgIcons.bell,
                     title: 'No activity yet',
-                    message: 'Friend requests, invites and results will appear here.',
+                    message:
+                        'Friend requests, invites and results will appear here.',
                   ),
                 ),
               )
@@ -253,30 +268,28 @@ class _NotificationTile extends StatelessWidget {
                 children: [
                   Text(
                     notification.title,
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13.5,
-                      height: 1.45,
-                      color: t.text,
-                    ),
+                    style: AgText.label.copyWith(height: 1.45, color: t.text),
                   ),
                   if (notification.message.isNotEmpty)
                     Text(
                       notification.message,
-                      style: TextStyle(fontFamily: 'Manrope', fontSize: 13, height: 1.4, color: t.sub),
+                      style: AgText.caption.copyWith(height: 1.4, color: t.sub),
                     ),
                   const SizedBox(height: 3),
                   Text(
                     '$timeAgo ago',
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, color: t.faint),
+                    style: AgText.micro.copyWith(color: t.faint),
                   ),
                   if (isRequest)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: Row(
                         children: [
-                          _MiniAction(label: 'Accept', gradient: true, onTap: onAccept),
+                          _MiniAction(
+                            label: 'Accept',
+                            gradient: true,
+                            onTap: onAccept,
+                          ),
                           const SizedBox(width: 8),
                           _MiniAction(label: 'Decline', onTap: onDecline),
                         ],
@@ -287,7 +300,11 @@ class _NotificationTile extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 10),
                       child: Row(
                         children: [
-                          _MiniAction(label: 'Join', gradient: true, onTap: onJoin),
+                          _MiniAction(
+                            label: 'Join',
+                            gradient: true,
+                            onTap: onJoin,
+                          ),
                           const SizedBox(width: 8),
                           _MiniAction(label: 'Later', onTap: onTap),
                         ],
@@ -330,7 +347,11 @@ class _NotificationTile extends StatelessWidget {
 }
 
 class _MiniAction extends StatelessWidget {
-  const _MiniAction({required this.label, required this.onTap, this.gradient = false});
+  const _MiniAction({
+    required this.label,
+    required this.onTap,
+    this.gradient = false,
+  });
   final String label;
   final VoidCallback onTap;
   final bool gradient;
@@ -350,12 +371,7 @@ class _MiniAction extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Manrope',
-            fontWeight: FontWeight.w700,
-            fontSize: 12.5,
-            color: gradient ? Colors.white : t.sub,
-          ),
+          style: AgText.label.copyWith(color: gradient ? Colors.white : t.sub),
         ),
       ),
     );

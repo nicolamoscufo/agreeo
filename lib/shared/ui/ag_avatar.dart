@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -93,10 +94,11 @@ class AgAvatar extends StatelessWidget {
       ),
       child: Text(
         initialsOf(name),
-        style: TextStyle(
-          fontFamily: 'Bricolage Grotesque',
+        style: AgText.h3.copyWith(
           fontWeight: FontWeight.w700,
           fontSize: size * 0.36,
+          letterSpacing: 0,
+          height: 1,
           color: Colors.white,
         ),
       ),

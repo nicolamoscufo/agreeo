@@ -1,5 +1,6 @@
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -11,10 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// is linked to in the graph. Pops back to the root so the auth welcome
 /// screen takes over once the session is cleared.
 Future<void> showDeleteAccountSheet(BuildContext context) {
-  return showAgSheet<void>(
-    context: context,
-    child: const _DeleteAccount(),
-  );
+  return showAgSheet<void>(context: context, child: const _DeleteAccount());
 }
 
 class _DeleteAccount extends ConsumerStatefulWidget {
@@ -92,13 +90,7 @@ class _DeleteAccountState extends ConsumerState<_DeleteAccount> {
             const SizedBox(width: 10),
             Text(
               'Delete account',
-              style: TextStyle(
-                fontFamily: 'Bricolage Grotesque',
-                fontWeight: FontWeight.w800,
-                fontSize: 25,
-                letterSpacing: -0.5,
-                color: t.text,
-              ),
+              style: AgText.h1.copyWith(letterSpacing: -0.5, color: t.text),
             ),
           ],
         ),
@@ -106,7 +98,7 @@ class _DeleteAccountState extends ConsumerState<_DeleteAccount> {
         Text(
           'This permanently removes your profile, likes, watchlist, reviews, '
           'friendships and Movie Nights. There is no way back.',
-          style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, height: 1.5, color: t.sub),
+          style: AgText.caption.copyWith(height: 1.5, color: t.sub),
         ),
         const SizedBox(height: 18),
         Container(
@@ -122,10 +114,13 @@ class _DeleteAccountState extends ConsumerState<_DeleteAccount> {
             autocorrect: false,
             enableSuggestions: false,
             cursorColor: t.red,
-            style: TextStyle(fontFamily: 'Manrope', fontSize: 15, fontWeight: FontWeight.w600, color: t.text),
+            style: AgText.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.text,
+            ),
             decoration: agBareInput(
               hint: 'Password (required to confirm)',
-              hintStyle: TextStyle(fontFamily: 'Manrope', fontSize: 15, color: t.faint),
+              hintStyle: AgText.body.copyWith(color: t.faint),
               collapsed: true,
               contentPadding: const EdgeInsets.symmetric(vertical: 15),
             ),
@@ -135,7 +130,10 @@ class _DeleteAccountState extends ConsumerState<_DeleteAccount> {
           const SizedBox(height: 12),
           Text(
             _error!,
-            style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w600, fontSize: 12.5, color: t.red),
+            style: AgText.caption.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.red,
+            ),
           ),
         ],
         const SizedBox(height: 20),
@@ -157,10 +155,8 @@ class _DeleteAccountState extends ConsumerState<_DeleteAccount> {
                   const SizedBox(width: 9),
                   Text(
                     _deleting ? 'Deleting…' : 'Delete forever',
-                    style: const TextStyle(
-                      fontFamily: 'Manrope',
+                    style: AgText.lead.copyWith(
                       fontWeight: FontWeight.w800,
-                      fontSize: 16,
                       color: Colors.white,
                     ),
                   ),

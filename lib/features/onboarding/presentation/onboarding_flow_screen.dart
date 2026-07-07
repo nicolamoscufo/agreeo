@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -13,10 +14,12 @@ class AgreeoOnboardingFlowScreen extends ConsumerStatefulWidget {
   const AgreeoOnboardingFlowScreen({super.key});
 
   @override
-  ConsumerState<AgreeoOnboardingFlowScreen> createState() => _AgreeoOnboardingFlowScreenState();
+  ConsumerState<AgreeoOnboardingFlowScreen> createState() =>
+      _AgreeoOnboardingFlowScreenState();
 }
 
-class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlowScreen> {
+class _AgreeoOnboardingFlowScreenState
+    extends ConsumerState<AgreeoOnboardingFlowScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
   int _pageIndex = 0;
@@ -40,7 +43,9 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
       setState(() {
         _searchFuture = query.isEmpty
             ? null
-            : ref.read(movieServiceProvider).searchMovies(query, const MovieSearchFilters());
+            : ref
+                  .read(movieServiceProvider)
+                  .searchMovies(query, const MovieSearchFilters());
       });
     });
   }
@@ -73,16 +78,27 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
                   Expanded(
                     child: Container(
                       height: 5,
-                      decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(9)),
+                      decoration: BoxDecoration(
+                        color: t.surface,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
                       alignment: Alignment.centerLeft,
                       child: FractionallySizedBox(
                         widthFactor: _pageIndex == 0 ? 0.5 : 1.0,
-                        child: Container(decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(9))),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: t.grad,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Text('${_pageIndex + 1} / 2', style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12, color: t.faint)),
+                  Text(
+                    '${_pageIndex + 1} / 2',
+                    style: AgText.labelSm.copyWith(color: t.faint),
+                  ),
                 ],
               ),
             ),
@@ -92,13 +108,22 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _pageIndex == 0 ? 'What do you love\nto watch?' : 'Tap a few you\nalready love',
-                    style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 28, height: 1.05, letterSpacing: -0.7, color: t.text),
+                    _pageIndex == 0
+                        ? 'What do you love\nto watch?'
+                        : 'Tap a few you\nalready love',
+                    style: AgText.display.copyWith(
+                      fontSize: 28,
+                      height: 1.05,
+                      letterSpacing: -0.7,
+                      color: t.text,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _pageIndex == 0 ? 'Pick at least 3. This shapes your feed.' : "We'll calibrate your recommendations from these.",
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 14, color: t.sub),
+                    _pageIndex == 0
+                        ? 'Pick at least 3. This shapes your feed.'
+                        : "We'll calibrate your recommendations from these.",
+                    style: AgText.body.copyWith(color: t.sub),
                   ),
                 ],
               ),
@@ -115,7 +140,9 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
                       HapticFeedback.selectionClick();
                       final next = selectedGenres.toSet();
                       if (!next.add(genre)) next.remove(genre);
-                      ref.read(agreeoAppControllerProvider.notifier).updateOnboardingGenres(next.toList());
+                      ref
+                          .read(agreeoAppControllerProvider.notifier)
+                          .updateOnboardingGenres(next.toList());
                     },
                   ),
                   _FavoritesStep(
@@ -126,7 +153,9 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
                     selectedIds: selectedMovieIds,
                     onToggle: (m) {
                       HapticFeedback.selectionClick();
-                      ref.read(agreeoAppControllerProvider.notifier).toggleFavoriteMovieSelection(m.id);
+                      ref
+                          .read(agreeoAppControllerProvider.notifier)
+                          .toggleFavoriteMovieSelection(m.id);
                     },
                   ),
                 ],
@@ -142,8 +171,11 @@ class _AgreeoOnboardingFlowScreenState extends ConsumerState<AgreeoOnboardingFlo
                 onPressed: !canContinue || _finishing
                     ? null
                     : _pageIndex == 0
-                        ? () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic)
-                        : _finish,
+                    ? () => _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                      )
+                    : _finish,
               ),
             ),
           ],
@@ -174,14 +206,27 @@ class _GenresStep extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 17,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   gradient: selected.contains(g) ? t.grad : null,
                   color: selected.contains(g) ? null : t.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: selected.contains(g) ? Colors.transparent : t.line, width: 1.5),
+                  border: Border.all(
+                    color: selected.contains(g) ? Colors.transparent : t.line,
+                    width: 1.5,
+                  ),
                   boxShadow: selected.contains(g)
-                      ? [BoxShadow(color: t.purple.withValues(alpha: 0.5), blurRadius: 20, offset: const Offset(0, 8), spreadRadius: -8)]
+                      ? [
+                          BoxShadow(
+                            color: t.purple.withValues(alpha: 0.5),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                            spreadRadius: -8,
+                          ),
+                        ]
                       : null,
                 ),
                 child: Row(
@@ -193,9 +238,7 @@ class _GenresStep extends StatelessWidget {
                     ],
                     Text(
                       g,
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontWeight: FontWeight.w700,
+                      style: AgText.label.copyWith(
                         fontSize: 14.5,
                         color: selected.contains(g) ? Colors.white : t.sub,
                       ),
@@ -234,20 +277,62 @@ class _FavoritesStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AgSearchField(controller: searchController, hint: 'Search movies…', onChanged: onSearchChanged),
+          AgSearchField(
+            controller: searchController,
+            hint: 'Search movies…',
+            onChanged: onSearchChanged,
+          ),
           const SizedBox(height: 16),
           Expanded(
             child: searchFuture != null
                 ? FutureBuilder<List<Movie>>(
                     future: searchFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                        return Center(child: CircularProgressIndicator(color: context.tokens.red));
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          !snapshot.hasData) {
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: context.tokens.red,
+                          ),
+                        );
                       }
-                      return _Grid(movies: snapshot.data ?? const [], selectedIds: selectedIds, onToggle: onToggle);
+                      if (snapshot.hasError && !snapshot.hasData) {
+                        final t = context.tokens;
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(AgIcons.wifiOff, size: 32, color: t.faint),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "Couldn't search",
+                                  style: AgText.h4.copyWith(color: t.text),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Check your connection and search again.',
+                                  textAlign: TextAlign.center,
+                                  style: AgText.caption.copyWith(color: t.sub),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return _Grid(
+                        movies: snapshot.data ?? const [],
+                        selectedIds: selectedIds,
+                        onToggle: onToggle,
+                      );
                     },
                   )
-                : _Grid(movies: movies, selectedIds: selectedIds, onToggle: onToggle),
+                : _Grid(
+                    movies: movies,
+                    selectedIds: selectedIds,
+                    onToggle: onToggle,
+                  ),
           ),
         ],
       ),
@@ -256,7 +341,11 @@ class _FavoritesStep extends StatelessWidget {
 }
 
 class _Grid extends StatelessWidget {
-  const _Grid({required this.movies, required this.selectedIds, required this.onToggle});
+  const _Grid({
+    required this.movies,
+    required this.selectedIds,
+    required this.onToggle,
+  });
   final List<Movie> movies;
   final Set<String> selectedIds;
   final ValueChanged<Movie> onToggle;
@@ -265,7 +354,12 @@ class _Grid extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     if (movies.isEmpty) {
-      return Center(child: Text('No movies found.', style: TextStyle(fontFamily: 'Manrope', color: t.faint)));
+      return Center(
+        child: Text(
+          'No movies found.',
+          style: AgText.body.copyWith(color: t.faint),
+        ),
+      );
     }
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
@@ -297,8 +391,15 @@ class _Grid extends StatelessWidget {
                     child: Container(
                       width: 30,
                       height: 30,
-                      decoration: BoxDecoration(color: t.red, shape: BoxShape.circle),
-                      child: const Icon(AgIcons.check, size: 18, color: Colors.white),
+                      decoration: BoxDecoration(
+                        color: t.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        AgIcons.check,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 )

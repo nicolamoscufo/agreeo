@@ -1,5 +1,6 @@
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -33,9 +34,8 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
       _error = null;
     });
     try {
-      final blocked = await ref
-          .read(backendSocialServiceProvider)
-          .getBlockedUsers();
+      final blocked =
+          await ref.read(backendSocialServiceProvider).getBlockedUsers();
       if (!mounted) return;
       setState(() {
         _blocked = blocked;
@@ -54,17 +54,14 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _unblockingIds.add(user.id));
     try {
-      final blocked = await ref
-          .read(backendSocialServiceProvider)
-          .unblockFriend(user.id);
+      final blocked =
+          await ref.read(backendSocialServiceProvider).unblockFriend(user.id);
       if (!mounted) return;
       setState(() {
         _blocked = blocked;
         _unblockingIds.remove(user.id);
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text('${user.name} unblocked')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('${user.name} unblocked')));
       // They can show up in search/requests again.
       ref
           .read(friendsMovieNightControllerProvider.notifier)
@@ -107,10 +104,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                   const SizedBox(width: 12),
                   Text(
                     'Blocked users',
-                    style: TextStyle(
-                      fontFamily: 'Bricolage Grotesque',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 23,
+                    style: AgText.h2.copyWith(
                       letterSpacing: -0.5,
                       color: t.text,
                     ),
@@ -170,12 +164,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
               Expanded(
                 child: Text(
                   user.name,
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: t.text,
-                  ),
+                  style: AgText.label.copyWith(fontSize: 15, color: t.text),
                 ),
               ),
               GestureDetector(
@@ -183,7 +172,10 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                 child: Opacity(
                   opacity: unblocking ? 0.5 : 1,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: t.surface,
                       borderRadius: BorderRadius.circular(11),
@@ -191,12 +183,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                     ),
                     child: Text(
                       unblocking ? 'Unblocking…' : 'Unblock',
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.5,
-                        color: t.red,
-                      ),
+                      style: AgText.label.copyWith(color: t.red),
                     ),
                   ),
                 ),

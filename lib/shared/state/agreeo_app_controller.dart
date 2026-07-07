@@ -25,6 +25,7 @@ class AgreeoAppState {
     required this.recommendedIds,
     required this.dailySuggestionIds,
     required this.trendingIds,
+    this.discoveryFeedFailed = false,
   });
 
   factory AgreeoAppState.initial() {
@@ -52,6 +53,10 @@ class AgreeoAppState {
   final List<String> recommendedIds;
   final List<String> dailySuggestionIds;
   final List<String> trendingIds;
+
+  /// Transient (not persisted): the last discovery-feed refresh threw. Lets the
+  /// Home rails show an error + retry instead of an indistinguishable "empty".
+  final bool discoveryFeedFailed;
 
   bool get isAuthenticated => session != null;
   bool get onboardingComplete => onboarding.completed;
@@ -138,6 +143,7 @@ class AgreeoAppState {
     List<String>? recommendedIds,
     List<String>? dailySuggestionIds,
     List<String>? trendingIds,
+    bool? discoveryFeedFailed,
   }) {
     return AgreeoAppState(
       hydrated: hydrated ?? this.hydrated,
@@ -150,6 +156,7 @@ class AgreeoAppState {
       recommendedIds: recommendedIds ?? this.recommendedIds,
       dailySuggestionIds: dailySuggestionIds ?? this.dailySuggestionIds,
       trendingIds: trendingIds ?? this.trendingIds,
+      discoveryFeedFailed: discoveryFeedFailed ?? this.discoveryFeedFailed,
     );
   }
 
@@ -936,6 +943,10 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       }
 
       if (recommended.isEmpty && suggestions.isEmpty && trending.isEmpty) {
+        // Reached the backend, it just had nothing new — that's not a failure.
+        if (state.discoveryFeedFailed) {
+          state = state.copyWith(discoveryFeedFailed: false);
+        }
         return;
       }
 
@@ -959,10 +970,12 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         trendingIds: trending.isEmpty && state.trendingIds.isNotEmpty
             ? state.trendingIds
             : trending.map((movie) => movie.id).toList(growable: false),
+        discoveryFeedFailed: false,
       );
       await _persist();
     } catch (e) {
       debugPrint('[AgreeoAppController] Failed to refresh discovery feeds: $e');
+      if (mounted) state = state.copyWith(discoveryFeedFailed: true);
     }
   }
 

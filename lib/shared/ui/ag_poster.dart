@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -45,12 +46,12 @@ class AgPoster extends StatefulWidget {
     final size = targetPx <= 154
         ? 'w154'
         : targetPx <= 185
-            ? 'w185'
-            : targetPx <= 342
-                ? 'w342'
-                : targetPx <= 500
-                    ? 'w500'
-                    : 'w780';
+        ? 'w185'
+        : targetPx <= 342
+        ? 'w342'
+        : targetPx <= 500
+        ? 'w500'
+        : 'w780';
     return url.replaceFirst(_tmdbSizeSegment, '/t/p/$size/');
   }
 
@@ -145,9 +146,7 @@ class _AgPosterState extends State<AgPoster> {
                         widget.title!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Bricolage Grotesque',
-                          fontWeight: FontWeight.w800,
+                        style: AgText.h4.copyWith(
                           fontSize: 14,
                           height: 1.04,
                           letterSpacing: -0.3,
@@ -211,9 +210,7 @@ class _PlaceholderArt extends StatelessWidget {
             maxLines: 3,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Bricolage Grotesque',
-              fontWeight: FontWeight.w800,
+            style: AgText.h4.copyWith(
               fontSize: 13,
               height: 1.05,
               letterSpacing: -0.3,

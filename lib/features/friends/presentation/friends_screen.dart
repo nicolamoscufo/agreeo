@@ -6,9 +6,9 @@ import 'package:agreeo/features/friends/presentation/movie_night_voting_screen.d
 import 'package:agreeo/features/friends/presentation/movie_night_waiting_room_screen.dart';
 import 'package:agreeo/features/friends/presentation/movie_night_wizard_screen.dart';
 import 'package:agreeo/features/friends/state/friends_movie_night_controller.dart';
-import 'package:agreeo/features/profile/presentation/profile_screen.dart';
 import 'package:agreeo/shared/models/social_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
@@ -35,11 +35,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   }
 
   void _onSearchChanged(String query) {
-    ref.read(friendsMovieNightControllerProvider.notifier).searchFriends(query, syncBackend: false);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .searchFriends(query, syncBackend: false);
     setState(() {});
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      ref.read(friendsMovieNightControllerProvider.notifier).searchFriends(query);
+      ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .searchFriends(query);
     });
   }
 
@@ -51,7 +55,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
   void _openFriend(Friend friend) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => FriendProfileScreen(friendId: friend.id)),
+      MaterialPageRoute<void>(
+        builder: (_) => FriendProfileScreen(friendId: friend.id),
+      ),
     );
   }
 
@@ -62,13 +68,21 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         title: Text('Cancel request to ${friend.name}?'),
         content: const Text('They will no longer see your friend request.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Keep it')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Cancel request')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Cancel request'),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    ref.read(friendsMovieNightControllerProvider.notifier).cancelFriendRequest(friend.id);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .cancelFriendRequest(friend.id);
     _toast('Friend request cancelled.');
   }
 
@@ -81,7 +95,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
   void _openEvent(MovieNightEvent event) {
     final route = switch (event.status) {
-      MovieNightStatus.draft || MovieNightStatus.waiting =>
+      MovieNightStatus.draft ||
+      MovieNightStatus.waiting =>
         MovieNightWaitingRoomScreen(eventId: event.id),
       MovieNightStatus.voting => MovieNightVotingScreen(eventId: event.id),
       MovieNightStatus.completed => MovieNightResultScreen(eventId: event.id),
@@ -123,25 +138,16 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                       Expanded(
                         child: Text(
                           'Friends',
-                          style: TextStyle(
-                            fontFamily: 'Bricolage Grotesque',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 27,
+                          style: AgText.h1.copyWith(
                             letterSpacing: -0.6,
                             color: t.text,
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
-                        ),
-                        child: AgAvatar(
-                          name: appState.session?.displayName ?? 'You',
-                          color: t.red,
-                          imageUrl: appState.session?.avatarUrl,
-                          size: 42,
-                        ),
+                      AgProfileButton(
+                        name: appState.session?.displayName ?? 'You',
+                        imageUrl: appState.session?.avatarUrl,
+                        color: t.red,
                       ),
                     ],
                   ),
@@ -173,17 +179,26 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                       children: [
                         Text(
                           'Requests',
-                          style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                          style: AgText.h4.copyWith(
+                            fontSize: 15,
+                            color: t.text,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
                           width: 20,
                           height: 20,
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(color: t.red, shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                            color: t.red,
+                            shape: BoxShape.circle,
+                          ),
                           child: Text(
                             '${requests.length}',
-                            style: const TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white),
+                            style: AgText.labelSm.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -205,22 +220,26 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   const SizedBox(height: 18),
                   Text(
                     'All friends · ${friends.length}',
-                    style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                    style: AgText.h4.copyWith(fontSize: 15, color: t.text),
                   ),
                   const SizedBox(height: 12),
                   if (friends.isEmpty)
                     Text(
                       'No friends yet — search above to connect.',
-                      style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.faint),
+                      style: AgText.caption.copyWith(color: t.faint),
                     )
                   else
                     for (final f in friends)
-                      _FriendRow(friend: f, onTap: () => _openFriend(f), onInvite: _openCreateMovieNight),
+                      _FriendRow(
+                        friend: f,
+                        onTap: () => _openFriend(f),
+                        onInvite: _openCreateMovieNight,
+                      ),
                   if (activeNights.isNotEmpty) ...[
                     const SizedBox(height: 22),
                     Text(
                       'Movie Nights',
-                      style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 15, color: t.text),
+                      style: AgText.h4.copyWith(fontSize: 15, color: t.text),
                     ),
                     const SizedBox(height: 12),
                     for (final e in activeNights)
@@ -233,7 +252,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               left: 20,
               right: 20,
               bottom: 96,
-              child: AgButton(label: 'Start a Movie Night', icon: AgIcons.film, onPressed: _openCreateMovieNight),
+              child: AgButton(
+                label: 'Start a Movie Night',
+                icon: AgIcons.film,
+                onPressed: _openCreateMovieNight,
+              ),
             ),
           ],
         ),
@@ -243,7 +266,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 }
 
 class _FriendRow extends StatelessWidget {
-  const _FriendRow({required this.friend, required this.onTap, required this.onInvite});
+  const _FriendRow({
+    required this.friend,
+    required this.onTap,
+    required this.onInvite,
+  });
   final Friend friend;
   final VoidCallback onTap;
   final VoidCallback onInvite;
@@ -256,7 +283,9 @@ class _FriendRow extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: t.line)),
+        ),
         child: Row(
           children: [
             AgAvatar(name: friend.name, imageUrl: friend.avatarUrl, size: 46),
@@ -267,12 +296,12 @@ class _FriendRow extends StatelessWidget {
                 children: [
                   Text(
                     friend.name,
-                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                    style: AgText.label.copyWith(fontSize: 15, color: t.text),
                   ),
                   const SizedBox(height: 1),
                   Text(
                     '${friend.watchedCount} watched · ${friend.reviewsCount} reviews',
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                    style: AgText.micro.copyWith(color: t.faint),
                   ),
                 ],
               ),
@@ -280,7 +309,10 @@ class _FriendRow extends StatelessWidget {
             GestureDetector(
               onTap: onInvite,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   gradient: t.gradSoft,
                   borderRadius: BorderRadius.circular(11),
@@ -288,7 +320,7 @@ class _FriendRow extends StatelessWidget {
                 ),
                 child: Text(
                   'Invite',
-                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 12.5, color: t.text),
+                  style: AgText.label.copyWith(color: t.text),
                 ),
               ),
             ),
@@ -300,7 +332,11 @@ class _FriendRow extends StatelessWidget {
 }
 
 class _RequestRow extends StatelessWidget {
-  const _RequestRow({required this.request, required this.onAccept, required this.onDecline});
+  const _RequestRow({
+    required this.request,
+    required this.onAccept,
+    required this.onDecline,
+  });
   final FriendRequest request;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
@@ -327,37 +363,60 @@ class _RequestRow extends StatelessWidget {
               children: [
                 Text(
                   f.name,
-                  style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 15, color: t.text),
+                  style: AgText.label.copyWith(fontSize: 15, color: t.text),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   '${f.watchedCount} watched · ${f.reviewsCount} reviews',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                  style: AgText.micro.copyWith(color: t.faint),
                 ),
               ],
             ),
           ),
-          GestureDetector(
-            onTap: onAccept,
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(11)),
-              child: const Icon(AgIcons.check, size: 19, color: Colors.white),
+          Semantics(
+            button: true,
+            label: 'Accept request',
+            excludeSemantics: true,
+            child: Tooltip(
+              message: 'Accept request',
+              child: GestureDetector(
+                onTap: onAccept,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: t.grad,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    AgIcons.check,
+                    size: 19,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onDecline,
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: t.surface2,
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: t.line2),
+          Semantics(
+            button: true,
+            label: 'Decline request',
+            excludeSemantics: true,
+            child: Tooltip(
+              message: 'Decline request',
+              child: GestureDetector(
+                onTap: onDecline,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: t.surface2,
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: t.line2),
+                  ),
+                  child: Icon(AgIcons.close, size: 18, color: t.sub),
+                ),
               ),
-              child: Icon(AgIcons.close, size: 18, color: t.sub),
             ),
           ),
         ],
@@ -393,84 +452,94 @@ class _SearchResults extends StatelessWidget {
         ),
         child: Text(
           'No matching people. Try another name.',
-          style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.sub),
+          style: AgText.caption.copyWith(color: t.sub),
         ),
       );
     }
     return Column(
       children: [
         for (final f in results)
-          Builder(builder: (context) {
-            final isFriend = social.isFriend(f.id);
-            final pending = social.isPending(f.id);
-            final incomingId = social.incomingRequestIdFor(f.id);
-            final pendingOutgoing = pending && incomingId == null && !isFriend;
-            final label = isFriend
-                ? 'Friends'
-                : incomingId != null
-                    ? 'Accept'
-                    : pendingOutgoing
-                        ? 'Pending'
-                        : 'Add';
-            // Pending stays tappable: tapping it offers to cancel the request.
-            final enabled = !isFriend;
-            final highlighted = enabled && !pendingOutgoing;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: t.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: t.line),
-              ),
-              child: Row(
-                children: [
-                  AgAvatar(name: f.name, imageUrl: f.avatarUrl, size: 44),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      f.name,
-                      style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14.5, color: t.text),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: enabled
-                        ? () {
-                            if (incomingId != null) {
-                              onAccept(incomingId);
-                            } else if (pendingOutgoing) {
-                              onCancelRequest(f);
-                            } else {
-                              onAdd(f);
-                            }
-                          }
-                        : null,
-                    child: Opacity(
-                      opacity: enabled ? 1 : 0.5,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                        decoration: BoxDecoration(
-                          gradient: highlighted ? t.grad : null,
-                          color: highlighted ? null : t.surface2,
-                          borderRadius: BorderRadius.circular(11),
-                          border: highlighted ? null : Border.all(color: t.line2),
+          Builder(
+            builder: (context) {
+              final isFriend = social.isFriend(f.id);
+              final pending = social.isPending(f.id);
+              final incomingId = social.incomingRequestIdFor(f.id);
+              final pendingOutgoing =
+                  pending && incomingId == null && !isFriend;
+              final label = isFriend
+                  ? 'Friends'
+                  : incomingId != null
+                      ? 'Accept'
+                      : pendingOutgoing
+                          ? 'Pending'
+                          : 'Add';
+              // Pending stays tappable: tapping it offers to cancel the request.
+              final enabled = !isFriend;
+              final highlighted = enabled && !pendingOutgoing;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: t.line),
+                ),
+                child: Row(
+                  children: [
+                    AgAvatar(name: f.name, imageUrl: f.avatarUrl, size: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        f.name,
+                        style: AgText.label.copyWith(
+                          fontSize: 14.5,
+                          color: t.text,
                         ),
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            fontFamily: 'Manrope',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
-                            color: highlighted ? Colors.white : t.sub,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: enabled
+                          ? () {
+                              if (incomingId != null) {
+                                onAccept(incomingId);
+                              } else if (pendingOutgoing) {
+                                onCancelRequest(f);
+                              } else {
+                                onAdd(f);
+                              }
+                            }
+                          : null,
+                      child: Opacity(
+                        opacity: enabled ? 1 : 0.5,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: highlighted ? t.grad : null,
+                            color: highlighted ? null : t.surface2,
+                            borderRadius: BorderRadius.circular(11),
+                            border:
+                                highlighted ? null : Border.all(color: t.line2),
+                          ),
+                          child: Text(
+                            label,
+                            style: AgText.label.copyWith(
+                              color: highlighted ? Colors.white : t.sub,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -499,7 +568,10 @@ class _MovieNightRow extends StatelessWidget {
             Container(
               width: 46,
               height: 46,
-              decoration: BoxDecoration(gradient: t.grad, borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(
+                gradient: t.grad,
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: const Icon(AgIcons.film, size: 24, color: Colors.white),
             ),
             const SizedBox(width: 13),
@@ -511,12 +583,12 @@ class _MovieNightRow extends StatelessWidget {
                     event.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 16, color: t.text),
+                    style: AgText.h4.copyWith(color: t.text),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${event.participants.length} participants · ${movieNightStatusLabel(event.status)}',
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, color: t.sub),
+                    style: AgText.caption.copyWith(color: t.sub),
                   ),
                 ],
               ),

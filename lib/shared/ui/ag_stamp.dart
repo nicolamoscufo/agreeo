@@ -1,3 +1,4 @@
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:flutter/material.dart';
 
 /// Swipe stamp (LIKE / NOPE): thick colored border, rotated badge, big Bricolage
@@ -43,9 +44,7 @@ class AgStamp extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
+          style: AgText.display.copyWith(
             fontSize: 28,
             letterSpacing: 1,
             color: color,

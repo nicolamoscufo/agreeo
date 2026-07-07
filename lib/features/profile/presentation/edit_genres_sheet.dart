@@ -1,6 +1,7 @@
 import 'package:agreeo/shared/catalog/genre_options.dart';
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -34,11 +35,8 @@ class _EditGenresState extends ConsumerState<_EditGenres> {
   @override
   void initState() {
     super.initState();
-    _selected = ref
-        .read(agreeoAppControllerProvider)
-        .onboarding
-        .favoriteGenres
-        .toSet();
+    _selected =
+        ref.read(agreeoAppControllerProvider).onboarding.favoriteGenres.toSet();
   }
 
   void _toggle(String genre) {
@@ -84,18 +82,12 @@ class _EditGenresState extends ConsumerState<_EditGenres> {
       children: [
         Text(
           'Favorite genres',
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
-            fontSize: 25,
-            letterSpacing: -0.5,
-            color: t.text,
-          ),
+          style: AgText.h1.copyWith(letterSpacing: -0.5, color: t.text),
         ),
         const SizedBox(height: 8),
         Text(
           'Pick at least $_minGenres. This reshapes your daily picks and recommendations.',
-          style: TextStyle(fontFamily: 'Manrope', fontSize: 13.5, color: t.sub),
+          style: AgText.caption.copyWith(color: t.sub),
         ),
         const SizedBox(height: 18),
         Expanded(
@@ -111,13 +103,18 @@ class _EditGenresState extends ConsumerState<_EditGenres> {
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 17,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         gradient: _selected.contains(g) ? t.grad : null,
                         color: _selected.contains(g) ? null : t.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: _selected.contains(g) ? Colors.transparent : t.line,
+                          color: _selected.contains(g)
+                              ? Colors.transparent
+                              : t.line,
                           width: 1.5,
                         ),
                       ),
@@ -125,16 +122,19 @@ class _EditGenresState extends ConsumerState<_EditGenres> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_selected.contains(g)) ...[
-                            const Icon(AgIcons.check, size: 15, color: Colors.white),
+                            const Icon(
+                              AgIcons.check,
+                              size: 15,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 8),
                           ],
                           Text(
                             g,
-                            style: TextStyle(
-                              fontFamily: 'Manrope',
-                              fontWeight: FontWeight.w700,
+                            style: AgText.label.copyWith(
                               fontSize: 14.5,
-                              color: _selected.contains(g) ? Colors.white : t.sub,
+                              color:
+                                  _selected.contains(g) ? Colors.white : t.sub,
                             ),
                           ),
                         ],

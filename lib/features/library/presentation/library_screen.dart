@@ -1,7 +1,7 @@
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
-import 'package:agreeo/features/profile/presentation/profile_screen.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +14,8 @@ class AgreeoLibraryScreen extends ConsumerStatefulWidget {
   const AgreeoLibraryScreen({super.key});
 
   @override
-  ConsumerState<AgreeoLibraryScreen> createState() => _AgreeoLibraryScreenState();
+  ConsumerState<AgreeoLibraryScreen> createState() =>
+      _AgreeoLibraryScreenState();
 }
 
 class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
@@ -32,22 +33,26 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
 
   List<Movie> _moviesForTab(AgreeoAppState state, _LibraryTab tab) {
     final query = _searchController.text.trim().toLowerCase();
-    final items = state.catalog.where((movie) {
-      final s = state.userMovieStateFor(movie.id);
-      final inTab = switch (tab) {
-        _LibraryTab.watchlist => s.inWatchlist && !s.watched,
-        _LibraryTab.liked => s.preference == MoviePreference.liked,
-        _LibraryTab.watched => s.watched,
-      };
-      if (!inTab) return false;
-      if (query.isEmpty) return true;
-      return movie.title.toLowerCase().contains(query) ||
-          movie.genres.any((g) => g.toLowerCase().contains(query));
-    }).toList(growable: false);
-    items.sort((a, b) => state
-        .userMovieStateFor(b.id)
-        .updatedAt
-        .compareTo(state.userMovieStateFor(a.id).updatedAt));
+    final items = state.catalog
+        .where((movie) {
+          final s = state.userMovieStateFor(movie.id);
+          final inTab = switch (tab) {
+            _LibraryTab.watchlist => s.inWatchlist && !s.watched,
+            _LibraryTab.liked => s.preference == MoviePreference.liked,
+            _LibraryTab.watched => s.watched,
+          };
+          if (!inTab) return false;
+          if (query.isEmpty) return true;
+          return movie.title.toLowerCase().contains(query) ||
+              movie.genres.any((g) => g.toLowerCase().contains(query));
+        })
+        .toList(growable: false);
+    items.sort(
+      (a, b) => state
+          .userMovieStateFor(b.id)
+          .updatedAt
+          .compareTo(state.userMovieStateFor(a.id).updatedAt),
+    );
     return items;
   }
 
@@ -75,10 +80,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                 Expanded(
                   child: Text(
                     'Your Library',
-                    style: TextStyle(
-                      fontFamily: 'Bricolage Grotesque',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 27,
+                    style: AgText.h1.copyWith(
                       letterSpacing: -0.6,
                       color: t.text,
                     ),
@@ -86,6 +88,7 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                 ),
                 _IconSquare(
                   icon: AgIcons.search,
+                  label: 'Search your library',
                   active: _searchOpen,
                   onTap: () => setState(() {
                     _searchOpen = !_searchOpen;
@@ -93,16 +96,10 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                   }),
                 ),
                 const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AgreeoProfileScreen()),
-                  ),
-                  child: AgAvatar(
-                    name: state.session?.displayName ?? 'You',
-                    color: t.red,
-                    imageUrl: state.session?.avatarUrl,
-                    size: 42,
-                  ),
+                AgProfileButton(
+                  name: state.session?.displayName ?? 'You',
+                  imageUrl: state.session?.avatarUrl,
+                  color: t.red,
                 ),
               ],
             ),
@@ -146,7 +143,15 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       children: [
                         const SizedBox(height: 60),
-                        _emptyForTab(context),
+                        if (state.hydrated)
+                          _emptyForTab(context)
+                        else
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 40),
+                              child: CircularProgressIndicator(color: t.red),
+                            ),
+                          ),
                       ],
                     )
                   : ListView.builder(
@@ -162,17 +167,23 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
                           runtimeLabel: _runtimeLabel(movie.runtime),
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            Navigator.of(context).push(MaterialPageRoute<void>(
-                              builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
-                            ));
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    AgreeoMovieDetailsScreen(movieId: movie.id),
+                              ),
+                            );
                           },
                           onLike: () => controller.likeMovie(movie.id),
                           onDislike: () => controller.dislikeMovie(movie.id),
                           onSeen: () => controller.markAsWatched(movie.id),
                           onReview: () {
-                            Navigator.of(context).push(MaterialPageRoute<void>(
-                              builder: (_) => AgreeoMovieDetailsScreen(movieId: movie.id),
-                            ));
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    AgreeoMovieDetailsScreen(movieId: movie.id),
+                              ),
+                            );
                           },
                         );
                       },
@@ -205,20 +216,12 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  color: on ? Colors.white : t.sub,
-                ),
+                style: AgText.label.copyWith(color: on ? Colors.white : t.sub),
               ),
               const SizedBox(width: 6),
               Text(
                 '${counts[tab] ?? 0}',
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
+                style: AgText.labelSm.copyWith(
                   color: on ? Colors.white70 : t.faint,
                 ),
               ),
@@ -232,45 +235,60 @@ class _AgreeoLibraryScreenState extends ConsumerState<AgreeoLibraryScreen> {
   Widget _emptyForTab(BuildContext context) {
     final (icon, title, message) = switch (_tab) {
       _LibraryTab.watchlist => (
-          AgIcons.bookmark,
-          'Your watchlist is empty',
-          'Save movies from Swipe or Home to find them here.',
-        ),
+        AgIcons.bookmark,
+        'Your watchlist is empty',
+        'Save movies from Swipe or Home to find them here.',
+      ),
       _LibraryTab.liked => (
-          AgIcons.heart,
-          'No liked movies yet',
-          'Like movies from Swipe to sharpen your taste.',
-        ),
+        AgIcons.heart,
+        'No liked movies yet',
+        'Like movies from Swipe to sharpen your taste.',
+      ),
       _LibraryTab.watched => (
-          AgIcons.eye,
-          'Nothing watched yet',
-          'Movies you finish build your memory lane here.',
-        ),
+        AgIcons.eye,
+        'Nothing watched yet',
+        'Movies you finish build your memory lane here.',
+      ),
     };
     return AgStateCard(icon: icon, title: title, message: message);
   }
 }
 
 class _IconSquare extends StatelessWidget {
-  const _IconSquare({required this.icon, required this.onTap, this.active = false});
+  const _IconSquare({
+    required this.icon,
+    required this.onTap,
+    required this.label,
+    this.active = false,
+  });
   final IconData icon;
   final VoidCallback onTap;
+  final String label;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: active ? t.surface2 : t.surface,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: active ? t.line2 : t.line),
+    return Semantics(
+      button: true,
+      toggled: active,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: active ? t.surface2 : t.surface,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: active ? t.line2 : t.line),
+            ),
+            child: Icon(icon, size: 20, color: active ? t.red : t.text),
+          ),
         ),
-        child: Icon(icon, size: 20, color: active ? t.red : t.text),
       ),
     );
   }
@@ -324,7 +342,14 @@ class _LibraryRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(width: 66, child: AgPoster(imageUrl: movie.posterUrl, title: movie.title, radius: 10)),
+            SizedBox(
+              width: 66,
+              child: AgPoster(
+                imageUrl: movie.posterUrl,
+                title: movie.title,
+                radius: 10,
+              ),
+            ),
             const SizedBox(width: 13),
             Expanded(
               child: Column(
@@ -336,27 +361,22 @@ class _LibraryRow extends StatelessWidget {
                       Expanded(
                         child: Text(
                           movie.title,
-                          style: TextStyle(
-                            fontFamily: 'Bricolage Grotesque',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15.5,
-                            height: 1.1,
-                            color: t.text,
-                          ),
+                          style: AgText.h4.copyWith(height: 1.1, color: t.text),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: badgeColor.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           badgeLabel,
-                          style: TextStyle(
-                            fontFamily: 'Manrope',
-                            fontWeight: FontWeight.w700,
+                          style: AgText.labelSm.copyWith(
                             fontSize: 10.5,
                             color: badgeColor,
                           ),
@@ -369,22 +389,22 @@ class _LibraryRow extends StatelessWidget {
                     meta,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                    style: AgText.micro.copyWith(color: t.faint),
                   ),
                   const SizedBox(height: 6),
                   if (userState.hasReview)
                     Container(
                       padding: const EdgeInsets.only(left: 9),
                       decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: t.line2, width: 2)),
+                        border: Border(
+                          left: BorderSide(color: t.line2, width: 2),
+                        ),
                       ),
                       child: Text(
                         '"${userState.review}"',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'Manrope',
-                          fontSize: 12,
+                        style: AgText.micro.copyWith(
                           height: 1.4,
                           fontStyle: FontStyle.italic,
                           color: t.sub,
@@ -399,17 +419,24 @@ class _LibraryRow extends StatelessWidget {
                         _Qa(icon: AgIcons.heart, onTap: onLike),
                         _Qa(icon: AgIcons.dislike, onTap: onDislike),
                         _Qa(icon: AgIcons.eye, onTap: onSeen),
-                        _Qa(icon: AgIcons.edit, label: 'Review', onTap: onReview),
+                        _Qa(
+                          icon: AgIcons.edit,
+                          label: 'Review',
+                          onTap: onReview,
+                        ),
                       ],
                     )
                   else
                     Row(
                       children: [
-                        AgStars(rating: (userState.rating ?? movie.rating.round()).toDouble()),
+                        AgStars(
+                          rating: (userState.rating ?? movie.rating.round())
+                              .toDouble(),
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           '· your rating',
-                          style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
+                          style: AgText.micro.copyWith(color: t.faint),
                         ),
                       ],
                     ),
@@ -438,7 +465,10 @@ class _Qa extends StatelessWidget {
         onTap();
       },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: label != null ? 10 : 6, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: label != null ? 10 : 6,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: t.surface2,
           borderRadius: BorderRadius.circular(9),
@@ -452,10 +482,8 @@ class _Qa extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 label!,
-                style: TextStyle(
-                  fontFamily: 'Manrope',
+                style: AgText.micro.copyWith(
                   fontWeight: FontWeight.w600,
-                  fontSize: 11.5,
                   color: t.sub,
                 ),
               ),

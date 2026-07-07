@@ -1,3 +1,4 @@
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_icons.dart';
 import 'package:flutter/material.dart';
@@ -19,12 +20,7 @@ class AgStars extends StatelessWidget {
         const SizedBox(width: 3),
         Text(
           rating.toStringAsFixed(1),
-          style: TextStyle(
-            fontFamily: 'Manrope',
-            fontWeight: FontWeight.w700,
-            fontSize: size,
-            color: t.text,
-          ),
+          style: AgText.label.copyWith(fontSize: size, color: t.text),
         ),
       ],
     );
@@ -53,15 +49,21 @@ class AgStarRater extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(count, (i) {
         final filled = i < value;
-        return GestureDetector(
-          onTap: () => onChanged(i + 1),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: Icon(
-              filled ? AgIcons.star : AgIcons.starOutline,
-              size: size,
-              color: filled ? t.gold : t.faint,
+        return Semantics(
+          button: true,
+          selected: filled,
+          label: 'Rate ${i + 1} of $count stars',
+          excludeSemantics: true,
+          child: GestureDetector(
+            onTap: () => onChanged(i + 1),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Icon(
+                filled ? AgIcons.star : AgIcons.starOutline,
+                size: size,
+                color: filled ? t.gold : t.faint,
+              ),
             ),
           ),
         );

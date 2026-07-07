@@ -1,3 +1,4 @@
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -57,10 +58,8 @@ class _AgButtonState extends State<AgButton> {
         ],
         Text(
           widget.label,
-          style: TextStyle(
-            fontFamily: 'Manrope',
+          style: AgText.lead.copyWith(
             fontWeight: isPrimary ? FontWeight.w800 : FontWeight.w700,
-            fontSize: 16,
             letterSpacing: -0.2,
             color: fg,
           ),
@@ -68,36 +67,42 @@ class _AgButtonState extends State<AgButton> {
       ],
     );
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: GestureDetector(
-        onTap: enabled
-            ? () {
-                HapticFeedback.lightImpact();
-                widget.onPressed!.call();
-              }
-            : null,
-        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-        onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-        child: AnimatedScale(
-          scale: _pressed ? 0.98 : 1,
-          duration: const Duration(milliseconds: 90),
-          child: Container(
-            height: widget.height,
-            width: widget.expand ? double.infinity : null,
-            padding: widget.expand
-                ? null
-                : const EdgeInsets.symmetric(horizontal: 24),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: isPrimary ? t.grad : null,
-              color: isPrimary ? null : t.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: isPrimary ? null : Border.all(color: t.line2),
-              boxShadow: isPrimary && enabled ? [t.accentGlow] : null,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      excludeSemantics: true,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: GestureDetector(
+          onTap: enabled
+              ? () {
+                  HapticFeedback.lightImpact();
+                  widget.onPressed!.call();
+                }
+              : null,
+          onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+          onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+          onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+          child: AnimatedScale(
+            scale: _pressed ? 0.98 : 1,
+            duration: const Duration(milliseconds: 90),
+            child: Container(
+              height: widget.height,
+              width: widget.expand ? double.infinity : null,
+              padding: widget.expand
+                  ? null
+                  : const EdgeInsets.symmetric(horizontal: 24),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: isPrimary ? t.grad : null,
+                color: isPrimary ? null : t.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: isPrimary ? null : Border.all(color: t.line2),
+                boxShadow: isPrimary && enabled ? [t.accentGlow] : null,
+              ),
+              child: content,
             ),
-            child: content,
           ),
         ),
       ),

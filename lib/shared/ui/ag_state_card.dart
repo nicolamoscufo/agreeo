@@ -1,3 +1,4 @@
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_button.dart';
 import 'package:flutter/material.dart';
@@ -51,24 +52,13 @@ class AgStateCard extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Bricolage Grotesque',
-              fontWeight: FontWeight.w800,
-              fontSize: 19,
-              letterSpacing: -0.4,
-              color: t.text,
-            ),
+            style: AgText.h3.copyWith(letterSpacing: -0.4, color: t.text),
           ),
           const SizedBox(height: 8),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Manrope',
-              fontSize: 13.5,
-              height: 1.5,
-              color: t.sub,
-            ),
+            style: AgText.caption.copyWith(height: 1.5, color: t.sub),
           ),
           if (actionLabel != null) ...[
             const SizedBox(height: 22),

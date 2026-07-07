@@ -3,6 +3,7 @@ import 'package:agreeo/features/friends/state/friends_movie_night_controller.dar
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
 import 'package:agreeo/shared/models/social_models.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:agreeo/shared/utils/movie_night_utils.dart';
@@ -15,7 +16,8 @@ class FriendProfileScreen extends ConsumerStatefulWidget {
   final String friendId;
 
   @override
-  ConsumerState<FriendProfileScreen> createState() => _FriendProfileScreenState();
+  ConsumerState<FriendProfileScreen> createState() =>
+      _FriendProfileScreenState();
 }
 
 enum _FriendTab { watched, reviews, watchlist }
@@ -28,7 +30,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final cached = ref.read(friendsMovieNightControllerProvider).profileFor(widget.friendId);
+    final cached = ref
+        .read(friendsMovieNightControllerProvider)
+        .profileFor(widget.friendId);
     if (cached == null) {
       _isLoading = true;
       Future<void>.microtask(_loadProfile);
@@ -49,7 +53,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          if (res == null) _errorMessage = 'Could not load this friend profile.';
+          if (res == null) {
+            _errorMessage = 'Could not load this friend profile.';
+          }
         });
       }
     } catch (_) {
@@ -91,11 +97,15 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     if (!mounted) return;
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(ok
-            ? 'Thanks — our team will review this within 24 hours.'
-            : 'Could not submit the report. Try again.'),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Thanks — our team will review this within 24 hours.'
+                : 'Could not submit the report. Try again.',
+          ),
+        ),
+      );
     if (!ok) return;
     // Reporting is usually followed by blocking; offer it as a one-tap follow-up.
     final block = await showDialog<bool>(
@@ -106,7 +116,10 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
           'Blocking removes them from your friends and stops them contacting you.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Not now')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not now'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: context.tokens.red),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -116,7 +129,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       ),
     );
     if (block == true && mounted) {
-      ref.read(friendsMovieNightControllerProvider.notifier).blockFriend(friend.id);
+      ref
+          .read(friendsMovieNightControllerProvider.notifier)
+          .blockFriend(friend.id);
       if (mounted) Navigator.of(context).pop();
     }
   }
@@ -126,15 +141,25 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Remove ${friend.name}?'),
-        content: const Text('You will no longer see each other\'s profiles or create movie nights together.'),
+        content: const Text(
+          'You will no longer see each other\'s profiles or create movie nights together.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Remove')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    ref.read(friendsMovieNightControllerProvider.notifier).removeFriend(friend.id);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .removeFriend(friend.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -147,7 +172,10 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
           'They will be removed from your friends and will no longer be able to find you or send you requests.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: context.tokens.red),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -157,7 +185,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    ref.read(friendsMovieNightControllerProvider.notifier).blockFriend(friend.id);
+    ref
+        .read(friendsMovieNightControllerProvider.notifier)
+        .blockFriend(friend.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -181,8 +211,8 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                   onAction: _loadProfile,
                 )
               : _isLoading
-                  ? CircularProgressIndicator(color: t.red)
-                  : Text('Friend not found', style: TextStyle(color: t.sub)),
+              ? CircularProgressIndicator(color: t.red)
+              : Text('Friend not found', style: TextStyle(color: t.sub)),
         ),
       );
     }
@@ -205,8 +235,16 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _SquareIcon(icon: AgIcons.chevronLeft, onTap: () => Navigator.of(context).pop()),
-                  _SquareIcon(icon: Icons.more_horiz_rounded, onTap: () => _showActions(friend)),
+                  _SquareIcon(
+                    icon: AgIcons.chevronLeft,
+                    label: 'Back',
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                  _SquareIcon(
+                    icon: Icons.more_horiz_rounded,
+                    label: 'More options',
+                    onTap: () => _showActions(friend),
+                  ),
                 ],
               ),
             ),
@@ -224,7 +262,11 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                   children: [
                     Row(
                       children: [
-                        AgAvatar(name: friend.name, imageUrl: friend.avatarUrl, size: 68),
+                        AgAvatar(
+                          name: friend.name,
+                          imageUrl: friend.avatarUrl,
+                          size: 68,
+                        ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -232,7 +274,10 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                             children: [
                               Text(
                                 friend.name,
-                                style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -0.4, color: t.text),
+                                style: AgText.h2.copyWith(
+                                  letterSpacing: -0.4,
+                                  color: t.text,
+                                ),
                               ),
                               if (friend.bio.isNotEmpty) ...[
                                 const SizedBox(height: 3),
@@ -240,7 +285,10 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                                   friend.bio,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, height: 1.4, color: t.sub),
+                                  style: AgText.caption.copyWith(
+                                    height: 1.4,
+                                    color: t.sub,
+                                  ),
                                 ),
                               ],
                               const SizedBox(height: 7),
@@ -251,7 +299,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                                   const SizedBox(width: 5),
                                   Text(
                                     'Friends',
-                                    style: TextStyle(fontFamily: 'Manrope', fontSize: 11.5, fontWeight: FontWeight.w700, color: t.faint),
+                                    style: AgText.labelSm.copyWith(
+                                      color: t.faint,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -263,11 +313,26 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        _StatBox(icon: AgIcons.eye, value: friend.watchedCount, label: 'Watched', color: t.text),
+                        _StatBox(
+                          icon: AgIcons.eye,
+                          value: friend.watchedCount,
+                          label: 'Watched',
+                          color: t.text,
+                        ),
                         const SizedBox(width: 9),
-                        _StatBox(icon: AgIcons.edit, value: friend.reviewsCount, label: 'Reviews', color: t.gold),
+                        _StatBox(
+                          icon: AgIcons.edit,
+                          value: friend.reviewsCount,
+                          label: 'Reviews',
+                          color: t.gold,
+                        ),
                         const SizedBox(width: 9),
-                        _StatBox(icon: AgIcons.film, value: sharedNights, label: 'Nights', color: t.red),
+                        _StatBox(
+                          icon: AgIcons.film,
+                          value: sharedNights,
+                          label: 'Nights',
+                          color: t.red,
+                        ),
                       ],
                     ),
                   ],
@@ -281,7 +346,9 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
                 icon: AgIcons.film,
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => MovieNightWizardScreen(preSelectedFriendIds: [friend.id]),
+                    builder: (_) => MovieNightWizardScreen(
+                      preSelectedFriendIds: [friend.id],
+                    ),
                   ),
                 ),
               ),
@@ -291,11 +358,23 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
               padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
               child: Row(
                 children: [
-                  _TabLabel(label: 'Watched', active: _tab == _FriendTab.watched, onTap: () => setState(() => _tab = _FriendTab.watched)),
+                  _TabLabel(
+                    label: 'Watched',
+                    active: _tab == _FriendTab.watched,
+                    onTap: () => setState(() => _tab = _FriendTab.watched),
+                  ),
                   const SizedBox(width: 24),
-                  _TabLabel(label: 'Reviews', active: _tab == _FriendTab.reviews, onTap: () => setState(() => _tab = _FriendTab.reviews)),
+                  _TabLabel(
+                    label: 'Reviews',
+                    active: _tab == _FriendTab.reviews,
+                    onTap: () => setState(() => _tab = _FriendTab.reviews),
+                  ),
                   const SizedBox(width: 24),
-                  _TabLabel(label: 'Watchlist', active: _tab == _FriendTab.watchlist, onTap: () => setState(() => _tab = _FriendTab.watchlist)),
+                  _TabLabel(
+                    label: 'Watchlist',
+                    active: _tab == _FriendTab.watchlist,
+                    onTap: () => setState(() => _tab = _FriendTab.watchlist),
+                  ),
                 ],
               ),
             ),
@@ -307,7 +386,11 @@ class _FriendProfileScreenState extends ConsumerState<FriendProfileScreen> {
     );
   }
 
-  Widget _buildTabBody(FriendProfile profile, PrivacySettings privacy, Friend friend) {
+  Widget _buildTabBody(
+    FriendProfile profile,
+    PrivacySettings privacy,
+    Friend friend,
+  ) {
     switch (_tab) {
       case _FriendTab.watched:
         return privacy.canShowWatched
@@ -338,26 +421,48 @@ class _BackIconButton extends StatelessWidget {
 }
 
 class _SquareIcon extends StatelessWidget {
-  const _SquareIcon({required this.icon, required this.onTap});
+  const _SquareIcon({
+    required this.icon,
+    required this.onTap,
+    required this.label,
+  });
   final IconData icon;
   final VoidCallback onTap;
+  final String label;
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: t.line)),
-        child: Icon(icon, size: 20, color: t.text),
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: t.line),
+            ),
+            child: Icon(icon, size: 20, color: t.text),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _StatBox extends StatelessWidget {
-  const _StatBox({required this.icon, required this.value, required this.label, required this.color});
+  const _StatBox({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
   final IconData icon;
   final int value;
   final String label;
@@ -377,8 +482,14 @@ class _StatBox extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(height: 5),
-            Text('$value', style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 19, color: t.text)),
-            Text(label, style: TextStyle(fontFamily: 'Manrope', fontSize: 11, fontWeight: FontWeight.w600, color: t.faint)),
+            Text('$value', style: AgText.h3.copyWith(color: t.text)),
+            Text(
+              label,
+              style: AgText.micro.copyWith(
+                fontWeight: FontWeight.w600,
+                color: t.faint,
+              ),
+            ),
           ],
         ),
       ),
@@ -387,7 +498,11 @@ class _StatBox extends StatelessWidget {
 }
 
 class _TabLabel extends StatelessWidget {
-  const _TabLabel({required this.label, required this.active, required this.onTap});
+  const _TabLabel({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final bool active;
   final VoidCallback onTap;
@@ -404,10 +519,8 @@ class _TabLabel extends StatelessWidget {
           children: [
             Text(
               label,
-              style: TextStyle(
-                fontFamily: 'Manrope',
+              style: AgText.body.copyWith(
                 fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 14,
                 color: active ? t.text : t.faint,
               ),
             ),
@@ -416,7 +529,13 @@ class _TabLabel extends StatelessWidget {
                 left: 0,
                 right: 0,
                 bottom: -11,
-                child: Container(height: 2.5, decoration: BoxDecoration(color: t.red, borderRadius: BorderRadius.circular(9))),
+                child: Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    color: t.red,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
               ),
           ],
         ),
@@ -433,7 +552,11 @@ class _MovieGrid extends StatelessWidget {
     if (movies.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 30),
-        child: AgStateCard(icon: AgIcons.film, title: 'Nothing here yet', message: 'No public movie activity in this section.'),
+        child: AgStateCard(
+          icon: AgIcons.film,
+          title: 'Nothing here yet',
+          message: 'No public movie activity in this section.',
+        ),
       );
     }
     return GridView.builder(
@@ -452,7 +575,9 @@ class _MovieGrid extends StatelessWidget {
           title: m.title,
           radius: 12,
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: m.id)),
+            MaterialPageRoute<void>(
+              builder: (_) => AgreeoMovieDetailsScreen(movieId: m.id),
+            ),
           ),
         );
       },
@@ -469,7 +594,11 @@ class _ReviewList extends StatelessWidget {
     if (reviews.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 30),
-        child: AgStateCard(icon: AgIcons.edit, title: 'No reviews visible', message: 'Shared reviews will appear here.'),
+        child: AgStateCard(
+          icon: AgIcons.edit,
+          title: 'No reviews visible',
+          message: 'Shared reviews will appear here.',
+        ),
       );
     }
     return ListView.separated(
@@ -480,33 +609,70 @@ class _ReviewList extends StatelessWidget {
         final r = reviews[i];
         return GestureDetector(
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => AgreeoMovieDetailsScreen(movieId: r.movie.id)),
+            MaterialPageRoute<void>(
+              builder: (_) => AgreeoMovieDetailsScreen(movieId: r.movie.id),
+            ),
           ),
           child: Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: t.line)),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: t.line),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: 50, child: AgPoster(imageUrl: r.movie.posterUrl, title: r.movie.title, radius: 9)),
+                SizedBox(
+                  width: 50,
+                  child: AgPoster(
+                    imageUrl: r.movie.posterUrl,
+                    title: r.movie.title,
+                    radius: 9,
+                  ),
+                ),
                 const SizedBox(width: 13),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(r.movie.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 14.5, color: t.text)),
+                      Text(
+                        r.movie.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AgText.h4.copyWith(
+                          fontSize: 14.5,
+                          color: t.text,
+                        ),
+                      ),
                       const SizedBox(height: 5),
                       Row(
                         children: [
                           for (var s = 0; s < 5; s++)
-                            Icon(s < r.rating ? AgIcons.star : AgIcons.starOutline, size: 12, color: s < r.rating ? t.gold : t.line2),
+                            Icon(
+                              s < r.rating ? AgIcons.star : AgIcons.starOutline,
+                              size: 12,
+                              color: s < r.rating ? t.gold : t.line2,
+                            ),
                           const SizedBox(width: 8),
-                          Text(movieNightDateLabel(r.date), style: TextStyle(fontFamily: 'Manrope', fontSize: 11, color: t.faint)),
+                          Text(
+                            movieNightDateLabel(r.date),
+                            style: AgText.micro.copyWith(color: t.faint),
+                          ),
                         ],
                       ),
                       if (r.reviewPreview.isNotEmpty) ...[
                         const SizedBox(height: 7),
-                        Text('"${r.reviewPreview}"', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, height: 1.45, fontStyle: FontStyle.italic, color: t.sub)),
+                        Text(
+                          '"${r.reviewPreview}"',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AgText.caption.copyWith(
+                            height: 1.45,
+                            fontStyle: FontStyle.italic,
+                            color: t.sub,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -535,13 +701,7 @@ class _FriendActionsSheet extends StatelessWidget {
       children: [
         Text(
           friendName,
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
-            fontSize: 21,
-            letterSpacing: -0.4,
-            color: t.text,
-          ),
+          style: AgText.h2.copyWith(letterSpacing: -0.4, color: t.text),
         ),
         const SizedBox(height: 16),
         _ActionRow(
@@ -594,18 +754,12 @@ class _ReportReasonSheet extends StatelessWidget {
       children: [
         Text(
           'Report ${friendName.split(' ').first}',
-          style: TextStyle(
-            fontFamily: 'Bricolage Grotesque',
-            fontWeight: FontWeight.w800,
-            fontSize: 21,
-            letterSpacing: -0.4,
-            color: t.text,
-          ),
+          style: AgText.h2.copyWith(letterSpacing: -0.4, color: t.text),
         ),
         const SizedBox(height: 4),
         Text(
           "Tell us what's wrong. Reports are confidential.",
-          style: TextStyle(fontFamily: 'Manrope', fontSize: 13, color: t.sub),
+          style: AgText.caption.copyWith(color: t.sub),
         ),
         const SizedBox(height: 16),
         for (final reason in _reasons)
@@ -625,9 +779,7 @@ class _ReportReasonSheet extends StatelessWidget {
                   Expanded(
                     child: Text(
                       reason,
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontWeight: FontWeight.w700,
+                      style: AgText.label.copyWith(
                         fontSize: 14.5,
                         color: t.text,
                       ),
@@ -682,13 +834,10 @@ class _ActionRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(fontFamily: 'Manrope', fontWeight: FontWeight.w700, fontSize: 14.5, color: color),
+                    style: AgText.label.copyWith(fontSize: 14.5, color: color),
                   ),
                   const SizedBox(height: 1),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontFamily: 'Manrope', fontSize: 12, color: t.faint),
-                  ),
+                  Text(subtitle, style: AgText.micro.copyWith(color: t.faint)),
                 ],
               ),
             ),
@@ -711,7 +860,8 @@ class _PrivateState extends StatelessWidget {
       child: AgStateCard(
         icon: AgIcons.bookmark,
         title: 'Private section',
-        message: "${name.split(' ').first}'s $what is private. Become closer friends to unlock it.",
+        message:
+            "${name.split(' ').first}'s $what is private. Become closer friends to unlock it.",
         iconColor: context.tokens.faint,
       ),
     );

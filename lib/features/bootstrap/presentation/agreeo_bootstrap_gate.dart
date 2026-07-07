@@ -2,6 +2,7 @@ import 'package:agreeo/features/auth/presentation/auth_welcome_screen.dart';
 import 'package:agreeo/features/onboarding/presentation/onboarding_flow_screen.dart';
 import 'package:agreeo/features/shell/presentation/agreeo_home_shell.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +60,10 @@ class _AgreeoLoadingScreen extends StatelessWidget {
                 gradient: RadialGradient(
                   center: const Alignment(0, -0.25),
                   radius: 0.9,
-                  colors: [t.purple.withValues(alpha: 0.16), Colors.transparent],
+                  colors: [
+                    t.purple.withValues(alpha: 0.16),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -74,19 +78,38 @@ class _AgreeoLoadingScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: t.grad,
                     borderRadius: BorderRadius.circular(28),
-                    boxShadow: [BoxShadow(color: t.purple.withValues(alpha: 0.55), blurRadius: 44, offset: const Offset(0, 18), spreadRadius: -12)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: t.purple.withValues(alpha: 0.55),
+                        blurRadius: 44,
+                        offset: const Offset(0, 18),
+                        spreadRadius: -12,
+                      ),
+                    ],
                   ),
-                  child: const Icon(AgIcons.play, size: 44, color: Colors.white),
+                  child: const Icon(
+                    AgIcons.play,
+                    size: 44,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(height: 26),
                 Text(
                   'Agreeo',
-                  style: TextStyle(fontFamily: 'Bricolage Grotesque', fontWeight: FontWeight.w800, fontSize: 42, height: 1, letterSpacing: -1.5, color: t.text),
+                  style: AgText.display.copyWith(
+                    fontSize: 42,
+                    height: 1,
+                    letterSpacing: -1.5,
+                    color: t.text,
+                  ),
                 ),
                 const SizedBox(height: 11),
                 Text(
                   'Agree on what to watch, faster.',
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 14, fontWeight: FontWeight.w600, color: t.sub),
+                  style: AgText.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: t.sub,
+                  ),
                 ),
               ],
             ),
@@ -97,11 +120,22 @@ class _AgreeoLoadingScreen extends StatelessWidget {
             bottom: 78,
             child: Column(
               children: [
-                SizedBox(width: 34, height: 34, child: CircularProgressIndicator(strokeWidth: 3, color: t.red)),
+                SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: t.red,
+                  ),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   "Curating tonight's lineup…",
-                  style: TextStyle(fontFamily: 'Manrope', fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: t.faint),
+                  style: AgText.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                    color: t.faint,
+                  ),
                 ),
               ],
             ),
