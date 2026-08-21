@@ -668,6 +668,44 @@ test('getRecommendationCandidates keeps collaborative results when semantic sear
   assert.deepEqual(response.candidates.map((candidate) => candidate.tmdbId), [100]);
 });
 
+test('concurrent recommendation requests share one in-flight computation', async (t) => {
+  const originalRun = neo4jService.run;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalTestContext = process.env.NODE_TEST_CONTEXT;
+  process.env.NODE_ENV = 'production';
+  delete process.env.NODE_TEST_CONTEXT;
+  const uid = 'in-flight-user';
+  movieRepository.invalidateRecommendationCache(uid);
+  t.after(() => {
+    neo4jService.run = originalRun;
+    movieRepository.invalidateRecommendationCache(uid);
+    if (originalNodeEnv == null) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalTestContext == null) delete process.env.NODE_TEST_CONTEXT;
+    else process.env.NODE_TEST_CONTEXT = originalTestContext;
+  });
+
+  let collaborativeCalls = 0;
+  neo4jService.run = async (query) => {
+    if (query.includes("'personalized' AS source")) {
+      collaborativeCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    return { records: [] };
+  };
+
+  const [first, second] = await Promise.all([
+    movieRepository.getRecommendationCandidates(uid, { bypassCache: true }),
+    movieRepository.getRecommendationCandidates(uid, { bypassCache: true }),
+  ]);
+
+  assert.equal(collaborativeCalls, 1);
+  assert.deepEqual(
+    new Set([first.cacheStatus, second.cacheStatus]),
+    new Set(['computed', 'shared-in-flight'])
+  );
+});
+
 test('getTopPositiveTagSignals and getTopNegativeTagSignals query and compute tag weights', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;

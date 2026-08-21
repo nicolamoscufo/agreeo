@@ -467,6 +467,11 @@ async function hydrateRecommendationEntries(
               negativePenalty: toFiniteNumber(entry.negativePenalty),
               explorationBonus: toFiniteNumber(entry.explorationBonus),
               finalScore: toFiniteNumber(entry.finalScore),
+              rankFusionScore: toFiniteNumber(entry.rankFusionScore),
+              collaborativeRank: entry.collaborativeRank ?? null,
+              semanticRank: entry.semanticRank ?? null,
+              semanticScore: toFiniteNumber(entry.semanticScore),
+              unactedExposureCount: entry.unactedExposureCount ?? 0,
               reason: entry.reason || '',
             },
           };
@@ -792,9 +797,11 @@ function buildDailySuggestionQueue(personalizedCandidates, exploratoryCandidates
   return queue;
 }
 
-async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
+async function loadForYouRecommendations(uid, { limit = 30, bypassCache = false } = {}) {
   const safeLimit = toPositiveInteger(limit, 30, 80);
-  const recommendationData = await movieRepository.getRecommendationCandidates(uid);
+  const recommendationData = await movieRepository.getRecommendationCandidates(uid, {
+    bypassCache,
+  });
   const enrichedCandidates = recommendationData.candidates.map((candidate) => ({
     ...candidate,
     reason: buildForYouReason(candidate),
@@ -808,6 +815,7 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
         fallbackReason: null,
         fallbackStrategy: null,
         experimentVariant: recommendationData.experimentVariant,
+        cacheStatus: recommendationData.cacheStatus,
       },
       candidates: [],
     };
@@ -827,6 +835,7 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
         fallbackUsed: false,
         fallbackReason: null,
         fallbackStrategy: null,
+        cacheStatus: recommendationData.cacheStatus,
       },
       candidates: enrichedCandidates,
     };
@@ -839,19 +848,22 @@ async function loadForYouRecommendations(uid, { limit = 30 } = {}) {
       fallbackReason: recommendationData.fallbackReason,
       fallbackStrategy: recommendationData.fallbackStrategy,
       experimentVariant: recommendationData.experimentVariant,
+      cacheStatus: recommendationData.cacheStatus,
     },
     candidates: enrichedCandidates,
   };
 }
 
-async function loadDailySuggestions(uid, { limit = 30 } = {}) {
+async function loadDailySuggestions(uid, { limit = 30, bypassCache = false } = {}) {
   const recommendationConfig = recommendationConfigForUser(uid);
   const safeLimit = toPositiveInteger(limit, 60, 80);
   let personalizedError = null;
   let exploratoryError = null;
   let forYouData;
   try {
-    forYouData = await movieRepository.getRecommendationCandidates(uid);
+    forYouData = await movieRepository.getRecommendationCandidates(uid, {
+      bypassCache,
+    });
   } catch (error) {
     personalizedError = error;
     forYouData = {
@@ -899,6 +911,7 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
         exploratoryCandidateCount: 0,
         personalizedRatio: 0.0,
         experimentVariant: recommendationConfig.variant,
+        cacheStatus: forYouData.cacheStatus || 'unavailable',
       },
       homeCandidates: personalizedCandidates,
       queueCandidates: [],
@@ -924,6 +937,7 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
         exploratoryCandidateCount: 0,
         personalizedRatio: 0.0,
         experimentVariant: recommendationConfig.variant,
+        cacheStatus: forYouData.cacheStatus || 'unavailable',
       },
       homeCandidates: personalizedCandidates,
       queueCandidates: [],
@@ -950,6 +964,7 @@ async function loadDailySuggestions(uid, { limit = 30 } = {}) {
         ? 0.0
         : personalizedResultCount / finalResults.length,
       experimentVariant: recommendationConfig.variant,
+      cacheStatus: forYouData.cacheStatus || 'unavailable',
     },
     homeCandidates: personalizedCandidates,
     queueCandidates,
@@ -1552,6 +1567,19 @@ exports.recommendationDebugStats = async (req, res) => {
   }
 
   try {
+    const traced = await neo4jService.captureQueryTrace(() => Promise.all([
+      movieRepository.getRecommendationUserProfile(uid),
+      movieRepository.getTopPositiveGenreSignals(uid),
+      movieRepository.getTopNegativeGenreSignals(uid),
+      movieRepository.getTopPositiveMovies(uid),
+      movieRepository.getTopNegativeMovies(uid),
+      movieRepository.getCandidatePoolStats(uid),
+      loadForYouRecommendations(uid, { limit: 12, bypassCache: true }),
+      loadDailySuggestions(uid, { limit: 20, bypassCache: true }),
+      movieRepository.getTopPositiveTagSignals(uid, 15),
+      movieRepository.getTopNegativeTagSignals(uid, 15),
+      movieRepository.getRecommendationMetrics(uid, 30),
+    ]));
     const [
       userProfile,
       positiveGenres,
@@ -1563,18 +1591,9 @@ exports.recommendationDebugStats = async (req, res) => {
       dailySuggestionData,
       positiveTags,
       negativeTags,
-    ] = await Promise.all([
-      movieRepository.getRecommendationUserProfile(uid),
-      movieRepository.getTopPositiveGenreSignals(uid),
-      movieRepository.getTopNegativeGenreSignals(uid),
-      movieRepository.getTopPositiveMovies(uid),
-      movieRepository.getTopNegativeMovies(uid),
-      movieRepository.getCandidatePoolStats(uid),
-      loadForYouRecommendations(uid, { limit: 12 }),
-      loadDailySuggestions(uid, { limit: 20 }),
-      movieRepository.getTopPositiveTagSignals(uid, 15),
-      movieRepository.getTopNegativeTagSignals(uid, 15),
-    ]);
+      recommendationMetrics,
+    ] = traced.value;
+    const recommendationConfig = recommendationConfigForUser(uid);
 
     const positiveGenreNames = new Set(positiveGenres.map((entry) => entry.name));
     const negativeGenreNames = new Set(negativeGenres.map((entry) => entry.name));
@@ -1589,7 +1608,12 @@ exports.recommendationDebugStats = async (req, res) => {
       return {
         tmdbId: movie.tmdbId,
         title: movie.title,
+        source: recommendation.source || 'unknown',
         finalScore: toFiniteNumber(recommendation.finalScore),
+        rankFusionScore: toFiniteNumber(recommendation.rankFusionScore),
+        collaborativeRank: recommendation.collaborativeRank ?? null,
+        semanticRank: recommendation.semanticRank ?? null,
+        semanticScore: toFiniteNumber(recommendation.semanticScore),
         genreScore: derivedGenreScore,
         popularityScore: toFiniteNumber(recommendation.popularityScore),
         collaborativeScore: toFiniteNumber(recommendation.collaborativeScore),
@@ -1597,6 +1621,7 @@ exports.recommendationDebugStats = async (req, res) => {
         explorationBonus: toFiniteNumber(recommendation.explorationBonus),
         tagRelevanceScore: toFiniteNumber(movie.tagRelevanceScore),
         matchedTags: Array.isArray(movie.matchedTags) ? movie.matchedTags : [],
+        unactedExposureCount: recommendation.unactedExposureCount ?? 0,
         reason: recommendation.reason || buildForYouReason(recommendation),
       };
     });
@@ -1657,6 +1682,60 @@ exports.recommendationDebugStats = async (req, res) => {
         candidateCount: forYouData.candidates.length,
       },
       debugConfig: buildDailySuggestionSettings(),
+      engineTrace: {
+        generatedAt: new Date().toISOString(),
+        experimentVariant: recommendationConfig.variant,
+        computation: {
+          forYou: forYouData.meta.cacheStatus || 'unknown',
+          daily: dailySuggestionData.meta.cacheStatus || 'unknown',
+          note: 'Made for you and Daily share one in-flight recommendation computation per user.',
+        },
+        config: recommendationConfig,
+        stages: [
+          {
+            id: 'signals',
+            title: '1. Profilo utente',
+            description: 'Neo4j raccoglie preferiti, like, watchlist, dislike, generi e tag collegati ai film.',
+            outputCount: userProfile.totalFeedbackActions || 0,
+          },
+          {
+            id: 'collaborative',
+            title: '2. Collaborative filtering',
+            description: 'Trova utenti MovieLens vicini, centra tutti i rating e applica shrinkage sul supporto.',
+            outputCount: forYouData.candidates.filter((candidate) =>
+              candidate.source === 'personalized' || candidate.source === 'hybrid'
+            ).length,
+          },
+          {
+            id: 'semantic',
+            title: '3. Profilo semantico',
+            description: 'Costruisce centroidi positivi/negativi, usa cosine similarity, frequenza logaritmica e IDF.',
+            outputCount: forYouData.candidates.filter((candidate) =>
+              candidate.source === 'semantic-tag' || candidate.source === 'hybrid'
+            ).length,
+          },
+          {
+            id: 'fusion',
+            title: '4. Reciprocal Rank Fusion',
+            description: 'Combina le posizioni delle sorgenti, poi penalizza esposizioni ignorate e diversifica i generi.',
+            outputCount: forYouData.results.length,
+          },
+          {
+            id: 'daily',
+            title: '5. Daily learning queue',
+            description: 'Mescola candidati personalizzati ed esplorativi e registra impressioni, posizione e azione.',
+            outputCount: dailySuggestionData.results.length,
+          },
+        ],
+        formulas: {
+          collaborative: 'weightedPreference = Σ(similarity × (rating − 3)) / Σ|similarity|; score = blend(weightedPreference, globalPrior, support) × log(neighbors + 1) × 10 − genrePenalty',
+          semantic: 'tagScore = IDF(tag) × log(1 + frequency) × positiveCosine³ − 0.75 × negativeCosine³',
+          fusion: 'RRF(movie) = Σ sourceWeight / (K + rank); final = 1000 × RRF / (1 + 0.15 × ignoredExposures)',
+          exploratory: 'score = familiarGenres×15 + avgRating×10 + log(ratings+1) + newGenres×40 − negativeGenres×25',
+        },
+        queries: traced.queries,
+        metrics: recommendationMetrics,
+      },
     });
   } catch (error) {
     return handleError(res, error, 'Failed to load recommendation debug stats');

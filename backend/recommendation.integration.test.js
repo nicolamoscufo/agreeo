@@ -15,6 +15,16 @@ test(
     const uid = `integration-${randomUUID()}`;
     const tmdbIds = [99000001, 99000002];
     await neo4jService.initialize();
+    const traceProbe = await neo4jService.captureQueryTrace(() =>
+      neo4jService.run(
+        'RETURN $uid AS uid, size($vector) AS dimensions',
+        { uid, vector: new Array(384).fill(0) }
+      )
+    );
+    assert.equal(traceProbe.queries.length, 1);
+    assert.equal(traceProbe.queries[0].params.uid, '<current-user>');
+    assert.equal(traceProbe.queries[0].params.vector, '<array:384>');
+    assert.equal(traceProbe.queries[0].records, 1);
     t.after(async () => {
       await neo4jService.run(
         'MATCH (batch:RecommendationBatch {uid: $uid}) DETACH DELETE batch',

@@ -122,6 +122,8 @@ The app follows a feature-first `lib/` layout:
 - `lib/models/` — data models shared with the backend contract.
 
 Navigation is documented in `docs/ROUTING_MAP.md`.
+The exam-oriented live recommendation walkthrough is documented in
+`docs/RECOMMENDATION_ENGINE_EXAM_GUIDE.md`.
 
 ## Getting started
 

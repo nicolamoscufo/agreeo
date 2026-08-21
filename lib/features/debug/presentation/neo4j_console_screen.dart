@@ -1,4 +1,5 @@
 import 'package:agreeo/services/neo4j_debug_service.dart';
+import 'package:agreeo/features/debug/presentation/recommendation_engine_tab.dart';
 import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
@@ -23,6 +24,7 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
   late Future<Neo4jOverview> _overviewFuture;
   late Future<List<Neo4jSchemaPattern>> _schemaFuture;
   late Future<Neo4jIndexReport> _indexesFuture;
+  late Future<Map<String, dynamic>> _recommendationFuture;
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
       _overviewFuture = _service.getOverview();
       _schemaFuture = _service.getSchema();
       _indexesFuture = _service.getIndexes();
+      _recommendationFuture = _service.getRecommendationEngine();
     });
   }
 
@@ -59,7 +62,7 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Neo4j Console',
+                      'Recommendation Lab',
                       style: AgText.h2.copyWith(
                         letterSpacing: -0.5,
                         color: t.text,
@@ -73,7 +76,7 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _TabSelector(
-                tabs: const ['Info', 'Schema', 'Indici', 'Query'],
+                tabs: const ['Info', 'Schema', 'Indici', 'Query', 'Motore'],
                 selected: _tab,
                 onChanged: (index) => setState(() => _tab = index),
               ),
@@ -87,6 +90,10 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
                   _SchemaTab(future: _schemaFuture, onRetry: _reload),
                   _IndexesTab(future: _indexesFuture, onRetry: _reload),
                   _QueryTab(service: _service),
+                  RecommendationEngineTab(
+                    future: _recommendationFuture,
+                    onRetry: _reload,
+                  ),
                 ],
               ),
             ),
@@ -151,33 +158,44 @@ class _TabSelector extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: t.line),
       ),
-      child: Row(
-        children: [
-          for (var i = 0; i < tabs.length; i++)
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  onChanged(i);
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: selected == i ? t.grad : null,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    tabs[i],
-                    style: AgText.label.copyWith(
-                      color: selected == i ? Colors.white : t.sub,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / tabs.length < 76
+              ? 76.0
+              : constraints.maxWidth / tabs.length;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var i = 0; i < tabs.length; i++)
+                  SizedBox(
+                    width: tabWidth,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        onChanged(i);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          gradient: selected == i ? t.grad : null,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          tabs[i],
+                          style: AgText.label.copyWith(
+                            color: selected == i ? Colors.white : t.sub,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+              ],
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -634,8 +652,9 @@ class _IndexCard extends StatelessWidget {
                 width: 7,
                 height: 7,
                 decoration: BoxDecoration(
-                  color:
-                      index.state.toUpperCase() == 'ONLINE' ? t.green : t.gold,
+                  color: index.state.toUpperCase() == 'ONLINE'
+                      ? t.green
+                      : t.gold,
                   shape: BoxShape.circle,
                 ),
               ),

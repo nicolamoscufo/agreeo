@@ -1,4 +1,36 @@
 const neo4j = require('neo4j-driver');
+const { AsyncLocalStorage } = require('node:async_hooks');
+
+const queryTraceStorage = new AsyncLocalStorage();
+
+function traceValue(value, key = '') {
+  if (key === 'uid') return '<current-user>';
+  if (Array.isArray(value)) {
+    if (value.length > 20) return `<array:${value.length}>`;
+    return value.map((entry) => traceValue(entry));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        traceValue(entryValue, entryKey),
+      ])
+    );
+  }
+  return value;
+}
+
+function classifyQuery(query) {
+  if (query.includes("'personalized' AS source")) return 'Collaborative filtering';
+  if (query.includes("queryNodes('tag_embeddings'")) return 'Vector similarity search';
+  if (query.includes('t.embedding AS embedding')) return 'User semantic profile';
+  if (query.includes("'exploratory' AS source")) return 'Exploratory candidates';
+  if (query.includes('RecommendationBatch') && query.includes('INCLUDED')) return 'Recommendation events';
+  if (query.includes('PREFERS_GENRE')) return 'Genre preferences';
+  if (query.includes('REQUESTED_RECOMMENDATIONS')) return 'Exposure signals';
+  if (query.includes('WHERE m.tmdbId IN $tmdbIds')) return 'Movie hydration cache';
+  return 'Neo4j query';
+}
 
 class Neo4jService {
   constructor() {
@@ -47,12 +79,43 @@ class Neo4jService {
 
   async run(query, params = {}) {
     const session = this.session();
+    const trace = queryTraceStorage.getStore();
+    const traceEntry = trace
+      ? {
+          order: trace.length + 1,
+          name: classifyQuery(query),
+          query: query.trim(),
+          params: traceValue(params),
+          durationMs: null,
+          records: null,
+          error: null,
+        }
+      : null;
+    if (traceEntry) trace.push(traceEntry);
+    const startedAt = Date.now();
 
     try {
-      return await session.run(query, params);
+      const result = await session.run(query, params);
+      if (traceEntry) {
+        traceEntry.durationMs = Date.now() - startedAt;
+        traceEntry.records = result.records.length;
+      }
+      return result;
+    } catch (error) {
+      if (traceEntry) {
+        traceEntry.durationMs = Date.now() - startedAt;
+        traceEntry.error = error instanceof Error ? error.message : String(error);
+      }
+      throw error;
     } finally {
       await session.close();
     }
+  }
+
+  async captureQueryTrace(actions) {
+    const queries = [];
+    const value = await queryTraceStorage.run(queries, actions);
+    return { value, queries };
   }
 
   async executeWrite(actions) {

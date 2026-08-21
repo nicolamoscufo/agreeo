@@ -1,6 +1,17 @@
 const neo4jService = require('./neo4jService');
 const { recommendationConfigForUser } = require('./recommendationConfig');
 
+const recommendationCache = new Map();
+const recommendationInFlight = new Map();
+const RECOMMENDATION_CACHE_TTL_MS = Math.max(
+  1000,
+  Number.parseInt(process.env.RECOMMENDATION_CACHE_TTL_MS || '5000', 10) || 5000
+);
+
+function invalidateRecommendationCache(uid) {
+  recommendationCache.delete(uid);
+}
+
 function toNativeNumber(value) {
   if (value == null) {
     return value;
@@ -334,7 +345,7 @@ function assertInteractionRelTypes(...types) {
 // transaction so the graph never ends up in a half-updated state.
 async function setMovieInteraction(uid, movie, { newRel, removeRels, recommendationContext = null }) {
   assertInteractionRelTypes(newRel, ...removeRels);
-  return neo4jService.executeWrite(async (tx) => {
+  const interaction = await neo4jService.executeWrite(async (tx) => {
     let dailyUsage = null;
     let recommendationAlreadyRecorded = false;
     if (recommendationContext) {
@@ -467,6 +478,8 @@ async function setMovieInteraction(uid, movie, { newRel, removeRels, recommendat
 
     return { updated: result.records.length > 0, dailyUsage };
   });
+  if (interaction.updated) invalidateRecommendationCache(uid);
+  return interaction;
 }
 
 async function likeMovie(uid, movie, recommendationContext = null) {
@@ -571,10 +584,12 @@ async function recordRecommendationImpressions(uid, batchId, items) {
     { uid, batchId, items: normalizedItems }
   );
   if (result.records.length === 0) return { matched: 0, recorded: 0 };
-  return {
+  const impressionResult = {
     matched: toNativeNumber(result.records[0].get('matchedCount')),
     recorded: toNativeNumber(result.records[0].get('recordedCount')),
   };
+  if (impressionResult.recorded > 0) invalidateRecommendationCache(uid);
+  return impressionResult;
 }
 
 async function getDailySwipeUsage(uid) {
@@ -657,7 +672,9 @@ async function saveSelectedFavorites(uid, movies) {
     }
   );
 
-  return result.records.length > 0;
+  const saved = result.records.length > 0;
+  if (saved) invalidateRecommendationCache(uid);
+  return saved;
 }
 
 async function savePreferredGenres(uid, genres) {
@@ -684,7 +701,9 @@ async function savePreferredGenres(uid, genres) {
     { uid, genres: normalizedGenres }
   );
 
-  return result.records.length > 0;
+  const saved = result.records.length > 0;
+  if (saved) invalidateRecommendationCache(uid);
+  return saved;
 }
 
 async function removeFromWatchlist(uid, tmdbId) {
@@ -695,6 +714,7 @@ async function removeFromWatchlist(uid, tmdbId) {
     `,
     { uid, tmdbId }
   );
+  invalidateRecommendationCache(uid);
 }
 
 async function removeLike(uid, tmdbId) {
@@ -705,6 +725,7 @@ async function removeLike(uid, tmdbId) {
     `,
     { uid, tmdbId }
   );
+  invalidateRecommendationCache(uid);
 }
 
 async function removeDislike(uid, tmdbId) {
@@ -715,6 +736,7 @@ async function removeDislike(uid, tmdbId) {
     `,
     { uid, tmdbId }
   );
+  invalidateRecommendationCache(uid);
 }
 
 async function removeSeen(uid, tmdbId) {
@@ -725,6 +747,7 @@ async function removeSeen(uid, tmdbId) {
     `,
     { uid, tmdbId }
   );
+  invalidateRecommendationCache(uid);
 }
 
 async function getUserLibrary(uid) {
@@ -1224,7 +1247,7 @@ async function getUnactedRecommendationExposures(uid) {
   ]));
 }
 
-async function getRecommendationCandidates(uid) {
+async function computeRecommendationCandidates(uid) {
   const config = recommendationConfigForUser(uid);
   const [personalizedResult, semanticResult, exposureResult] = await Promise.allSettled([
     getPersonalizedRecommendationCandidates(uid),
@@ -1317,6 +1340,42 @@ async function getRecommendationCandidates(uid) {
     fallbackReason: null,
     fallbackStrategy: null,
   };
+}
+
+async function getRecommendationCandidates(uid, { bypassCache = false } = {}) {
+  const cacheEnabled = process.env.NODE_ENV !== 'test' &&
+    process.env.NODE_TEST_CONTEXT == null;
+  if (!cacheEnabled) {
+    const value = await computeRecommendationCandidates(uid);
+    return { ...value, cacheStatus: 'disabled' };
+  }
+
+  const now = Date.now();
+  const cached = recommendationCache.get(uid);
+  if (!bypassCache && cached && cached.expiresAt > now) {
+    return { ...cached.value, cacheStatus: 'hit' };
+  }
+
+  const running = recommendationInFlight.get(uid);
+  if (running) {
+    const value = await running;
+    return { ...value, cacheStatus: 'shared-in-flight' };
+  }
+
+  const computation = computeRecommendationCandidates(uid);
+  recommendationInFlight.set(uid, computation);
+  try {
+    const value = await computation;
+    recommendationCache.set(uid, {
+      value,
+      expiresAt: Date.now() + RECOMMENDATION_CACHE_TTL_MS,
+    });
+    return { ...value, cacheStatus: 'computed' };
+  } finally {
+    if (recommendationInFlight.get(uid) === computation) {
+      recommendationInFlight.delete(uid);
+    }
+  }
 }
 
 async function getRecommendations(uid) {
@@ -1758,6 +1817,7 @@ async function findMoviesBySemanticTags(tagsWithWeights, uid) {
 module.exports = {
   DailySwipeLimitError,
   InvalidRecommendationContextError,
+  invalidateRecommendationCache,
   findMovieByTmdbId,
   findMoviesByTmdbIds,
   mergeTmdbMovie,
