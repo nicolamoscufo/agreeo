@@ -424,15 +424,30 @@ exports.deleteAccount = async (req, res) => {
     if (!found) return res.status(404).json({ error: 'User not found' });
     if (!valid) return res.status(403).json({ error: 'Password is incorrect' });
 
-    // DETACH DELETE also removes every relationship (LIKED, FRIENDS_WITH,
-    // PARTICIPATES_IN, ...), so the user disappears from friends' views too.
-    await neo4jService.run(
-      `
-      MATCH (u:AppUser {uid: $uid})
-      DETACH DELETE u
-      `,
-      { uid }
-    );
+    await neo4jService.executeWrite(async (tx) => {
+      await tx.run(
+        `
+        MATCH (batch:RecommendationBatch {uid: $uid})
+        DETACH DELETE batch
+        `,
+        { uid }
+      );
+      await tx.run(
+        `
+        MATCH (quota:DailySwipeQuota {uid: $uid})
+        DETACH DELETE quota
+        `,
+        { uid }
+      );
+      // Removes all social and movie-state relationships as well.
+      await tx.run(
+        `
+        MATCH (u:AppUser {uid: $uid})
+        DETACH DELETE u
+        `,
+        { uid }
+      );
+    });
 
     return res.json({ ok: true });
   } catch (e) {

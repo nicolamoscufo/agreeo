@@ -55,6 +55,7 @@ test('saveSelectedFavorites persists SELECTED_FAVORITE relationships by tmdbId',
   assert.equal(saved, true);
   assert.equal(calls.length, 3);
   assert.match(calls[0].query, /MERGE \(m:Movie \{tmdbId: \$tmdbId\}\)/);
+  assert.match(calls[0].query, /MERGE \(m\)-\[:IN_GENRE\]->\(g\)/);
   assert.match(calls[2].query, /MATCH \(m:Movie \{tmdbId: tmdbId\}\)/);
   assert.match(calls[2].query, /MERGE \(u\)-\[r:SELECTED_FAVORITE\]->\(m\)/);
   assert.match(calls[2].query, /SET r\.weight = \$weight/);
@@ -97,6 +98,139 @@ test('savePreferredGenres persists onboarding genres as PREFERS_GENRE', async (t
   });
 });
 
+test('recordRecommendationBatch persists ranked source metadata', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+  neo4jService.run = async (query, params) => {
+    calls.push({ query, params });
+    return { records: [record({ includedCount: 2 })] };
+  };
+
+  const recorded = await movieRepository.recordRecommendationBatch('user-1', {
+    batchId: 'batch-1',
+    kind: 'daily',
+    expiresAt: '2026-08-22T00:00:00.000Z',
+    results: [
+      { tmdbId: 10, recommendation: { source: 'hybrid', finalScore: 12.5 } },
+      { tmdbId: 20, recommendation: { source: 'exploratory', finalScore: 8.0 } },
+    ],
+  });
+
+  assert.equal(recorded, 2);
+  assert.match(calls[1].query, /RecommendationBatch \{id: \$batchId\}/);
+  assert.match(calls[1].query, /size\(movies\) = size\(\$items\)/);
+  assert.match(calls[1].query, /MERGE \(batch\)-\[included:INCLUDED\]->\(movie\)/);
+  assert.deepEqual(calls[1].params.items, [
+    { tmdbId: 10, position: 0, source: 'hybrid', finalScore: 12.5 },
+    { tmdbId: 20, position: 1, source: 'exploratory', finalScore: 8.0 },
+  ]);
+});
+
+test('recommendation swipe is recorded atomically with the movie interaction', async (t) => {
+  const calls = [];
+  const originalExecuteWrite = neo4jService.executeWrite;
+  t.after(() => {
+    neo4jService.executeWrite = originalExecuteWrite;
+  });
+  neo4jService.executeWrite = async (actions) => actions({
+    run: async (query, params) => {
+      calls.push({ query, params });
+      if (query.includes('existingSwipe')) {
+        return { records: [record({ existingSwipe: null })] };
+      }
+      if (query.includes('DailySwipeQuota')) {
+        return { records: [record({ usedToday: 4 })] };
+      }
+      if (query.includes('RETURN m.tmdbId AS tmdbId')) {
+        return { records: [record({ tmdbId: 10 })] };
+      }
+      return { records: [] };
+    },
+  });
+
+  const result = await movieRepository.likeMovie(
+    'user-1',
+    { tmdbId: 10, title: 'Movie', genres: ['Drama'] },
+    {
+      batchId: 'batch-1',
+      action: 'like',
+      source: 'daily-suggestion',
+      position: 2,
+      limitEnabled: true,
+      limit: 20,
+    }
+  );
+
+  assert.equal(result.updated, true);
+  assert.deepEqual(result.dailyUsage, {
+    usedToday: 4,
+    remainingToday: 16,
+    limit: 20,
+  });
+  assert.ok(calls.some(({ query }) => query.includes('included.swipedAt')));
+});
+
+test('recommendation swipe limit rejects before interaction writes', async (t) => {
+  const calls = [];
+  const originalExecuteWrite = neo4jService.executeWrite;
+  t.after(() => {
+    neo4jService.executeWrite = originalExecuteWrite;
+  });
+  neo4jService.executeWrite = async (actions) => actions({
+    run: async (query) => {
+      calls.push(query);
+      if (query.includes('existingSwipe')) {
+        return { records: [record({ existingSwipe: null })] };
+      }
+      return { records: [record({ usedToday: 21 })] };
+    },
+  });
+
+  await assert.rejects(
+    movieRepository.dislikeMovie(
+      'user-1',
+      { tmdbId: 10, title: 'Movie', genres: ['Drama'] },
+      {
+        batchId: 'batch-1',
+        action: 'dislike',
+        source: 'daily-suggestion',
+        position: 2,
+        limitEnabled: true,
+        limit: 20,
+      }
+    ),
+    (error) => error instanceof movieRepository.DailySwipeLimitError
+  );
+  assert.equal(calls.length, 2);
+});
+
+test('active daily recommendation cannot bypass context enforcement', async (t) => {
+  const calls = [];
+  const originalExecuteWrite = neo4jService.executeWrite;
+  t.after(() => {
+    neo4jService.executeWrite = originalExecuteWrite;
+  });
+  neo4jService.executeWrite = async (actions) => actions({
+    run: async (query) => {
+      calls.push(query);
+      return { records: [record({ pendingContexts: 1 })] };
+    },
+  });
+
+  await assert.rejects(
+    movieRepository.likeMovie('user-1', {
+      tmdbId: 10,
+      title: 'Movie',
+      genres: ['Drama'],
+    }),
+    (error) => error instanceof movieRepository.InvalidRecommendationContextError
+  );
+  assert.equal(calls.length, 1);
+});
+
 test('getRecommendations excludes selected favorites from personalized recommendations', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
@@ -112,7 +246,7 @@ test('getRecommendations excludes selected favorites from personalized recommend
 
   await movieRepository.getRecommendations('user-1');
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.match(calls[0].query, /LIKED\|SELECTED_FAVORITE\|WATCHLISTED/);
   assert.match(
     calls[0].query,
@@ -143,7 +277,11 @@ test('getRecommendations ranks candidates by weighted collaborative score', asyn
   assert.match(personalizedQuery, /\* \(toFloat\(r1\.rating\) - 3\.0\)/);
   assert.match(personalizedQuery, /1\.0 \/ sqrt\(log\(toFloat\(coalesce\(seed\.movieLensRatingCount, seedMl\.movieLensRatingCount, 0\)\) \+ 10\.0\)\)/);
   assert.match(personalizedQuery, /count\(DISTINCT seed\) AS overlapCount/);
-  assert.match(personalizedQuery, /coalesce\(sum\(similarityScore\), 1\.0\)\) \* log\(toFloat\(count\(DISTINCT similar\)\) \+ 1\.0\) \* 10\.0\) AS collaborativeScore/);
+  assert.doesNotMatch(personalizedQuery, /WHERE r2\.rating >= 4\.0/);
+  assert.match(personalizedQuery, /LIMIT toInteger\(\$neighborLimit\)/);
+  assert.match(personalizedQuery, /avg\(toFloat\(r2\.rating\)\) AS similarRating/);
+  assert.match(personalizedQuery, /coalesce\(sum\(abs\(similarityScore\)\), 1\.0\) AS weightedPreference/);
+  assert.match(personalizedQuery, /\$supportShrinkage/);
   assert.match(personalizedQuery, /collaborativeScore - negativePenalty AS finalScore/);
   assert.match(personalizedQuery, /ORDER BY\s+finalScore DESC/);
   assert.match(personalizedQuery, /LIMIT 80/);
@@ -154,6 +292,9 @@ test('getRecommendations ranks candidates by weighted collaborative score', asyn
     watchlistedWeight: 1.25,
     dislikedGenreThreshold: 2,
     dislikedGenrePenalty: 1.5,
+    neighborLimit: 50,
+    supportShrinkage: 5.0,
+    globalMeanRating: 3.5,
   });
 });
 
@@ -176,8 +317,9 @@ test('getRecommendations applies a safe disliked-genre penalty', async (t) => {
   assert.match(personalizedQuery, /OPTIONAL MATCH \(me\)-\[r:LIKED\|DISLIKED\|SELECTED_FAVORITE\|WATCHLISTED\]->\(m:Movie\)/);
   assert.match(personalizedQuery, /mMl:MovieLensMovie\)-\[:IN_GENRE\]->\(mlGenre:Genre\)/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(m\)-\[:IN_GENRE\]->\(movieGenre:Genre\)/);
+  assert.match(personalizedQuery, /reduce\(\s+uniqueGenres = \[\]/);
   assert.match(personalizedQuery, /g\.count >= \$dislikedGenreThreshold/);
-  assert.match(personalizedQuery, /OPTIONAL MATCH \(recMl\)-\[:IN_GENRE\]->\(recMlGenre:Genre\)/);
+  assert.match(personalizedQuery, /candidateMl:MovieLensMovie\)-\[:IN_GENRE\]->\(recMlGenre:Genre\)/);
   assert.match(personalizedQuery, /OPTIONAL MATCH \(rec\)-\[:IN_GENRE\]->\(recMovieGenre:Genre\)/);
   assert.match(personalizedQuery, /\$dislikedGenrePenalty \* toFloat\(entry\.count\)/);
   assert.match(personalizedQuery, /max\(negativePenalty\) AS negativePenalty/);
@@ -198,7 +340,7 @@ test('getRecommendations does not query a cold-start fallback', async (t) => {
 
   await movieRepository.getRecommendations('user-1');
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.doesNotMatch(calls[0].query, /coalesce\(m\.movieLensRatingCount, 0\) >= \$minFallbackRatingCount/);
 });
 
@@ -221,6 +363,12 @@ test('getExploratoryCandidates passes the limit as a query parameter', async (t)
   });
 
   assert.match(calls[0].query, /LIMIT toInteger\(\$limit\)/);
+  assert.match(
+    calls[0].query,
+    /NOT genre IN preferredGenres AND NOT genre IN positiveGenres AND NOT genre IN negativeGenres/
+  );
+  assert.match(calls[0].query, /reduce\(\s+uniqueGenres = \[\]/);
+  assert.match(calls[0].query, /ORDER BY\s+finalScore DESC,\s+explorationBonus DESC/);
   assert.equal(calls[0].params.limit, 18);
 });
 
@@ -281,6 +429,22 @@ test('diversifyRecommendations still dedupes when genre data is missing', async 
   assert.deepEqual(diversified.map((movie) => movie.tmdbId), [10, 12]);
 });
 
+test('diversifyRecommendations backfills a homogeneous ranked pool', async () => {
+  const { diversifyRecommendations } = require('./movieController');
+  const candidates = Array.from({ length: 8 }, (_, index) => ({
+    tmdbId: index + 1,
+    title: `Movie ${index + 1}`,
+    genreIds: [1],
+  }));
+
+  const diversified = diversifyRecommendations(candidates, 8);
+
+  assert.deepEqual(
+    diversified.map((movie) => movie.tmdbId),
+    candidates.map((movie) => movie.tmdbId)
+  );
+});
+
 test('getSemanticTagRecommendationCandidates queries user history, calculates taste vector and runs tag index vector search', async (t) => {
   const calls = [];
   const originalRun = neo4jService.run;
@@ -333,17 +497,44 @@ test('getSemanticTagRecommendationCandidates queries user history, calculates ta
   // Verify calls
   assert.equal(calls.length, 2);
   assert.match(calls[0].query, /MATCH \(u:AppUser \{uid: \$uid\}\)-\[r:LIKED\|SELECTED_FAVORITE\|WATCHLISTED\|DISLIKED\]->\(m:Movie\)/);
-  assert.match(calls[1].query, /CALL db\.index\.vector\.queryNodes\('tag_embeddings', toInteger\(\$topK\), \$userTasteVector\)/);
+  assert.match(calls[1].query, /CALL db\.index\.vector\.queryNodes\('tag_embeddings', toInteger\(\$topK\), \$positiveTasteVector\)/);
+  assert.match(calls[1].query, /vector\.similarity\.cosine\(tagNode\.embedding, \$negativeTasteVector\)/);
   
-  // Taste vector verification (weighted sum, NOT magnitude-normalized: the
-  // vector index uses cosine similarity, invariant to positive scaling).
-  // LIKED: 0.1 * 3.0 (liked weight) * 2 (frequency) = 0.6
-  // DISLIKED: -0.2 * -3.0 (disliked weight) * 1 (frequency) = 0.6
-  // Sum = 1.2
-  const computedTasteVector = calls[1].params.userTasteVector;
-  assert.equal(computedTasteVector.length, 384);
-  assert.ok(Math.abs(computedTasteVector[0] - 1.2) < 0.0001);
+  const positiveTasteVector = calls[1].params.positiveTasteVector;
+  const negativeTasteVector = calls[1].params.negativeTasteVector;
+  assert.equal(positiveTasteVector.length, 384);
+  assert.equal(negativeTasteVector.length, 384);
+  assert.ok(Math.abs(positiveTasteVector[0] - (1 / Math.sqrt(384))) < 0.0001);
+  assert.ok(Math.abs(negativeTasteVector[0] + (1 / Math.sqrt(384))) < 0.0001);
+  assert.equal(calls[1].params.hasNegativeTaste, true);
   assert.equal(calls[1].params.limit, 10);
+});
+
+test('getSemanticTagRecommendationCandidates requires positive taste evidence', async (t) => {
+  const calls = [];
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query) => {
+    calls.push(query);
+    return {
+      records: [
+        record({
+          embedding: new Array(384).fill(0.1),
+          relType: 'DISLIKED',
+          frequency: 1,
+        }),
+      ],
+    };
+  };
+
+  const candidates = await movieRepository.getSemanticTagRecommendationCandidates('user-1');
+
+  assert.deepEqual(candidates, []);
+  assert.equal(calls.length, 1);
 });
 
 test('getRecommendationCandidates combines collaborative and semantic candidates as a hybrid pool', async (t) => {
@@ -432,17 +623,49 @@ test('getRecommendationCandidates combines collaborative and semantic candidates
   const response = await movieRepository.getRecommendationCandidates('user-1');
   const candidates = response.candidates;
 
-  // Expected combined & sorted candidates:
-  // 1. Movie B (hybrid): 5.0 (personalized) + 8.0 (semantic) = 13.0
-  // 2. Movie C (semantic): 12.0
-  // 3. Movie A (personalized): 10.0
+  // Reciprocal-rank fusion keeps source scales independent and rewards overlap.
   assert.equal(candidates.length, 3);
-  assert.deepEqual(candidates.map(c => c.tmdbId), [200, 300, 100]);
+  assert.deepEqual(candidates.map(c => c.tmdbId), [200, 100, 300]);
   
   const movieB = candidates[0];
-  assert.equal(movieB.finalScore, 13.0);
+  assert.ok(movieB.finalScore > candidates[1].finalScore);
   assert.equal(movieB.source, 'hybrid');
+  assert.equal(movieB.collaborativeRankingScore, 5.0);
+  assert.equal(movieB.semanticScore, 8.0);
+  assert.equal(movieB.collaborativeRank, 2);
+  assert.equal(movieB.semanticRank, 1);
+  assert.deepEqual(movieB.matchedTags, [{ tag: 'space', frequency: 3 }]);
   assert.match(movieB.reason, /High collaborative overlap.*Also matches themes you like/);
+});
+
+test('getRecommendationCandidates keeps collaborative results when semantic search fails', async (t) => {
+  const originalRun = neo4jService.run;
+
+  t.after(() => {
+    neo4jService.run = originalRun;
+  });
+
+  neo4jService.run = async (query) => {
+    if (query.includes("'personalized' AS source")) {
+      return {
+        records: [
+          record({
+            tmdbId: 100,
+            title: 'Movie A',
+            similarUsers: 3,
+            collaborativeScore: 8,
+            finalScore: 8,
+            source: 'personalized',
+          }),
+        ],
+      };
+    }
+    throw new Error('vector index unavailable');
+  };
+
+  const response = await movieRepository.getRecommendationCandidates('user-1');
+
+  assert.deepEqual(response.candidates.map((candidate) => candidate.tmdbId), [100]);
 });
 
 test('getTopPositiveTagSignals and getTopNegativeTagSignals query and compute tag weights', async (t) => {

@@ -36,7 +36,7 @@ class BackendCatalogMovieService implements MovieService {
   }
 
   @override
-  Future<List<Movie>> getDailySuggestions({
+  Future<DailySuggestionBatch> getDailySuggestions({
     required List<String> favoriteGenres,
     required List<String> favoriteMovieIds,
     int? limit,
@@ -49,9 +49,8 @@ class BackendCatalogMovieService implements MovieService {
       debugPrint(
         '[BackendCatalogMovieService] personalized daily suggestions failed: $error',
       );
+      rethrow;
     }
-
-    return const <Movie>[];
   }
 
   @override

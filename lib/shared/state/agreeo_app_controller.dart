@@ -25,6 +25,16 @@ class AgreeoAppState {
     required this.recommendedIds,
     required this.dailySuggestionIds,
     required this.trendingIds,
+    this.dailySuggestionsGeneratedAt,
+    this.dailySuggestionBatchId,
+    this.dailySuggestionContexts =
+        const <String, RecommendationActionContext>{},
+    this.dailySwipeLimitEnabled = false,
+    this.dailySwipeLimit,
+    this.dailySwipesUsedToday = 0,
+    this.dailySwipesRemainingToday,
+    this.dailySwipeResetAt,
+    this.movieMutationInProgress = false,
     this.discoveryFeedFailed = false,
   });
 
@@ -34,6 +44,7 @@ class AgreeoAppState {
       session: null,
       onboarding: OnboardingState.initial(),
       profilePreferences: ProfilePreferences.initial(),
+      movieMutationInProgress: false,
       catalog: const <Movie>[],
       movieStates: const <String, UserMovieState>{},
       undoStack: const <UndoEntry>[],
@@ -53,6 +64,15 @@ class AgreeoAppState {
   final List<String> recommendedIds;
   final List<String> dailySuggestionIds;
   final List<String> trendingIds;
+  final DateTime? dailySuggestionsGeneratedAt;
+  final String? dailySuggestionBatchId;
+  final Map<String, RecommendationActionContext> dailySuggestionContexts;
+  final bool dailySwipeLimitEnabled;
+  final int? dailySwipeLimit;
+  final int dailySwipesUsedToday;
+  final int? dailySwipesRemainingToday;
+  final DateTime? dailySwipeResetAt;
+  final bool movieMutationInProgress;
 
   /// Transient (not persisted): the last discovery-feed refresh threw. Lets the
   /// Home rails show an error + retry instead of an indistinguishable "empty".
@@ -60,6 +80,36 @@ class AgreeoAppState {
 
   bool get isAuthenticated => session != null;
   bool get onboardingComplete => onboarding.completed;
+  bool get dailySwipeLimitReached {
+    if (!dailySwipeLimitEnabled || dailySwipesRemainingToday == null) {
+      return false;
+    }
+    final resetAt = dailySwipeResetAt;
+    if (resetAt != null && !DateTime.now().isBefore(resetAt)) return false;
+    return dailySwipesRemainingToday! <= 0;
+  }
+
+  bool get dailySuggestionQueueExpired {
+    if (dailySuggestionIds.isEmpty) return false;
+    if (dailySuggestionIds.any(
+      (id) => !dailySuggestionContexts.containsKey(id),
+    )) {
+      return true;
+    }
+    if (dailySuggestionIds.any((id) {
+      final expiresAt = dailySuggestionContexts[id]?.expiresAt;
+      return expiresAt == null || !DateTime.now().isBefore(expiresAt);
+    })) {
+      return true;
+    }
+    final generatedAt = dailySuggestionsGeneratedAt;
+    if (generatedAt == null) return true;
+    return DateTime.now().difference(generatedAt) >= const Duration(hours: 24);
+  }
+
+  RecommendationActionContext? dailySuggestionContextFor(String movieId) {
+    return dailySuggestionContexts[movieId];
+  }
 
   Movie? movieById(String movieId) {
     for (final movie in catalog) {
@@ -86,6 +136,9 @@ class AgreeoAppState {
   }
 
   List<Movie> get remainingDailySuggestions {
+    if (dailySuggestionQueueExpired || dailySwipeLimitReached) {
+      return const <Movie>[];
+    }
     return moviesByIds(dailySuggestionIds)
         .where((movie) => userMovieStateFor(movie.id).isUntouched)
         .toList(growable: false);
@@ -143,6 +196,20 @@ class AgreeoAppState {
     List<String>? recommendedIds,
     List<String>? dailySuggestionIds,
     List<String>? trendingIds,
+    DateTime? dailySuggestionsGeneratedAt,
+    bool clearDailySuggestionsGeneratedAt = false,
+    String? dailySuggestionBatchId,
+    bool clearDailySuggestionBatchId = false,
+    Map<String, RecommendationActionContext>? dailySuggestionContexts,
+    bool? dailySwipeLimitEnabled,
+    int? dailySwipeLimit,
+    bool clearDailySwipeLimit = false,
+    int? dailySwipesUsedToday,
+    int? dailySwipesRemainingToday,
+    bool clearDailySwipesRemainingToday = false,
+    DateTime? dailySwipeResetAt,
+    bool clearDailySwipeResetAt = false,
+    bool? movieMutationInProgress,
     bool? discoveryFeedFailed,
   }) {
     return AgreeoAppState(
@@ -156,6 +223,28 @@ class AgreeoAppState {
       recommendedIds: recommendedIds ?? this.recommendedIds,
       dailySuggestionIds: dailySuggestionIds ?? this.dailySuggestionIds,
       trendingIds: trendingIds ?? this.trendingIds,
+      dailySuggestionsGeneratedAt: clearDailySuggestionsGeneratedAt
+          ? null
+          : dailySuggestionsGeneratedAt ?? this.dailySuggestionsGeneratedAt,
+      dailySuggestionBatchId: clearDailySuggestionBatchId
+          ? null
+          : dailySuggestionBatchId ?? this.dailySuggestionBatchId,
+      dailySuggestionContexts:
+          dailySuggestionContexts ?? this.dailySuggestionContexts,
+      dailySwipeLimitEnabled:
+          dailySwipeLimitEnabled ?? this.dailySwipeLimitEnabled,
+      dailySwipeLimit: clearDailySwipeLimit
+          ? null
+          : dailySwipeLimit ?? this.dailySwipeLimit,
+      dailySwipesUsedToday: dailySwipesUsedToday ?? this.dailySwipesUsedToday,
+      dailySwipesRemainingToday: clearDailySwipesRemainingToday
+          ? null
+          : dailySwipesRemainingToday ?? this.dailySwipesRemainingToday,
+      dailySwipeResetAt: clearDailySwipeResetAt
+          ? null
+          : dailySwipeResetAt ?? this.dailySwipeResetAt,
+      movieMutationInProgress:
+          movieMutationInProgress ?? this.movieMutationInProgress,
       discoveryFeedFailed: discoveryFeedFailed ?? this.discoveryFeedFailed,
     );
   }
@@ -171,6 +260,23 @@ class AgreeoAppState {
       'undoStack': undoStack.map((value) => value.toJson()).toList(),
       'recommendedIds': recommendedIds,
       'dailySuggestionIds': dailySuggestionIds,
+      'dailySuggestionsGeneratedAt': dailySuggestionsGeneratedAt
+          ?.toIso8601String(),
+      'dailySuggestionBatchId': dailySuggestionBatchId,
+      'dailySuggestionContexts': dailySuggestionContexts.map(
+        (movieId, context) =>
+            MapEntry<String, dynamic>(movieId, <String, dynamic>{
+              'batchId': context.batchId,
+              'position': context.position,
+              'source': context.source,
+              'expiresAt': context.expiresAt?.toIso8601String(),
+            }),
+      ),
+      'dailySwipeLimitEnabled': dailySwipeLimitEnabled,
+      'dailySwipeLimit': dailySwipeLimit,
+      'dailySwipesUsedToday': dailySwipesUsedToday,
+      'dailySwipesRemainingToday': dailySwipesRemainingToday,
+      'dailySwipeResetAt': dailySwipeResetAt?.toIso8601String(),
       'trendingIds': trendingIds,
       'catalog': catalog.map((value) => value.toJson()).toList(),
     };
@@ -199,6 +305,26 @@ class AgreeoAppState {
     if (rawCatalog is List) {
       for (final item in rawCatalog.whereType<Map>()) {
         catalogItems.add(Movie.fromJson(item.cast<String, dynamic>()));
+      }
+    }
+
+    final dailySuggestionContexts = <String, RecommendationActionContext>{};
+    final rawDailySuggestionContexts = json['dailySuggestionContexts'];
+    if (rawDailySuggestionContexts is Map) {
+      for (final entry in rawDailySuggestionContexts.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        final values = value.cast<String, dynamic>();
+        final batchId = values['batchId']?.toString() ?? '';
+        final position = (values['position'] as num?)?.toInt();
+        if (batchId.isEmpty || position == null || position < 0) continue;
+        dailySuggestionContexts[entry.key
+            .toString()] = RecommendationActionContext(
+          batchId: batchId,
+          position: position,
+          source: values['source']?.toString() ?? 'daily-suggestion',
+          expiresAt: DateTime.tryParse(values['expiresAt']?.toString() ?? ''),
+        );
       }
     }
 
@@ -240,6 +366,20 @@ class AgreeoAppState {
               ?.map((value) => value.toString())
               .toList(growable: false) ??
           const <String>[],
+      dailySuggestionsGeneratedAt: DateTime.tryParse(
+        json['dailySuggestionsGeneratedAt']?.toString() ?? '',
+      ),
+      dailySuggestionBatchId: json['dailySuggestionBatchId']?.toString(),
+      dailySuggestionContexts: dailySuggestionContexts,
+      dailySwipeLimitEnabled: json['dailySwipeLimitEnabled'] == true,
+      dailySwipeLimit: (json['dailySwipeLimit'] as num?)?.toInt(),
+      dailySwipesUsedToday:
+          (json['dailySwipesUsedToday'] as num?)?.toInt() ?? 0,
+      dailySwipesRemainingToday: (json['dailySwipesRemainingToday'] as num?)
+          ?.toInt(),
+      dailySwipeResetAt: DateTime.tryParse(
+        json['dailySwipeResetAt']?.toString() ?? '',
+      ),
       trendingIds:
           (json['trendingIds'] as List?)
               ?.map((value) => value.toString())
@@ -272,6 +412,20 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   final BackendMovieService _backendMovieService;
   bool _isRefillingDailySuggestions = false;
   bool _hasExhaustedDailySuggestions = false;
+  int _feedGeneration = 0;
+  Completer<void>? _activeMutation;
+
+  void _invalidateFeedRequests() {
+    _feedGeneration += 1;
+    _isRefillingDailySuggestions = false;
+    _hasExhaustedDailySuggestions = false;
+  }
+
+  bool _isCurrentFeedRequest(int generation, String sessionId) {
+    return mounted &&
+        generation == _feedGeneration &&
+        state.session?.id == sessionId;
+  }
 
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
@@ -374,6 +528,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       final onboardingCompleted = await _authService.isOnboardingCompleted();
       if (!mounted) return;
 
+      _invalidateFeedRequests();
       state = state.copyWith(
         session: session,
         onboarding: state.onboarding.copyWith(completed: onboardingCompleted),
@@ -394,14 +549,24 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       email: email,
       password: password,
     );
+    _invalidateFeedRequests();
     state = state.copyWith(
       session: session,
       onboarding: OnboardingState.initial(),
       profilePreferences: ProfilePreferences.initial(),
+      movieMutationInProgress: false,
       movieStates: <String, UserMovieState>{},
       undoStack: <UndoEntry>[],
       recommendedIds: <String>[],
       dailySuggestionIds: <String>[],
+      dailySuggestionContexts: const <String, RecommendationActionContext>{},
+      clearDailySuggestionsGeneratedAt: true,
+      clearDailySuggestionBatchId: true,
+      dailySwipeLimitEnabled: false,
+      clearDailySwipeLimit: true,
+      dailySwipesUsedToday: 0,
+      clearDailySwipesRemainingToday: true,
+      clearDailySwipeResetAt: true,
       trendingIds: <String>[],
     );
     await _persist();
@@ -412,15 +577,16 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
 
   Future<void> logIn({required String email, required String password}) async {
     final session = await _authService.logIn(email: email, password: password);
+    _invalidateFeedRequests();
     final onboardingCompleted = await _authService.isOnboardingCompleted();
 
     List<Movie> recommended = const [];
-    List<Movie> suggestions = const [];
+    var dailyBatch = const DailySuggestionBatch(movies: <Movie>[]);
     List<Movie> trending = const [];
 
     if (onboardingCompleted) {
       try {
-        final results = await Future.wait<List<Movie>>([
+        final results = await Future.wait<Object>([
           _movieService.getRecommendedForYou(),
           _movieService.getDailySuggestions(
             favoriteGenres: const [],
@@ -429,14 +595,15 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
           ),
           _movieService.getTrendingMovies(),
         ]);
-        recommended = results[0];
-        suggestions = results[1];
-        trending = results[2];
+        recommended = results[0] as List<Movie>;
+        dailyBatch = results[1] as DailySuggestionBatch;
+        trending = results[2] as List<Movie>;
       } catch (e) {
         debugPrint('[AgreeoAppController] Pre-login feed fetch failed: $e');
       }
     }
 
+    final suggestions = dailyBatch.movies;
     final mergedCatalog = _mergeCatalogMovies(state.catalog, [
       recommended,
       suggestions,
@@ -449,6 +616,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         completed: onboardingCompleted,
       ),
       profilePreferences: ProfilePreferences.initial(),
+      movieMutationInProgress: false,
       movieStates: <String, UserMovieState>{},
       undoStack: <UndoEntry>[],
       catalog: mergedCatalog,
@@ -458,6 +626,19 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       dailySuggestionIds: suggestions
           .map((movie) => movie.id)
           .toList(growable: false),
+      dailySuggestionsGeneratedAt: suggestions.isEmpty ? null : DateTime.now(),
+      clearDailySuggestionsGeneratedAt: suggestions.isEmpty,
+      dailySuggestionBatchId: dailyBatch.batchId,
+      dailySuggestionContexts: _contextsForDailyBatch(dailyBatch),
+      clearDailySuggestionBatchId: dailyBatch.batchId == null,
+      dailySwipeLimitEnabled: dailyBatch.swipeLimitEnabled,
+      dailySwipeLimit: dailyBatch.swipeLimit,
+      clearDailySwipeLimit: dailyBatch.swipeLimit == null,
+      dailySwipesUsedToday: dailyBatch.usedToday,
+      dailySwipesRemainingToday: dailyBatch.remainingToday,
+      clearDailySwipesRemainingToday: dailyBatch.remainingToday == null,
+      dailySwipeResetAt: dailyBatch.resetAt,
+      clearDailySwipeResetAt: dailyBatch.resetAt == null,
       trendingIds: trending.map((movie) => movie.id).toList(growable: false),
     );
     await _persist();
@@ -467,6 +648,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
   }
 
   Future<void> logOut() async {
+    _invalidateFeedRequests();
     _ref.read(realTimeServiceProvider).disconnect();
     await _authService.logOut();
     state = AgreeoAppState.initial().copyWith(
@@ -768,7 +950,9 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
               canShowWatchlist: showWatchlistToFriends,
             )
             .catchError((Object e) {
-              debugPrint('[AgreeoAppController] Privacy backend sync failed: $e');
+              debugPrint(
+                '[AgreeoAppController] Privacy backend sync failed: $e',
+              );
             }),
       );
     }
@@ -800,33 +984,69 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     }
   }
 
-  Future<String> likeMovie(String movieId) async {
+  RecommendationActionContext? _dailyRecommendationContext(String movieId) {
+    return state.dailySuggestionContextFor(movieId);
+  }
+
+  Future<void> recordDailySuggestionImpression(
+    String movieId, {
+    RecommendationActionContext? context,
+  }) async {
+    final resolvedContext = context ?? _dailyRecommendationContext(movieId);
+    final movie = state.movieById(movieId);
+    if (resolvedContext == null || movie?.tmdbId == null) return;
+    await _backendMovieService.recordRecommendationImpression(
+      batchId: resolvedContext.batchId,
+      tmdbId: movie!.tmdbId!,
+      position: resolvedContext.position,
+    );
+  }
+
+  Future<String> likeMovie(
+    String movieId, {
+    bool fromDailySuggestions = false,
+  }) async {
     return _applyMutation(
       _userMovieStateService.likeMovie(
         state.movieStates,
         state.undoStack,
         movieId,
       ),
+      recommendationContext: fromDailySuggestions
+          ? _dailyRecommendationContext(movieId)
+          : null,
     );
   }
 
-  Future<String> dislikeMovie(String movieId) async {
+  Future<String> dislikeMovie(
+    String movieId, {
+    bool fromDailySuggestions = false,
+  }) async {
     return _applyMutation(
       _userMovieStateService.dislikeMovie(
         state.movieStates,
         state.undoStack,
         movieId,
       ),
+      recommendationContext: fromDailySuggestions
+          ? _dailyRecommendationContext(movieId)
+          : null,
     );
   }
 
-  Future<String> addToWatchlist(String movieId) async {
+  Future<String> addToWatchlist(
+    String movieId, {
+    bool fromDailySuggestions = false,
+  }) async {
     return _applyMutation(
       _userMovieStateService.addToWatchlist(
         state.movieStates,
         state.undoStack,
         movieId,
       ),
+      recommendationContext: fromDailySuggestions
+          ? _dailyRecommendationContext(movieId)
+          : null,
     );
   }
 
@@ -840,13 +1060,19 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     );
   }
 
-  Future<String> markAsWatched(String movieId) async {
+  Future<String> markAsWatched(
+    String movieId, {
+    bool fromDailySuggestions = false,
+  }) async {
     return _applyMutation(
       _userMovieStateService.markAsWatched(
         state.movieStates,
         state.undoStack,
         movieId,
       ),
+      recommendationContext: fromDailySuggestions
+          ? _dailyRecommendationContext(movieId)
+          : null,
     );
   }
 
@@ -914,39 +1140,68 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       state = state.copyWith(
         recommendedIds: <String>[],
         dailySuggestionIds: <String>[],
+        dailySuggestionContexts: const <String, RecommendationActionContext>{},
+        clearDailySuggestionBatchId: true,
       );
       return;
     }
 
+    final requestGeneration = _feedGeneration;
+    final sessionId = state.session!.id;
+
     try {
-      final results = await Future.wait<List<Movie>>([
+      final results = await Future.wait<Object>([
         page > 1
-            ? Future.value(const <Movie>[])
+            ? Future<Object>.value(const <Movie>[])
             : _movieService.getRecommendedForYou(),
         page > 1
-            ? Future.value(const <Movie>[])
+            ? Future<Object>.value(
+                const DailySuggestionBatch(movies: <Movie>[]),
+              )
             : _movieService.getDailySuggestions(
                 favoriteGenres: state.onboarding.favoriteGenres,
                 favoriteMovieIds: state.onboarding.favoriteMovieIds,
                 limit: dailySuggestionBatchSize,
               ),
         page > 1
-            ? Future.value(const <Movie>[])
+            ? Future<Object>.value(const <Movie>[])
             : _movieService.getTrendingMovies(),
       ]);
-      final recommended = results[0];
-      final suggestions = results[1];
-      final trending = results[2];
+      final recommended = results[0] as List<Movie>;
+      final dailyBatch = results[1] as DailySuggestionBatch;
+      final suggestions = dailyBatch.movies;
+      final trending = results[2] as List<Movie>;
+
+      if (!_isCurrentFeedRequest(requestGeneration, sessionId)) return;
 
       if (page == 1) {
         _hasExhaustedDailySuggestions = suggestions.isEmpty;
       }
 
       if (recommended.isEmpty && suggestions.isEmpty && trending.isEmpty) {
-        // Reached the backend, it just had nothing new — that's not a failure.
-        if (state.discoveryFeedFailed) {
-          state = state.copyWith(discoveryFeedFailed: false);
-        }
+        final limitReached =
+            dailyBatch.swipeLimitEnabled &&
+            dailyBatch.remainingToday != null &&
+            dailyBatch.remainingToday! <= 0;
+        state = state.copyWith(
+          dailySuggestionIds: limitReached
+              ? const <String>[]
+              : state.dailySuggestionIds,
+          dailySuggestionContexts: limitReached
+              ? const <String, RecommendationActionContext>{}
+              : state.dailySuggestionContexts,
+          clearDailySuggestionBatchId: limitReached,
+          dailySwipeLimitEnabled: dailyBatch.swipeLimitEnabled,
+          dailySwipeLimit: dailyBatch.swipeLimit,
+          clearDailySwipeLimit: dailyBatch.swipeLimit == null,
+          dailySwipesUsedToday: dailyBatch.usedToday,
+          dailySwipesRemainingToday: dailyBatch.remainingToday,
+          clearDailySwipesRemainingToday: dailyBatch.remainingToday == null,
+          dailySwipeResetAt: dailyBatch.resetAt,
+          clearDailySwipeResetAt: dailyBatch.resetAt == null,
+          discoveryFeedFailed: false,
+        );
+        await _persist();
         return;
       }
 
@@ -967,6 +1222,23 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
             suggestions.isEmpty && state.dailySuggestionIds.isNotEmpty
             ? state.dailySuggestionIds
             : _dedupeMovieIds(suggestions.map((movie) => movie.id)),
+        dailySuggestionsGeneratedAt: page == 1 && suggestions.isNotEmpty
+            ? DateTime.now()
+            : null,
+        dailySuggestionBatchId: page == 1 ? dailyBatch.batchId : null,
+        dailySuggestionContexts: page == 1
+            ? _contextsForDailyBatch(dailyBatch)
+            : null,
+        clearDailySuggestionBatchId: page == 1 && dailyBatch.batchId == null,
+        dailySwipeLimitEnabled: page == 1 ? dailyBatch.swipeLimitEnabled : null,
+        dailySwipeLimit: page == 1 ? dailyBatch.swipeLimit : null,
+        clearDailySwipeLimit: page == 1 && dailyBatch.swipeLimit == null,
+        dailySwipesUsedToday: page == 1 ? dailyBatch.usedToday : null,
+        dailySwipesRemainingToday: page == 1 ? dailyBatch.remainingToday : null,
+        clearDailySwipesRemainingToday:
+            page == 1 && dailyBatch.remainingToday == null,
+        dailySwipeResetAt: page == 1 ? dailyBatch.resetAt : null,
+        clearDailySwipeResetAt: page == 1 && dailyBatch.resetAt == null,
         trendingIds: trending.isEmpty && state.trendingIds.isNotEmpty
             ? state.trendingIds
             : trending.map((movie) => movie.id).toList(growable: false),
@@ -975,70 +1247,117 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       await _persist();
     } catch (e) {
       debugPrint('[AgreeoAppController] Failed to refresh discovery feeds: $e');
-      if (mounted) state = state.copyWith(discoveryFeedFailed: true);
+      if (_isCurrentFeedRequest(requestGeneration, sessionId)) {
+        state = state.copyWith(discoveryFeedFailed: true);
+      }
     }
   }
 
   Future<void> refreshHomeFeed({int page = 1}) async {
     await _refreshDiscoveryFeeds(page: page);
-    if (state.recommendedIds.isNotEmpty) {
-      final shuffled = List<String>.from(state.recommendedIds)..shuffle();
-      state = state.copyWith(recommendedIds: shuffled);
-      await _persist();
-    }
   }
 
   Future<void> syncLibrary() async {
     await _syncLibraryFromBackend();
   }
 
-
   Future<void> _ensureDailySuggestionBuffer({bool force = false}) async {
+    final queueExpired = state.dailySuggestionQueueExpired;
     if (!state.isAuthenticated ||
         !state.onboardingComplete ||
+        state.dailySwipeLimitReached ||
         _isRefillingDailySuggestions ||
-        (!force && _hasExhaustedDailySuggestions)) {
+        (!force && _hasExhaustedDailySuggestions && !queueExpired)) {
       return;
     }
 
-    final untouchedIds = state.dailySuggestionIds
-        .where((movieId) => state.userMovieStateFor(movieId).isUntouched)
-        .toList(growable: false);
+    final untouchedIds = queueExpired
+        ? const <String>[]
+        : state.dailySuggestionIds
+              .where((movieId) => state.userMovieStateFor(movieId).isUntouched)
+              .toList(growable: false);
 
     if (!force && untouchedIds.length >= swipeQueueRefillThreshold) {
       return;
     }
 
     _isRefillingDailySuggestions = true;
+    final requestGeneration = _feedGeneration;
+    final sessionId = state.session!.id;
     try {
-      final suggestions = await _movieService.getDailySuggestions(
+      final dailyBatch = await _movieService.getDailySuggestions(
         favoriteGenres: state.onboarding.favoriteGenres,
         favoriteMovieIds: state.onboarding.favoriteMovieIds,
         limit: dailySuggestionBatchSize,
       );
+      final suggestions = dailyBatch.movies;
+
+      if (!_isCurrentFeedRequest(requestGeneration, sessionId)) return;
 
       if (suggestions.isEmpty) {
         _hasExhaustedDailySuggestions = true;
+        final limitReached =
+            dailyBatch.swipeLimitEnabled &&
+            dailyBatch.remainingToday != null &&
+            dailyBatch.remainingToday! <= 0;
+        state = state.copyWith(
+          dailySuggestionIds: limitReached
+              ? const <String>[]
+              : state.dailySuggestionIds,
+          dailySuggestionContexts: limitReached
+              ? const <String, RecommendationActionContext>{}
+              : state.dailySuggestionContexts,
+          clearDailySuggestionBatchId: limitReached,
+          dailySwipeLimitEnabled: dailyBatch.swipeLimitEnabled,
+          dailySwipeLimit: dailyBatch.swipeLimit,
+          clearDailySwipeLimit: dailyBatch.swipeLimit == null,
+          dailySwipesUsedToday: dailyBatch.usedToday,
+          dailySwipesRemainingToday: dailyBatch.remainingToday,
+          clearDailySwipesRemainingToday: dailyBatch.remainingToday == null,
+          dailySwipeResetAt: dailyBatch.resetAt,
+          clearDailySwipeResetAt: dailyBatch.resetAt == null,
+        );
+        await _persist();
         return;
       }
 
       _hasExhaustedDailySuggestions = false;
 
       final currentCatalog = _mergeCatalogMovies(state.catalog, [suggestions]);
-      final nextDailyIds = _appendUniqueMovieIds(
-        state.dailySuggestionIds,
-        suggestions.map((movie) => movie.id),
-      );
+      final nextDailyIds = _dedupeMovieIds(<String>[
+        if (!queueExpired) ...untouchedIds,
+        ...suggestions.map((movie) => movie.id),
+      ]);
+      final batchContexts = _contextsForDailyBatch(dailyBatch);
+      final nextContexts = <String, RecommendationActionContext>{
+        if (!queueExpired)
+          for (final id in untouchedIds) id: ?state.dailySuggestionContexts[id],
+        ...batchContexts,
+      };
 
       state = state.copyWith(
         catalog: currentCatalog,
         dailySuggestionIds: nextDailyIds,
+        dailySuggestionsGeneratedAt: DateTime.now(),
+        dailySuggestionBatchId: dailyBatch.batchId,
+        dailySuggestionContexts: nextContexts,
+        clearDailySuggestionBatchId: dailyBatch.batchId == null,
+        dailySwipeLimitEnabled: dailyBatch.swipeLimitEnabled,
+        dailySwipeLimit: dailyBatch.swipeLimit,
+        clearDailySwipeLimit: dailyBatch.swipeLimit == null,
+        dailySwipesUsedToday: dailyBatch.usedToday,
+        dailySwipesRemainingToday: dailyBatch.remainingToday,
+        clearDailySwipesRemainingToday: dailyBatch.remainingToday == null,
+        dailySwipeResetAt: dailyBatch.resetAt,
+        clearDailySwipeResetAt: dailyBatch.resetAt == null,
       );
       await _persist();
     } catch (e) {
       debugPrint('[AgreeoAppController] Failed to refill suggestions: $e');
     } finally {
-      _isRefillingDailySuggestions = false;
+      if (requestGeneration == _feedGeneration) {
+        _isRefillingDailySuggestions = false;
+      }
     }
   }
 
@@ -1073,38 +1392,98 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     return items.toList(growable: false);
   }
 
-  List<String> _appendUniqueMovieIds(
-    Iterable<String> existingIds,
-    Iterable<String> newIds,
+  Map<String, RecommendationActionContext> _contextsForDailyBatch(
+    DailySuggestionBatch batch,
   ) {
-    return _dedupeMovieIds(<String>[...existingIds, ...newIds]);
+    final batchId = batch.batchId;
+    if (batchId == null || batchId.isEmpty) {
+      return const <String, RecommendationActionContext>{};
+    }
+    return <String, RecommendationActionContext>{
+      for (var index = 0; index < batch.movies.length; index += 1)
+        batch.movies[index].id: RecommendationActionContext(
+          batchId: batchId,
+          position: index,
+          expiresAt: batch.batchExpiresAt,
+        ),
+    };
   }
 
   Future<String> _applyMutation(
     UserMovieStateMutation mutation, {
     bool refreshSuggestions = true,
+    RecommendationActionContext? recommendationContext,
   }) async {
-    state = state.copyWith(
-      movieStates: mutation.states,
-      undoStack: mutation.undoStack,
-    );
-    await _persist();
-
-    _syncBackendMovieState(
-      mutation.movieId,
-      mutation.previousState,
-      mutation.nextState,
-    ).catchError((e) {
-      debugPrint('[AgreeoAppController] Mutation background sync failed: $e');
-    });
-
-    if (refreshSuggestions && state.onboardingComplete) {
-      _asyncRefreshSuggestionsAndBuffer();
-    } else {
-      await _persist();
+    while (_activeMutation != null) {
+      await _activeMutation!.future;
     }
-
-    return mutation.message;
+    final completion = Completer<void>();
+    _activeMutation = completion;
+    final requestGeneration = _feedGeneration;
+    final sessionId = state.session?.id;
+    try {
+      state = state.copyWith(
+        movieStates: mutation.states,
+        undoStack: mutation.undoStack,
+        movieMutationInProgress: true,
+      );
+      final usage = await _syncBackendMovieState(
+        mutation.movieId,
+        mutation.previousState,
+        mutation.nextState,
+        recommendationContext: recommendationContext,
+      );
+      final sameSession =
+          requestGeneration == _feedGeneration &&
+          state.session?.id == sessionId;
+      if (!sameSession) return mutation.message;
+      if (usage != null) {
+        state = state.copyWith(
+          dailySwipeLimitEnabled: usage.limit != null,
+          dailySwipeLimit: usage.limit,
+          clearDailySwipeLimit: usage.limit == null,
+          dailySwipesUsedToday: usage.usedToday,
+          dailySwipesRemainingToday: usage.remainingToday,
+          clearDailySwipesRemainingToday: usage.remainingToday == null,
+          dailySwipeResetAt: usage.resetAt,
+          clearDailySwipeResetAt: usage.resetAt == null,
+        );
+      }
+      state = state.copyWith(movieMutationInProgress: false);
+      await _persist();
+      if (refreshSuggestions && state.onboardingComplete) {
+        _asyncRefreshSuggestionsAndBuffer();
+      }
+      return mutation.message;
+    } catch (error) {
+      final sameSession =
+          requestGeneration == _feedGeneration &&
+          state.session?.id == sessionId;
+      if (sameSession) {
+        final usage = error is MovieBackendRequestException
+            ? error.dailyUsage
+            : null;
+        state = state.copyWith(
+          movieStates: mutation.previousStates,
+          undoStack: mutation.previousUndoStack,
+          movieMutationInProgress: false,
+          dailySwipeLimitEnabled: usage?.limit != null
+              ? true
+              : state.dailySwipeLimitEnabled,
+          dailySwipeLimit: usage?.limit,
+          dailySwipesUsedToday: usage?.usedToday,
+          dailySwipesRemainingToday: usage?.remainingToday,
+          dailySwipeResetAt: usage?.resetAt,
+        );
+        await _persist();
+      }
+      rethrow;
+    } finally {
+      if (identical(_activeMutation, completion)) {
+        _activeMutation = null;
+      }
+      if (!completion.isCompleted) completion.complete();
+    }
   }
 
   Future<void> _asyncRefreshSuggestionsAndBuffer() async {
@@ -1122,8 +1501,12 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       return;
     }
 
+    final requestGeneration = _feedGeneration;
+    final sessionId = state.session!.id;
+
     try {
       final recommended = await _movieService.getRecommendedForYou();
+      if (!_isCurrentFeedRequest(requestGeneration, sessionId)) return;
       if (recommended.isEmpty) return;
       final currentCatalog = _mergeCatalogMovies(state.catalog, [recommended]);
       state = state.copyWith(
@@ -1140,55 +1523,68 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
     }
   }
 
-  Future<void> _syncBackendMovieState(
+  Future<DailySwipeUsage?> _syncBackendMovieState(
     String movieId,
     UserMovieState previousState,
-    UserMovieState nextState,
-  ) async {
+    UserMovieState nextState, {
+    RecommendationActionContext? recommendationContext,
+  }) async {
     if (!state.isAuthenticated || movieId.isEmpty) {
-      return;
+      return null;
     }
 
     final movie = state.movieById(movieId);
     if (movie?.tmdbId == null) {
-      return;
+      return null;
     }
 
     final tmdbId = movie!.tmdbId!;
 
-    try {
-      if (previousState.preference != MoviePreference.liked &&
-          nextState.preference == MoviePreference.liked) {
-        await _backendMovieService.likeMovie(movie);
-      } else if (previousState.preference == MoviePreference.liked &&
-          nextState.preference != MoviePreference.liked) {
-        await _backendMovieService.removeLike(tmdbId);
-      }
-
-      if (previousState.preference != MoviePreference.disliked &&
-          nextState.preference == MoviePreference.disliked) {
-        await _backendMovieService.dislikeMovie(movie);
-      } else if (previousState.preference == MoviePreference.disliked &&
-          nextState.preference != MoviePreference.disliked) {
-        await _backendMovieService.removeDislike(tmdbId);
-      }
-
-      if (!previousState.inWatchlist && nextState.inWatchlist) {
-        await _backendMovieService.addToWatchlist(movie);
-      } else if (previousState.inWatchlist && !nextState.inWatchlist) {
-        await _backendMovieService.removeFromWatchlist(tmdbId);
-      }
-
-      if (!previousState.watched && nextState.watched) {
-        await _backendMovieService.markAsSeen(movie);
-      } else if (previousState.watched && !nextState.watched) {
-        await _backendMovieService.removeSeen(tmdbId);
-      }
-    } catch (e) {
-      debugPrint(
-        '[AgreeoAppController] Offline state synchronization failed: $e',
+    if (previousState.preference != MoviePreference.liked &&
+        nextState.preference == MoviePreference.liked) {
+      return _backendMovieService.likeMovie(
+        movie,
+        recommendationContext: recommendationContext,
       );
     }
+
+    if (previousState.preference != MoviePreference.disliked &&
+        nextState.preference == MoviePreference.disliked) {
+      return _backendMovieService.dislikeMovie(
+        movie,
+        recommendationContext: recommendationContext,
+      );
+    }
+
+    if (!previousState.inWatchlist && nextState.inWatchlist) {
+      return _backendMovieService.addToWatchlist(
+        movie,
+        recommendationContext: recommendationContext,
+      );
+    }
+
+    if (!previousState.watched && nextState.watched) {
+      return _backendMovieService.markAsSeen(
+        movie,
+        recommendationContext: recommendationContext,
+      );
+    }
+
+    if (previousState.preference == MoviePreference.liked &&
+        nextState.preference != MoviePreference.liked) {
+      await _backendMovieService.removeLike(tmdbId);
+    }
+    if (previousState.preference == MoviePreference.disliked &&
+        nextState.preference != MoviePreference.disliked) {
+      await _backendMovieService.removeDislike(tmdbId);
+    }
+    if (previousState.inWatchlist && !nextState.inWatchlist) {
+      await _backendMovieService.removeFromWatchlist(tmdbId);
+    }
+    if (previousState.watched && !nextState.watched) {
+      await _backendMovieService.removeSeen(tmdbId);
+    }
+    return null;
   }
 
   Future<void> _persist() async {

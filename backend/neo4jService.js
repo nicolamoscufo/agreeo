@@ -149,6 +149,24 @@ class Neo4jService {
     `);
 
     await this.run(`
+      CREATE CONSTRAINT recommendation_batch_id IF NOT EXISTS
+      FOR (b:RecommendationBatch)
+      REQUIRE b.id IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE INDEX recommendation_batch_created_at IF NOT EXISTS
+      FOR (b:RecommendationBatch)
+      ON (b.createdAt)
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT daily_swipe_quota_key IF NOT EXISTS
+      FOR (q:DailySwipeQuota)
+      REQUIRE q.key IS UNIQUE
+    `);
+
+    await this.run(`
       CREATE INDEX movie_title IF NOT EXISTS
       FOR (m:Movie)
       ON (m.title)
@@ -166,6 +184,30 @@ class Neo4jService {
       CREATE INDEX movie_ml_rating_count IF NOT EXISTS
       FOR (m:Movie)
       ON (m.movieLensRatingCount)
+    `);
+
+    // Older TMDB cache writes stored genre names only as a property. Keep the
+    // graph representation used by recommendation queries in sync on startup.
+    await this.run(`
+      MATCH (m:Movie)
+      WHERE size(coalesce(m.genres, [])) > 0
+      UNWIND m.genres AS genreName
+      MERGE (g:Genre {name: genreName})
+      MERGE (m)-[:IN_GENRE]->(g)
+    `);
+
+    // Recommendation events are operational analytics, not permanent user
+    // profile data. Keep a bounded window for diagnostics and ranking metrics.
+    await this.run(`
+      MATCH (batch:RecommendationBatch)
+      WHERE batch.createdAt < datetime() - duration({days: 90})
+      DETACH DELETE batch
+    `);
+
+    await this.run(`
+      MATCH (quota:DailySwipeQuota)
+      WHERE quota.day < date() - duration({days: 90})
+      DETACH DELETE quota
     `);
   }
 

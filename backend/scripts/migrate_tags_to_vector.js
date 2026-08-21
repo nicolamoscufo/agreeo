@@ -1,9 +1,34 @@
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const neo4jService = require('../neo4jService');
 const embeddingService = require('../embeddingService');
 
-const CACHE_FILE = path.join(__dirname, '..', 'data', 'tag_embeddings_multilingual_cache.json');
+const CACHE_FILE = embeddingService.CACHE_FILE;
+
+function toNativeNumber(value) {
+  return typeof value?.toNumber === 'function' ? value.toNumber() : Number(value);
+}
+
+function isValidEmbedding(value) {
+  return Array.isArray(value) && value.length === 384 && value.every(Number.isFinite);
+}
+
+async function waitForVectorIndex(maxAttempts = 30) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const result = await neo4jService.run(`
+      SHOW INDEXES YIELD name, type, state
+      WHERE name = 'tag_embeddings'
+      RETURN name, type, state
+    `);
+    const record = result.records[0];
+    if (record && record.get('type') === 'VECTOR' && record.get('state') === 'ONLINE') {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error('Vector index tag_embeddings did not become ONLINE in time.');
+}
 
 async function migrate() {
   console.log('==================================================');
@@ -56,6 +81,19 @@ async function migrate() {
     `);
     const tags = tagResult.records.map(rec => rec.get('tag')).filter(Boolean);
     console.log(`[MIGRATION] Found ${tags.length} unique tags to process.`);
+    if (tags.length === 0) {
+      throw new Error('No raw TAGGED relationships found; semantic migration cannot continue.');
+    }
+
+    const expectedRelationshipResult = await neo4jService.run(`
+      MATCH (:MovieLensUser)-[r:TAGGED]->(ml:MovieLensMovie)
+      WHERE r.tag IS NOT NULL
+      WITH DISTINCT ml, r.tag AS tagText
+      RETURN count(*) AS expectedRelationshipCount
+    `);
+    const expectedRelationshipCount = toNativeNumber(
+      expectedRelationshipResult.records[0].get('expectedRelationshipCount')
+    );
 
     // 5. Populate (:Tag) nodes
     console.log('[MIGRATION] Populating (:Tag) nodes with embeddings...');
@@ -72,18 +110,30 @@ async function migrate() {
     }
 
     const tagBatch = [];
+    const failedTags = [];
     for (const tag of tags) {
       let embedding = cachedEmbeddings[tag];
-      if (!embedding) {
+      if (!isValidEmbedding(embedding)) {
         console.log(`[MIGRATION] Embedding not cached for "${tag}". Computing dynamically...`);
         try {
           embedding = await embeddingService.getEmbedding(tag, 'passage');
         } catch (err) {
           console.error(`[MIGRATION] Failed to compute embedding for tag "${tag}":`, err);
+          failedTags.push(tag);
           continue;
         }
       }
+      if (!isValidEmbedding(embedding)) {
+        failedTags.push(tag);
+        continue;
+      }
       tagBatch.push({ tag, embedding });
+    }
+
+    if (failedTags.length > 0 || tagBatch.length !== tags.length) {
+      throw new Error(
+        `Embedding generation incomplete: ${tagBatch.length}/${tags.length} tags ready, ${failedTags.length} failed.`
+      );
     }
 
     // Write Tag nodes in batches
@@ -110,6 +160,24 @@ async function migrate() {
     `);
     const relCount = relResult.records[0].get('relCount').toNumber();
     console.log(`[MIGRATION] Created ${relCount} [:HAS_TAG] relationships.`);
+    if (relCount !== expectedRelationshipCount) {
+      throw new Error(
+        `HAS_TAG materialization incomplete: expected ${expectedRelationshipCount}, found ${relCount}.`
+      );
+    }
+
+    console.log('[MIGRATION] Computing global tag IDF weights...');
+    await neo4jService.run(`
+      MATCH (movie:MovieLensMovie)
+      WITH count(movie) AS totalMovies
+      MATCH (tag:Tag)
+      OPTIONAL MATCH (tag)<-[:HAS_TAG]-(taggedMovie:MovieLensMovie)
+      WITH tag, totalMovies, count(DISTINCT taggedMovie) AS documentFrequency
+      SET
+        tag.documentFrequency = documentFrequency,
+        tag.idf = log((toFloat(totalMovies) + 1.0) /
+          (toFloat(documentFrequency) + 1.0)) + 1.0
+    `);
 
     // 7. Store totalTagCount on (ml:MovieLensMovie) nodes to optimize scoring calculation
     console.log('[MIGRATION] Setting totalTagCount property on MovieLensMovie nodes...');
@@ -123,14 +191,24 @@ async function migrate() {
     const movieCount = countResult.records[0].get('movieCount').toNumber();
     console.log(`[MIGRATION] Updated ${movieCount} MovieLensMovie nodes with totalTagCount.`);
 
-    // 8. Verify index state
-    console.log('[MIGRATION] Checking vector index population state...');
-    const indexCheck = await neo4jService.run('SHOW INDEXES YIELD name, type, state, populationPercent');
-    indexCheck.records.forEach(r => {
-      if (r.get('name') === 'tag_embeddings') {
-        console.log(`[MIGRATION] Index "${r.get('name')}": Type: ${r.get('type')}, State: ${r.get('state')}, Progress: ${r.get('populationPercent')}%`);
-      }
-    });
+    // 8. Verify materialized data and index readiness.
+    const embeddedTagResult = await neo4jService.run(`
+      MATCH (t:Tag)
+      WHERE t.name IN $tags AND t.embedding IS NOT NULL
+      RETURN count(t) AS embeddedTagCount
+    `, { tags });
+    const embeddedTagCount = toNativeNumber(
+      embeddedTagResult.records[0].get('embeddedTagCount')
+    );
+    if (embeddedTagCount !== tags.length) {
+      throw new Error(
+        `Tag materialization incomplete: expected ${tags.length}, found ${embeddedTagCount}.`
+      );
+    }
+
+    console.log('[MIGRATION] Waiting for vector index "tag_embeddings"...');
+    await waitForVectorIndex();
+    console.log('[MIGRATION] Semantic graph and vector index are ready.');
 
     console.log('==================================================');
     console.log('[MIGRATION] Migration Completed Successfully.');

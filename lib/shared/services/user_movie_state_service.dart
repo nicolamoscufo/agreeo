@@ -5,6 +5,8 @@ class UserMovieStateMutation {
     required this.movieId,
     required this.previousState,
     required this.nextState,
+    required this.previousStates,
+    required this.previousUndoStack,
     required this.states,
     required this.undoStack,
     required this.message,
@@ -13,6 +15,8 @@ class UserMovieStateMutation {
   final String movieId;
   final UserMovieState previousState;
   final UserMovieState nextState;
+  final Map<String, UserMovieState> previousStates;
+  final List<UndoEntry> previousUndoStack;
   final Map<String, UserMovieState> states;
   final List<UndoEntry> undoStack;
   final String message;
@@ -281,6 +285,8 @@ class LocalUserMovieStateService implements UserMovieStateService {
         movieId: '',
         previousState: UserMovieState.initial(''),
         nextState: UserMovieState.initial(''),
+        previousStates: currentStates,
+        previousUndoStack: currentUndoStack,
         states: currentStates,
         undoStack: currentUndoStack,
         message: 'Nothing to undo.',
@@ -296,6 +302,8 @@ class LocalUserMovieStateService implements UserMovieStateService {
       movieId: entry.movieId,
       previousState: entry.nextState,
       nextState: entry.previousState,
+      previousStates: currentStates,
+      previousUndoStack: currentUndoStack,
       states: updatedStates,
       undoStack: updatedUndoStack,
       message: 'Action undone.',
@@ -329,6 +337,8 @@ class LocalUserMovieStateService implements UserMovieStateService {
       movieId: movieId,
       previousState: previousState,
       nextState: nextState,
+      previousStates: currentStates,
+      previousUndoStack: currentUndoStack,
       states: updatedStates,
       undoStack: updatedUndoStack,
       message: message,

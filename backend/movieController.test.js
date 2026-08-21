@@ -2,9 +2,11 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { hydrateRecommendations } = require('./movieController');
+const { TmdbHttpError } = require('./tmdbClient');
 
 test('hydrateRecommendations preserves order and skips stale TMDB ids', async () => {
   const warned = [];
+  let cacheLookupCount = 0;
   const hydrated = await hydrateRecommendations(
     [
       { tmdbId: 1, similarUsers: 2, avgSimilarRating: 4.5, globalAvg: 3.8, ratingCount: 120 },
@@ -16,7 +18,7 @@ test('hydrateRecommendations preserves order and skips stale TMDB ids', async ()
       batchSize: 2,
       tmdbFetch: async (path) => {
         if (path === '/movie/2') {
-          throw new Error('TMDB error 404: missing');
+          throw new TmdbHttpError(404, 'missing');
         }
 
         return {
@@ -30,17 +32,21 @@ test('hydrateRecommendations preserves order and skips stale TMDB ids', async ()
           genre_ids: [1],
         };
       },
-      findMovieByTmdbId: async (tmdbId) => ({
-        tmdbId,
-        movieLensAvgRating: 3.3,
-        movieLensRatingCount: 50,
-      }),
+      findMoviesByTmdbIds: async (tmdbIds) => {
+        cacheLookupCount += 1;
+        return tmdbIds.map((tmdbId) => ({
+          tmdbId,
+          movieLensAvgRating: 3.3,
+          movieLensRatingCount: 50,
+        }));
+      },
       mergeTmdbMovie: async () => {},
       logger: { warn: (message) => warned.push(message) },
     }
   );
 
   assert.deepEqual(hydrated.map((movie) => movie.tmdbId), [1, 3]);
+  assert.equal(cacheLookupCount, 1);
   assert.equal(warned.length, 1);
   assert.match(warned[0], /Skipping stale TMDB recommendation 2/);
 });
@@ -72,7 +78,7 @@ test('hydrateRecommendations stops once the limit is reached', async () => {
           genre_ids: [1],
         };
       },
-      findMovieByTmdbId: async (tmdbId) => ({ tmdbId }),
+      findMoviesByTmdbIds: async (tmdbIds) => tmdbIds.map((tmdbId) => ({ tmdbId })),
       mergeTmdbMovie: async () => {},
       logger: { warn: () => {} },
     }
@@ -80,4 +86,40 @@ test('hydrateRecommendations stops once the limit is reached', async () => {
 
   assert.equal(hydrated.length, 30);
   assert.equal(fetchCount, 32);
+});
+
+test('hydrateRecommendations propagates infrastructure failures', async () => {
+  await assert.rejects(
+    hydrateRecommendations(
+      [{ tmdbId: 1 }],
+      {
+        tmdbFetch: async () => {
+          throw new Error('TMDB unavailable');
+        },
+        findMoviesByTmdbIds: async () => [{ tmdbId: 1 }],
+        mergeTmdbMovie: async () => {},
+        logger: { warn: () => {} },
+      }
+    ),
+    /TMDB unavailable/
+  );
+});
+
+test('hydrateRecommendations keeps a fetched movie when cache write fails', async () => {
+  const warned = [];
+  const hydrated = await hydrateRecommendations(
+    [{ tmdbId: 1 }],
+    {
+      tmdbFetch: async () => ({ id: 1, title: 'Movie 1', genre_ids: [1] }),
+      findMoviesByTmdbIds: async () => [{ tmdbId: 1 }],
+      mergeTmdbMovie: async () => {
+        throw new Error('Neo4j write failed');
+      },
+      logger: { warn: (message) => warned.push(message) },
+    }
+  );
+
+  assert.deepEqual(hydrated.map((movie) => movie.tmdbId), [1]);
+  assert.equal(warned.length, 1);
+  assert.match(warned[0], /Failed to cache TMDB movie 1/);
 });

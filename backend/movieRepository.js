@@ -1,4 +1,5 @@
 const neo4jService = require('./neo4jService');
+const { recommendationConfigForUser } = require('./recommendationConfig');
 
 function toNativeNumber(value) {
   if (value == null) {
@@ -103,6 +104,16 @@ async function mergeTmdbMovie(movie, tx = null) {
       m.movieLensRatingCount = coalesce($movieLensRatingCount, m.movieLensRatingCount),
       m.genres = CASE WHEN size($genres) > 0 THEN $genres ELSE coalesce(m.genres, []) END,
       m.tmdbHydrated = coalesce(m.tmdbHydrated, false) OR $tmdbHydrated
+    FOREACH (genreName IN $genres |
+      MERGE (g:Genre {name: genreName})
+      MERGE (m)-[:IN_GENRE]->(g)
+    )
+    WITH m
+    OPTIONAL MATCH (m)-[stale:IN_GENRE]->(staleGenre:Genre)
+    FOREACH (relationship IN CASE
+      WHEN size($genres) > 0 AND NOT staleGenre.name IN $genres THEN [stale]
+      ELSE []
+    END | DELETE relationship)
     `,
     {
       tmdbId: movie.tmdbId,
@@ -168,6 +179,12 @@ async function findMoviesByTmdbIds(tmdbIds) {
 function toFiniteNumber(value, fallback = 0) {
   const numeric = value == null ? fallback : Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function normalizedVectorOrNull(vector) {
+  const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
+  if (!Number.isFinite(magnitude) || magnitude === 0) return null;
+  return vector.map((value) => value / magnitude);
 }
 
 function toPositiveInteger(value, fallback = 5, max = 100) {
@@ -285,6 +302,25 @@ const INTERACTION_REL_TYPES = new Set([
   'SELECTED_FAVORITE',
 ]);
 
+class DailySwipeLimitError extends Error {
+  constructor(usage) {
+    super('Daily swipe limit reached.');
+    this.name = 'DailySwipeLimitError';
+    this.usage = usage;
+  }
+}
+
+class InvalidRecommendationContextError extends Error {
+  constructor() {
+    super('Recommendation batch is invalid or expired.');
+    this.name = 'InvalidRecommendationContextError';
+  }
+}
+
+function currentUtcDay() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function assertInteractionRelTypes(...types) {
   for (const type of types) {
     if (!INTERACTION_REL_TYPES.has(type)) {
@@ -296,9 +332,93 @@ function assertInteractionRelTypes(...types) {
 // Sets a single exclusive preference relationship for a user/movie pair,
 // removing any conflicting relationships first. All steps run inside one write
 // transaction so the graph never ends up in a half-updated state.
-async function setMovieInteraction(uid, movie, { newRel, removeRels }) {
+async function setMovieInteraction(uid, movie, { newRel, removeRels, recommendationContext = null }) {
   assertInteractionRelTypes(newRel, ...removeRels);
   return neo4jService.executeWrite(async (tx) => {
+    let dailyUsage = null;
+    let recommendationAlreadyRecorded = false;
+    if (recommendationContext) {
+      const contextResult = await tx.run(
+        `
+        MATCH (u:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+          (batch:RecommendationBatch {id: $batchId, kind: 'daily'})
+        WHERE batch.expiresAt > datetime()
+        MATCH (batch)-[included:INCLUDED]->(:Movie {tmdbId: $tmdbId})
+        RETURN included.swipedAt AS existingSwipe
+        `,
+        {
+          uid,
+          batchId: recommendationContext.batchId,
+          tmdbId: movie.tmdbId,
+        }
+      );
+
+      if (contextResult.records.length === 0) {
+        throw new InvalidRecommendationContextError();
+      }
+
+      recommendationAlreadyRecorded =
+        contextResult.records[0].get('existingSwipe') != null;
+      const day = currentUtcDay();
+      const quotaResult = await tx.run(
+        `
+        MATCH (u:AppUser {uid: $uid})
+        MERGE (quota:DailySwipeQuota {key: $quotaKey})
+        ON CREATE SET
+          quota.uid = $uid,
+          quota.day = date($day),
+          quota.used = 0,
+          quota.createdAt = datetime()
+        MERGE (u)-[:HAS_DAILY_QUOTA]->(quota)
+        SET quota.used = coalesce(quota.used, 0) + $increment
+        RETURN quota.used AS usedToday
+        `,
+        {
+          uid,
+          quotaKey: `${uid}:${day}`,
+          day,
+          increment: recommendationAlreadyRecorded ? 0 : 1,
+        }
+      );
+      const usedToday = toNativeNumber(quotaResult.records[0].get('usedToday')) || 0;
+      if (
+        !recommendationAlreadyRecorded &&
+        recommendationContext.limitEnabled &&
+        usedToday > recommendationContext.limit
+      ) {
+        throw new DailySwipeLimitError({
+          usedToday,
+          remainingToday: 0,
+          limit: recommendationContext.limit,
+        });
+      }
+
+      dailyUsage = {
+        usedToday,
+        remainingToday: recommendationContext.limitEnabled
+          ? Math.max(0, recommendationContext.limit - usedToday)
+          : null,
+        limit: recommendationContext.limitEnabled ? recommendationContext.limit : null,
+      };
+    } else {
+      const pendingResult = await tx.run(
+        `
+        MATCH (:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+          (batch:RecommendationBatch {kind: 'daily'})-[included:INCLUDED]->
+          (:Movie {tmdbId: $tmdbId})
+        WHERE batch.expiresAt > datetime() AND included.swipedAt IS NULL
+        RETURN count(included) AS pendingContexts
+        `,
+        { uid, tmdbId: movie.tmdbId }
+      );
+      const pendingContexts = pendingResult.records.length === 0
+        ? 0
+        : toNativeNumber(pendingResult.records[0].get('pendingContexts'));
+      if (pendingContexts > 0) {
+        throw new InvalidRecommendationContextError();
+      }
+    }
+
     if (removeRels.length > 0) {
       await tx.run(
         `
@@ -322,24 +442,194 @@ async function setMovieInteraction(uid, movie, { newRel, removeRels }) {
       { uid, tmdbId: movie.tmdbId }
     );
 
-    return result.records.length > 0;
+    if (recommendationContext && result.records.length > 0) {
+      await tx.run(
+        `
+        MATCH (:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+          (batch:RecommendationBatch {id: $batchId})
+        MATCH (batch)-[included:INCLUDED]->(:Movie {tmdbId: $tmdbId})
+        SET
+          included.swipedAt = coalesce(included.swipedAt, datetime()),
+          included.action = $action,
+          included.clientSource = $source,
+          included.clientPosition = $position
+        `,
+        {
+          uid,
+          batchId: recommendationContext.batchId,
+          tmdbId: movie.tmdbId,
+          action: recommendationContext.action,
+          source: recommendationContext.source,
+          position: recommendationContext.position,
+        }
+      );
+    }
+
+    return { updated: result.records.length > 0, dailyUsage };
   });
 }
 
-async function likeMovie(uid, movie) {
-  return setMovieInteraction(uid, movie, { newRel: 'LIKED', removeRels: ['DISLIKED'] });
+async function likeMovie(uid, movie, recommendationContext = null) {
+  return setMovieInteraction(uid, movie, { newRel: 'LIKED', removeRels: ['DISLIKED'], recommendationContext });
 }
 
-async function dislikeMovie(uid, movie) {
-  return setMovieInteraction(uid, movie, { newRel: 'DISLIKED', removeRels: ['LIKED', 'WATCHLISTED'] });
+async function dislikeMovie(uid, movie, recommendationContext = null) {
+  return setMovieInteraction(uid, movie, { newRel: 'DISLIKED', removeRels: ['LIKED', 'WATCHLISTED'], recommendationContext });
 }
 
-async function watchlistMovie(uid, movie) {
-  return setMovieInteraction(uid, movie, { newRel: 'WATCHLISTED', removeRels: ['DISLIKED', 'ALREADY_SEEN'] });
+async function watchlistMovie(uid, movie, recommendationContext = null) {
+  return setMovieInteraction(uid, movie, { newRel: 'WATCHLISTED', removeRels: ['DISLIKED', 'ALREADY_SEEN'], recommendationContext });
 }
 
-async function markMovieAsSeen(uid, movie) {
-  return setMovieInteraction(uid, movie, { newRel: 'ALREADY_SEEN', removeRels: ['WATCHLISTED'] });
+async function markMovieAsSeen(uid, movie, recommendationContext = null) {
+  return setMovieInteraction(uid, movie, { newRel: 'ALREADY_SEEN', removeRels: ['WATCHLISTED'], recommendationContext });
+}
+
+async function recordRecommendationBatch(uid, { batchId, kind, expiresAt, experimentVariant = 'control-v1', results }) {
+  const itemsByTmdbId = new Map();
+  (Array.isArray(results) ? results : []).forEach((movie, index) => {
+    if (!Number.isInteger(movie?.tmdbId) || itemsByTmdbId.has(movie.tmdbId)) return;
+    itemsByTmdbId.set(movie.tmdbId, {
+      tmdbId: movie.tmdbId,
+      position: index,
+      source: movie.recommendation?.source || 'unknown',
+      finalScore: toFiniteNumber(movie.recommendation?.finalScore),
+    });
+  });
+  const items = Array.from(itemsByTmdbId.values());
+  if (!batchId || items.length === 0) return 0;
+
+  await neo4jService.run(
+    `
+    MATCH (batch:RecommendationBatch {uid: $uid})
+    WHERE batch.createdAt < datetime() - duration({days: 90})
+    DETACH DELETE batch
+    `,
+    { uid }
+  );
+
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})
+    MATCH (movie:Movie)
+    WHERE movie.tmdbId IN [item IN $items | item.tmdbId]
+    WITH u, collect(movie) AS movies
+    WHERE size(movies) = size($items)
+    MERGE (batch:RecommendationBatch {id: $batchId})
+    ON CREATE SET
+      batch.uid = $uid,
+      batch.kind = $kind,
+      batch.experimentVariant = $experimentVariant,
+      batch.createdAt = datetime(),
+      batch.expiresAt = datetime($expiresAt)
+    MERGE (u)-[:REQUESTED_RECOMMENDATIONS]->(batch)
+    WITH batch, movies
+    UNWIND $items AS item
+    WITH batch, item, head([movie IN movies WHERE movie.tmdbId = item.tmdbId]) AS movie
+    MERGE (batch)-[included:INCLUDED]->(movie)
+    ON CREATE SET included.servedAt = datetime()
+    SET
+      included.position = item.position,
+      included.source = item.source,
+      included.finalScore = item.finalScore
+    RETURN count(included) AS includedCount
+    `,
+    { uid, batchId, kind, expiresAt, experimentVariant, items }
+  );
+  return result.records.length === 0
+    ? 0
+    : toNativeNumber(result.records[0].get('includedCount'));
+}
+
+async function recordRecommendationImpressions(uid, batchId, items) {
+  const itemsByTmdbId = new Map();
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    if (!Number.isInteger(item?.tmdbId) || itemsByTmdbId.has(item.tmdbId)) return;
+    itemsByTmdbId.set(item.tmdbId, {
+      tmdbId: item.tmdbId,
+      position: Number.isInteger(item.position) ? item.position : null,
+    });
+  });
+  const normalizedItems = Array.from(itemsByTmdbId.values());
+  if (!batchId || normalizedItems.length === 0) return 0;
+
+  const result = await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+      (batch:RecommendationBatch {id: $batchId})
+    WHERE batch.expiresAt > datetime()
+    UNWIND $items AS item
+    MATCH (batch)-[included:INCLUDED]->(:Movie {tmdbId: item.tmdbId})
+    WITH included, item, included.impressedAt IS NULL AS isNew
+    SET
+      included.impressedAt = coalesce(included.impressedAt, datetime()),
+      included.clientPosition = coalesce(item.position, included.clientPosition)
+    RETURN
+      count(DISTINCT included) AS matchedCount,
+      sum(CASE WHEN isNew THEN 1 ELSE 0 END) AS recordedCount
+    `,
+    { uid, batchId, items: normalizedItems }
+  );
+  if (result.records.length === 0) return { matched: 0, recorded: 0 };
+  return {
+    matched: toNativeNumber(result.records[0].get('matchedCount')),
+    recorded: toNativeNumber(result.records[0].get('recordedCount')),
+  };
+}
+
+async function getDailySwipeUsage(uid) {
+  const day = currentUtcDay();
+  const result = await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})
+    OPTIONAL MATCH (quota:DailySwipeQuota {key: $quotaKey})
+    RETURN coalesce(quota.used, 0) AS usedToday
+    `,
+    { uid, quotaKey: `${uid}:${day}` }
+  );
+  return result.records.length === 0
+    ? 0
+    : toNativeNumber(result.records[0].get('usedToday'));
+}
+
+async function getRecommendationMetrics(uid, days = 30) {
+  const safeDays = toPositiveInteger(days, 30, 365);
+  const result = await neo4jService.run(
+    `
+    MATCH (u:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+      (batch:RecommendationBatch)-[included:INCLUDED]->(:Movie)
+    WHERE batch.createdAt >= datetime() - duration({days: $days})
+    WITH
+      coalesce(included.source, 'unknown') AS source,
+      coalesce(batch.experimentVariant, 'control-v1') AS experimentVariant,
+      count(included) AS served,
+      sum(CASE WHEN included.impressedAt IS NOT NULL THEN 1 ELSE 0 END) AS impressed,
+      sum(CASE WHEN included.swipedAt IS NOT NULL THEN 1 ELSE 0 END) AS swiped,
+      sum(CASE WHEN included.action = 'like' THEN 1 ELSE 0 END) AS liked,
+      sum(CASE WHEN included.action = 'dislike' THEN 1 ELSE 0 END) AS disliked,
+      sum(CASE WHEN included.action = 'watchlist' THEN 1 ELSE 0 END) AS watchlisted,
+      sum(CASE WHEN included.action = 'seen' THEN 1 ELSE 0 END) AS seen
+    RETURN source, experimentVariant, served, impressed, swiped, liked, disliked, watchlisted, seen
+    ORDER BY served DESC
+    `,
+    { uid, days: safeDays }
+  );
+  return result.records.map((record) => {
+    const served = toNativeNumber(record.get('served')) || 0;
+    const swiped = toNativeNumber(record.get('swiped')) || 0;
+    return {
+      source: record.get('source'),
+      experimentVariant: record.get('experimentVariant'),
+      served,
+      impressed: toNativeNumber(record.get('impressed')) || 0,
+      swiped,
+      liked: toNativeNumber(record.get('liked')) || 0,
+      disliked: toNativeNumber(record.get('disliked')) || 0,
+      watchlisted: toNativeNumber(record.get('watchlisted')) || 0,
+      seen: toNativeNumber(record.get('seen')) || 0,
+      swipeThroughRate: served === 0 ? 0 : swiped / served,
+    };
+  });
 }
 
 async function saveSelectedFavorites(uid, movies) {
@@ -578,6 +868,7 @@ async function getUserLibrary(uid) {
 }
 
 async function getPersonalizedRecommendationCandidates(uid) {
+  const config = recommendationConfigForUser(uid);
   const personalized = await neo4jService.run(
     `
     MATCH (me:AppUser {uid: $uid})
@@ -588,8 +879,15 @@ async function getPersonalizedRecommendationCandidates(uid) {
       OPTIONAL MATCH (me)-[r:LIKED|DISLIKED|SELECTED_FAVORITE|WATCHLISTED]->(m:Movie)
       OPTIONAL MATCH (m)<-[:MATCHES_TMDB]-(mMl:MovieLensMovie)-[:IN_GENRE]->(mlGenre:Genre)
       OPTIONAL MATCH (m)-[:IN_GENRE]->(movieGenre:Genre)
-      WITH r, collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) AS genreNames
-      UNWIND CASE WHEN size(genreNames) = 0 THEN [null] ELSE genreNames END AS genreName
+      WITH r, reduce(
+        uniqueGenres = [],
+        genreName IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) |
+        CASE
+          WHEN genreName IS NULL OR genreName IN uniqueGenres THEN uniqueGenres
+          ELSE uniqueGenres + genreName
+        END
+      ) AS genreNames
+      UNWIND genreNames AS genreName
       WITH genreName,
            sum(CASE WHEN type(r) = 'DISLIKED' THEN 1 ELSE 0 END) AS dislikedCount,
            count(r) AS totalInteractions
@@ -622,19 +920,28 @@ async function getPersonalizedRecommendationCandidates(uid) {
         * (1.0 / sqrt(log(toFloat(coalesce(seed.movieLensRatingCount, seedMl.movieLensRatingCount, 0)) + 10.0)))
       ) AS similarityScore
     WHERE similarityScore > 0
+    ORDER BY similarityScore DESC
+    LIMIT toInteger($neighborLimit)
 
     MATCH (similar)-[r2:RATED]->(recMl:MovieLensMovie)-[:MATCHES_TMDB]->(rec:Movie)
-    WHERE r2.rating >= 4.0
-      AND rec.tmdbId IS NOT NULL 
-
+    WHERE rec.tmdbId IS NOT NULL
       AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(rec)
 
-    OPTIONAL MATCH (recMl)-[:IN_GENRE]->(recMlGenre:Genre)
+    // Canonicalize duplicate MovieLens-to-TMDB mappings before scoring.
+    WITH
+      rec,
+      similar,
+      avg(toFloat(r2.rating)) AS similarRating,
+      max(similarityScore) AS similarityScore,
+      max(overlapCount) AS overlapCount,
+      dislikedGenres
+
+    OPTIONAL MATCH (rec)<-[:MATCHES_TMDB]-(candidateMl:MovieLensMovie)-[:IN_GENRE]->(recMlGenre:Genre)
     OPTIONAL MATCH (rec)-[:IN_GENRE]->(recMovieGenre:Genre)
     WITH
       rec,
       similar,
-      r2,
+      similarRating,
       similarityScore,
       overlapCount,
       dislikedGenres,
@@ -642,14 +949,14 @@ async function getPersonalizedRecommendationCandidates(uid) {
     WITH
       rec,
       similar,
-      r2,
+      similarRating,
       similarityScore,
       overlapCount,
       [entry IN coalesce(dislikedGenres, []) WHERE entry.name IN candidateGenreNames | entry] AS matchingDislikedGenres
     WITH
       rec,
       similar,
-      r2,
+      similarRating,
       similarityScore,
       overlapCount,
       reduce(penalty = 0.0, entry IN matchingDislikedGenres |
@@ -659,10 +966,29 @@ async function getPersonalizedRecommendationCandidates(uid) {
     WITH
       rec,
       count(DISTINCT similar) AS similarUsers,
-      avg(r2.rating) AS avgSimilarRating,
-      ((sum(similarityScore * (toFloat(r2.rating) - 3.0)) / coalesce(sum(similarityScore), 1.0)) * log(toFloat(count(DISTINCT similar)) + 1.0) * 10.0) AS collaborativeScore,
+      avg(similarRating) AS avgSimilarRating,
+      sum(similarityScore * (similarRating - 3.0)) /
+        coalesce(sum(abs(similarityScore)), 1.0) AS weightedPreference,
       avg(overlapCount) AS avgOverlapCount,
       max(negativePenalty) AS negativePenalty
+    WITH
+      rec,
+      similarUsers,
+      avgSimilarRating,
+      weightedPreference,
+      avgOverlapCount,
+      negativePenalty,
+      toFloat(similarUsers) / (toFloat(similarUsers) + $supportShrinkage) AS supportWeight
+    WITH
+      rec,
+      similarUsers,
+      avgSimilarRating,
+      (
+        (weightedPreference * supportWeight) +
+        ((toFloat(coalesce(rec.movieLensAvgRating, $globalMeanRating)) - 3.0) * (1.0 - supportWeight))
+      ) * log(toFloat(similarUsers) + 1.0) * 10.0 AS collaborativeScore,
+      avgOverlapCount,
+      negativePenalty
     WITH
       rec,
       similarUsers,
@@ -671,6 +997,7 @@ async function getPersonalizedRecommendationCandidates(uid) {
       avgOverlapCount,
       negativePenalty,
       collaborativeScore - negativePenalty AS finalScore
+    WHERE finalScore > 0
 
     RETURN
       rec.tmdbId AS tmdbId,
@@ -703,6 +1030,9 @@ async function getPersonalizedRecommendationCandidates(uid) {
       watchlistedWeight: 1.25,
       dislikedGenreThreshold: 2,
       dislikedGenrePenalty: 1.5,
+      neighborLimit: config.collaborativeNeighborLimit,
+      supportShrinkage: config.supportShrinkage,
+      globalMeanRating: 3.5,
     }
   );
 
@@ -717,13 +1047,18 @@ async function getPersonalizedRecommendationCandidates(uid) {
 }
 
 async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
+  const config = recommendationConfigForUser(uid);
   const safeLimit = toPositiveInteger(limit, 50, 200);
   const tagsResult = await neo4jService.run(
     `
     MATCH (u:AppUser {uid: $uid})-[r:LIKED|SELECTED_FAVORITE|WATCHLISTED|DISLIKED]->(m:Movie)
     MATCH (m)<-[:MATCHES_TMDB]-(ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)
     WHERE t.embedding IS NOT NULL
-    RETURN t.embedding AS embedding, type(r) AS relType, coalesce(h.frequency, 1) AS frequency
+    RETURN
+      t.embedding AS embedding,
+      type(r) AS relType,
+      coalesce(h.frequency, 1) AS frequency,
+      coalesce(t.idf, 1.0) AS idf
     `,
     { uid }
   );
@@ -732,8 +1067,10 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
     return [];
   }
 
-  const userTasteVector = new Array(384).fill(0);
-  let totalWeight = 0;
+  const positiveTasteVector = new Array(384).fill(0);
+  const negativeTasteVector = new Array(384).fill(0);
+  let positiveWeight = 0;
+  let negativeWeight = 0;
 
   for (const record of tagsResult.records) {
     const embedding = record.get('embedding');
@@ -741,6 +1078,7 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
 
     const relType = record.get('relType');
     const frequency = toNativeNumber(record.get('frequency')) || 1;
+    const idf = toFiniteNumber(record.get('idf'), 1.0);
 
     let relWeight = 1.0;
     if (relType === 'SELECTED_FAVORITE') {
@@ -750,45 +1088,75 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
     } else if (relType === 'WATCHLISTED') {
       relWeight = 1.5;
     } else if (relType === 'DISLIKED') {
-      relWeight = -3.0;
+      relWeight = 3.0;
     }
 
-    const weight = relWeight * frequency;
+    const weight = relWeight * Math.log1p(Math.max(1, frequency)) * idf;
+    const targetVector = relType === 'DISLIKED' ? negativeTasteVector : positiveTasteVector;
 
     for (let i = 0; i < 384; i++) {
-      userTasteVector[i] += embedding[i] * weight;
+      targetVector[i] += embedding[i] * weight;
     }
-    totalWeight += weight;
+    if (relType === 'DISLIKED') {
+      negativeWeight += weight;
+    } else {
+      positiveWeight += weight;
+    }
   }
 
-  if (totalWeight <= 0) {
+  if (positiveWeight <= 0) {
     return [];
   }
 
-  // No magnitude normalization needed: the vector index uses cosine similarity,
-  // which is invariant to scaling the query vector by a positive scalar.
+  const normalizedPositiveTaste = normalizedVectorOrNull(positiveTasteVector);
+  if (!normalizedPositiveTaste) return [];
+  const normalizedNegativeTaste = normalizedVectorOrNull(negativeTasteVector);
 
   const vectorResult = await neo4jService.run(
     `
-    CALL db.index.vector.queryNodes('tag_embeddings', toInteger($topK), $userTasteVector)
+    CALL db.index.vector.queryNodes('tag_embeddings', toInteger($topK), $positiveTasteVector)
     YIELD node AS tagNode, score AS similarity
     MATCH (tagNode)<-[h:HAS_TAG]-(ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)
     
     MATCH (me:AppUser {uid: $uid})
     WHERE NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
     
-    WITH ml, m, tagNode.name AS tag, h.frequency AS tagFrequency, similarity
-    WITH ml, m, tag, tagFrequency, (2.0 * similarity - 1.0) AS stdSimilarity
-    WHERE stdSimilarity >= $similarityThreshold
+    WITH
+      ml,
+      m,
+      tagNode.name AS tag,
+      h.frequency AS tagFrequency,
+      coalesce(tagNode.idf, 1.0) AS tagIdf,
+      (2.0 * similarity - 1.0) AS positiveSimilarity,
+      CASE
+        WHEN $hasNegativeTaste
+        THEN (2.0 * vector.similarity.cosine(tagNode.embedding, $negativeTasteVector) - 1.0)
+        ELSE 0.0
+      END AS negativeSimilarity
+    WHERE positiveSimilarity >= $similarityThreshold
     
-    WITH ml, m, sum(tagFrequency * (stdSimilarity ^ 3)) AS rawScore, collect({ tag: tag, frequency: tagFrequency, similarity: stdSimilarity }) AS matchedTags
-    WITH m, rawScore / sqrt(toFloat(coalesce(ml.totalTagCount, 1.0))) AS tagRelevanceScore, matchedTags
+    WITH
+      ml,
+      m,
+      sum(tagIdf * log(toFloat(tagFrequency) + 1.0) * (positiveSimilarity ^ 3)) AS positiveRawScore,
+      sum(tagIdf * log(toFloat(tagFrequency) + 1.0) * CASE
+        WHEN negativeSimilarity > 0.0 THEN negativeSimilarity ^ 3
+        ELSE 0.0
+      END) AS negativeRawScore,
+      collect({ tag: tag, frequency: tagFrequency, similarity: positiveSimilarity }) AS matchedTags
+    WITH
+      m,
+      sum((positiveRawScore - ($negativeTastePenalty * negativeRawScore)) /
+        sqrt(toFloat(coalesce(ml.totalTagCount, 1.0)))) AS tagRelevanceScore,
+      sum(negativeRawScore) AS negativeTagPenalty,
+      reduce(tags = [], entries IN collect(matchedTags) | tags + entries) AS matchedTags
     WHERE tagRelevanceScore > 0
     
     RETURN
       m.tmdbId AS tmdbId,
       m.title AS title,
       tagRelevanceScore,
+      negativeTagPenalty,
       matchedTags,
       m.movieLensAvgRating AS globalAvg,
       m.movieLensRatingCount AS ratingCount
@@ -797,9 +1165,12 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
     `,
     {
       uid,
-      userTasteVector,
-      topK: 25,
-      similarityThreshold: 0.35,
+      positiveTasteVector: normalizedPositiveTaste,
+      negativeTasteVector: normalizedNegativeTaste || new Array(384).fill(0),
+      hasNegativeTaste: normalizedNegativeTaste != null,
+      negativeTastePenalty: config.semanticNegativePenalty,
+      topK: config.semanticTopK,
+      similarityThreshold: config.semanticSimilarityThreshold,
       limit: safeLimit,
     }
   );
@@ -824,6 +1195,7 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
       source: 'semantic-tag',
       reason: 'Matches themes and vibes you enjoy based on your ratings.',
       tagRelevanceScore: rawScore,
+      negativeTagPenalty: toFiniteNumber(rec.get('negativeTagPenalty')),
       matchedTags: Array.isArray(rec.get('matchedTags'))
         ? rec.get('matchedTags').map(mt => ({
             tag: mt.tag,
@@ -834,37 +1206,104 @@ async function getSemanticTagRecommendationCandidates(uid, limit = 50) {
   });
 }
 
+async function getUnactedRecommendationExposures(uid) {
+  const result = await neo4jService.run(
+    `
+    MATCH (:AppUser {uid: $uid})-[:REQUESTED_RECOMMENDATIONS]->
+      (batch:RecommendationBatch)-[included:INCLUDED]->(movie:Movie)
+    WHERE batch.createdAt >= datetime() - duration({days: 30})
+      AND included.impressedAt IS NOT NULL
+      AND included.swipedAt IS NULL
+    RETURN movie.tmdbId AS tmdbId, count(included) AS exposureCount
+    `,
+    { uid }
+  );
+  return new Map(result.records.map((record) => [
+    toNativeNumber(record.get('tmdbId')),
+    toNativeNumber(record.get('exposureCount')) || 0,
+  ]));
+}
+
 async function getRecommendationCandidates(uid) {
-  const personalized = await getPersonalizedRecommendationCandidates(uid);
-  const semantic = await getSemanticTagRecommendationCandidates(uid);
+  const config = recommendationConfigForUser(uid);
+  const [personalizedResult, semanticResult, exposureResult] = await Promise.allSettled([
+    getPersonalizedRecommendationCandidates(uid),
+    getSemanticTagRecommendationCandidates(uid),
+    getUnactedRecommendationExposures(uid),
+  ]);
 
-  const combined = [];
-  const seen = new Set();
-
-  for (const c of personalized) {
-    seen.add(c.tmdbId);
-    combined.push(c);
+  if (personalizedResult.status === 'rejected' && semanticResult.status === 'rejected') {
+    throw new AggregateError(
+      [personalizedResult.reason, semanticResult.reason],
+      'All recommendation sources failed'
+    );
   }
 
-  for (const c of semantic) {
-    if (seen.has(c.tmdbId)) {
-      const existing = combined.find(x => x.tmdbId === c.tmdbId);
-      if (existing) {
-        existing.finalScore += c.finalScore;
-        existing.reason = `${existing.reason} Also matches themes you like.`;
-        existing.source = 'hybrid';
-      }
-    } else {
-      seen.add(c.tmdbId);
-      combined.push(c);
+  if (personalizedResult.status === 'rejected') {
+    console.warn('[Recommendations] Collaborative source unavailable:', personalizedResult.reason);
+  }
+  if (semanticResult.status === 'rejected') {
+    console.warn('[Recommendations] Semantic source unavailable:', semanticResult.reason);
+  }
+
+  const personalized = personalizedResult.status === 'fulfilled' ? personalizedResult.value : [];
+  const semantic = semanticResult.status === 'fulfilled' ? semanticResult.value : [];
+  const exposures = exposureResult.status === 'fulfilled'
+    ? exposureResult.value
+    : new Map();
+
+  const reciprocalRankK = config.reciprocalRankK;
+  const semanticWeight = config.semanticWeight;
+  const byTmdbId = new Map();
+
+  personalized.forEach((candidate, index) => {
+    if (candidate.tmdbId == null || byTmdbId.has(candidate.tmdbId)) return;
+    byTmdbId.set(candidate.tmdbId, {
+      ...candidate,
+      collaborativeRank: index + 1,
+      collaborativeRankingScore: candidate.finalScore,
+      rankFusionScore: 1.0 / (reciprocalRankK + index + 1),
+    });
+  });
+
+  const seenSemantic = new Set();
+  semantic.forEach((candidate, index) => {
+    if (candidate.tmdbId == null || seenSemantic.has(candidate.tmdbId)) return;
+    seenSemantic.add(candidate.tmdbId);
+    const contribution = semanticWeight / (reciprocalRankK + index + 1);
+    const existing = byTmdbId.get(candidate.tmdbId);
+    if (existing) {
+      existing.rankFusionScore += contribution;
+      existing.semanticRank = index + 1;
+      existing.semanticScore = candidate.finalScore;
+      existing.tagRelevanceScore = candidate.tagRelevanceScore;
+      existing.negativeTagPenalty = candidate.negativeTagPenalty;
+      existing.matchedTags = candidate.matchedTags;
+      existing.reason = `${existing.reason} Also matches themes you like.`;
+      existing.source = 'hybrid';
+      return;
     }
-  }
+    byTmdbId.set(candidate.tmdbId, {
+      ...candidate,
+      semanticRank: index + 1,
+      semanticScore: candidate.finalScore,
+      rankFusionScore: contribution,
+    });
+  });
 
-  combined.sort((a, b) => b.finalScore - a.finalScore);
+  const combined = Array.from(byTmdbId.values());
+  for (const candidate of combined) {
+    const exposureCount = exposures.get(candidate.tmdbId) || 0;
+    candidate.unactedExposureCount = exposureCount;
+    candidate.rankFusionScore /= 1.0 + (0.15 * exposureCount);
+    candidate.finalScore = candidate.rankFusionScore * 1000.0;
+  }
+  combined.sort((a, b) => b.rankFusionScore - a.rankFusionScore);
 
   if (combined.length > 0) {
     return {
       candidates: combined,
+      experimentVariant: config.variant,
       fallbackUsed: false,
       fallbackReason: null,
       fallbackStrategy: null,
@@ -873,6 +1312,7 @@ async function getRecommendationCandidates(uid) {
 
   return {
     candidates: [],
+    experimentVariant: config.variant,
     fallbackUsed: false,
     fallbackReason: null,
     fallbackStrategy: null,
@@ -930,7 +1370,14 @@ async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 
       preferredGenres,
       positiveGenres,
       negativeGenres,
-      [genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) WHERE genre IS NOT NULL] AS candidateGenres,
+      reduce(
+        uniqueGenres = [],
+        genre IN collect(DISTINCT mlGenre.name) + collect(DISTINCT movieGenre.name) |
+        CASE
+          WHEN genre IS NULL OR genre IN uniqueGenres THEN uniqueGenres
+          ELSE uniqueGenres + genre
+        END
+      ) AS candidateGenres,
       toFloat(coalesce(m.movieLensRatingCount, 0)) AS ratingCount,
       toFloat(coalesce(m.movieLensAvgRating, $globalMeanRating)) AS avgRating
     WITH
@@ -938,7 +1385,7 @@ async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 
       ratingCount,
       avgRating,
       size([genre IN candidateGenres WHERE genre IN preferredGenres OR genre IN positiveGenres]) AS familiarGenres,
-      size([genre IN candidateGenres WHERE NOT genre IN preferredGenres AND NOT genre IN positiveGenres]) AS exploratoryGenres,
+      size([genre IN candidateGenres WHERE NOT genre IN preferredGenres AND NOT genre IN positiveGenres AND NOT genre IN negativeGenres]) AS exploratoryGenres,
       size([genre IN candidateGenres WHERE genre IN negativeGenres]) AS matchedNegativeGenres
 
     RETURN
@@ -960,8 +1407,8 @@ async function getExploratoryCandidates(uid, { excludedTmdbIds = [], limit = 30 
         ELSE 'Popular unseen title kept to test uncertain taste edges.'
       END AS reason
     ORDER BY
-      explorationBonus DESC,
       finalScore DESC,
+      explorationBonus DESC,
       ratingCount DESC
     LIMIT toInteger($limit)
     `,
@@ -1309,6 +1756,8 @@ async function findMoviesBySemanticTags(tagsWithWeights, uid) {
 }
 
 module.exports = {
+  DailySwipeLimitError,
+  InvalidRecommendationContextError,
   findMovieByTmdbId,
   findMoviesByTmdbIds,
   mergeTmdbMovie,
@@ -1317,6 +1766,10 @@ module.exports = {
   dislikeMovie,
   watchlistMovie,
   markMovieAsSeen,
+  recordRecommendationBatch,
+  recordRecommendationImpressions,
+  getDailySwipeUsage,
+  getRecommendationMetrics,
   saveSelectedFavorites,
   savePreferredGenres,
   removeFromWatchlist,
