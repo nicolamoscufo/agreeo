@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="docs/agreeo_logo.png" alt="Agreeo Logo" width="130" style="border-radius: 28px;" />
   <h1>Agreeo</h1>
   <p><strong>Graph-Native Movie Recommendation &amp; Social Decision Engine</strong></p>
 
@@ -32,7 +31,6 @@
   - [3. Transactional Quota Increment (`M06`)](#3-transactional-quota-increment-m06)
   - [4. Symmetric Social Invariants (`S06`)](#4-symmetric-social-invariants-s06)
   - [5. Group Voting Lock on Event Node (`S44`)](#5-group-voting-lock-on-event-node-s44)
-- [Mobile Client Previews](#-mobile-client-previews)
 - [Technical Architecture & Stack](#-technical-architecture--stack)
 - [Getting Started & Local Setup](#-getting-started--local-setup)
   - [Prerequisites](#prerequisites)
@@ -195,29 +193,6 @@ SET v.vote = $vote, v.updatedAt = datetime(),
     ev.updatedAt = datetime()  // Exclusive write-lock serializes concurrent votes
 RETURN m.tmdbId;
 ```
-
----
-
-## 📱 Mobile Client Previews
-
-<div align="center">
-  <table border="0">
-    <tr>
-      <td align="center"><strong>Login &amp; Auth</strong></td>
-      <td align="center"><strong>Personalized Home</strong></td>
-      <td align="center"><strong>Discovery Swipe Deck</strong></td>
-      <td align="center"><strong>Social &amp; Friends</strong></td>
-      <td align="center"><strong>User Library</strong></td>
-    </tr>
-    <tr>
-      <td><img src="docs/screenshots/iphone_xr/01_login.png" width="180" alt="Login" /></td>
-      <td><img src="docs/screenshots/iphone_xr/02_home.png" width="180" alt="Home" /></td>
-      <td><img src="docs/screenshots/iphone_xr/04_swipe.png" width="180" alt="Swipe" /></td>
-      <td><img src="docs/screenshots/iphone_xr/05_friends.png" width="180" alt="Friends" /></td>
-      <td><img src="docs/screenshots/iphone_xr/03_library.png" width="180" alt="Library" /></td>
-    </tr>
-  </table>
-</div>
 
 ---
 
