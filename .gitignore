@@ -65,13 +65,14 @@ backend/struttura_*.txt
 .env.azure
 .env.azure.local
 
-# Local external MCP clone (keep out of this repo)
+# Local tools & search utilities
+tools/mcp/
 tools/mcp/web-search-mcp/
 
 # Screenshot di lavorazione del design Daylight (usa-e-getta)
 design_reference/scraps/
 
-# Graphify / vexp: ignore generated indexes, caches and local graphs
+# Local search and navigation index caches
 vexp/
 .vexp/
 vexp-*
@@ -92,3 +93,14 @@ graphify-outputs/
 graphify-out/
 graphify_tmp/
 graphify-temp/
+
+# Local developer notes and editor workspace tooling
+AGENTS.md
+.clinerules/
+vexp.toml
+.mcp.json
+.vscode/mcp.json
+.impeccable/
+.codex/
+.github/copilot-instructions.md
+docs/WORKSPACE_CLEANUP_PLAN.md

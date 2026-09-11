@@ -1,4 +1,4 @@
-﻿# ðŸ› ï¸ Agreeo â€” Piano di Remediation e Hardening Production
+# ðŸ› ï¸ Agreeo â€” Piano di Remediation e Hardening Production
 
 > Piano operativo per risolvere i problemi emersi nell'audit di production-readiness
 > e applicare i miglioramenti. Ordinato per prioritÃ : **Fase 1 (Critical, bloccanti)**
@@ -269,8 +269,8 @@ this._driver = neo4j.driver(uri, neo4j.auth.basic(user, password), {
 - [x] Verificare label dei campi form (auth, onboarding, edit profile).
 - [ ] Controllo contrasto sui token tema ([lib/shared/theme/agreeo_tokens.dart](../lib/shared/theme/agreeo_tokens.dart)) per WCAG AA.
 
-## 3.9 â€” CI: lint + test + audit
-**File:** [.github/](../.github/) (oggi solo `copilot-instructions.md`, nessun workflow).
+## 3.9 — CI: lint + test + audit
+**File:** [.github/](../.github/) (aggiungere workflow CI).
 - [x] Workflow GitHub Actions: `flutter analyze` + `flutter test` (frontend) e `node --test` + `npm audit --audit-level=high` (backend) su PR.
 - [ ] Bloccare il merge su fallimento test/audit critico.
 

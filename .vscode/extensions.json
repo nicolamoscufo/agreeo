@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "vexp.vexp-vscode"
+        "Dart-Code.flutter",
+        "Dart-Code.dart-code"
     ]
 }

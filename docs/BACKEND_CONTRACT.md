@@ -155,7 +155,7 @@ status mirrored in `realTimeConnectionProvider`.
 
 ## 4. Gaps — DA CHIARIRE (decide together before the affected phase)
 
-1. **`theme_mode_provider.dart` does not exist.** The migration prompt (Phases 1, 4,
+1. **`theme_mode_provider.dart` does not exist.** The migration specification (Phases 1, 4,
    Settings) says to wire `themeMode` to an *existing*
    `lib/shared/state/theme_mode_provider.dart`. That file is **absent**; `app.dart`
    currently hardcodes `themeMode: ThemeMode.dark`. The Settings screen's
@@ -167,7 +167,7 @@ status mirrored in `realTimeConnectionProvider`.
 2. **Bottom-nav shape mismatch (3 different specs).**
    - Current shell (`agreeo_home_shell.dart`): `Home(0) · Library(1) · Swipe(2) · Friends(3) · Profile(4)`.
    - JSX `BottomNav` (`ag-shared.jsx`): `Home · Swipe · [Movie-Night FAB] · Library · Friends` — **no Profile tab** (profile is reached via the header avatar).
-   - Migration prompt Phase 2: `Home · Swipe · Library · Friends · Profile`.
+   - Migration specification Phase 2: `Home · Swipe · Library · Friends · Profile`.
    → **Decision needed:** which tab order + does the center Movie-Night FAB stay?
    If we adopt the JSX layout, Profile moves to a header-avatar route and the shell's
    `navIndexProvider` index meaning changes.

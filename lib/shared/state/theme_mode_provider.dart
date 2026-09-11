@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Persists the user's Light/Dark/System choice for the Daylight theme.
 ///
 /// This is presentation state (not part of the backend contract). It was added
-/// during the Daylight migration because the prompt referenced a
+/// during the Daylight theme migration because the UI design specification referenced a
 /// `theme_mode_provider` that did not yet exist. The Settings screen binds its
 /// theme toggle to [themeModeProvider]; `app.dart` watches it for `themeMode`.
 class ThemeModeController extends StateNotifier<ThemeMode> {

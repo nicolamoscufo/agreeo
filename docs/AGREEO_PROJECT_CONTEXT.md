@@ -1,7 +1,7 @@
 # Agreeo / MoveMate Project Context and Neo4j Integration Guide
 
 **Last updated:** 2026-05-10  
-**Intended audience:** coding agents, AI pair programmers, repository maintainers, backend/frontend implementers  
+**Intended audience:** repository maintainers, backend and frontend developers, project reviewers  
 **Project origin:** User-Driven Software Engineering course project, originally assigned as **Project D – MoveMate**  
 **Current product name used in the assignment:** **Agreeo**
 
@@ -472,7 +472,7 @@ The project follows an iterative user-centered process:
 8. Evaluate prototypes.
 9. Improve the system based on findings.
 
-Coding agents must not treat the UI as random screens. Each flow should map back to user needs and task models.
+Developers must not treat the UI as random screens. Each flow should map back to user needs and task models.
 
 ### 11.2 Interaction Design Basics
 
@@ -623,7 +623,7 @@ The backend translates these API calls into Neo4j Cypher queries.
 
 ## 15. Proposed Neo4j Graph Model
 
-This schema is intentionally practical and agent-friendly. Adapt names to the existing repository conventions.
+This schema is intentionally practical and developer-friendly. Adapt names to the existing repository conventions.
 
 ### 15.1 Node Labels
 
@@ -1145,9 +1145,9 @@ The next prototype should improve:
 
 ---
 
-## 26. Acceptance Criteria for Coding Agents
-
-A coding agent working on this project should satisfy these acceptance criteria.
+## 26. Engineering Acceptance Criteria
+ 
+The system implementation should satisfy these acceptance criteria.
 
 ### 26.1 Product Criteria
 
@@ -1249,9 +1249,9 @@ If the answer is no, it should be deferred.
 
 ---
 
-## 29. Instructions for Future AI Coding Agents
-
-When working on this project:
+## 29. Core Development Guidelines
+ 
+When contributing to this project:
 
 1. Read this file first.
 2. Preserve the core value proposition: reduce group decision fatigue.

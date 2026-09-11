@@ -50,7 +50,7 @@ watch(agreeoAppControllerProvider):
 | 3 | Friends | `FriendsScreen` |
 | 4 | Profile | `AgreeoProfileScreen` |
 
-> ⚠️ This order differs from both the JSX `BottomNav` and the migration prompt — see
+> ⚠️ This order differs from both the JSX `BottomNav` and the initial design specification — see
 > **GAP §4.2** in `BACKEND_CONTRACT.md`. Resolve the canonical order before Phase 2.
 
 **AppBar actions (Home tab only):** Mood sheet (`showMoodSelectorSheet`), Random-pick
