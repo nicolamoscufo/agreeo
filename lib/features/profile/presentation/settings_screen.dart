@@ -249,8 +249,8 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                     rows: [
                       _NavRow(
                         icon: AgIcons.sparkle,
-                        title: 'Neo4j Console',
-                        subtitle: 'Schema, indici e query Cypher live',
+                        title: 'Recommendation Lab',
+                        subtitle: 'Motore, score e query Cypher live',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const Neo4jConsoleScreen(),
@@ -353,46 +353,48 @@ class _ThemeSelector extends StatelessWidget {
         border: Border.all(color: t.line),
       ),
       child: Row(
-        children: items.map((item) {
-          final on = mode == item.$1;
-          return Expanded(
-            child: Semantics(
-              button: true,
-              selected: on,
-              label: '${item.$2} theme',
-              excludeSemantics: true,
-              child: GestureDetector(
-                onTap: () => onChanged(item.$1),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  height: 42,
-                  decoration: BoxDecoration(
-                    gradient: on ? t.grad : null,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        item.$3,
-                        size: 18,
-                        color: on ? Colors.white : t.sub,
+        children: items
+            .map((item) {
+              final on = mode == item.$1;
+              return Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: on,
+                  label: '${item.$2} theme',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    onTap: () => onChanged(item.$1),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: on ? t.grad : null,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        item.$2,
-                        style: AgText.label.copyWith(
-                          fontSize: 14,
-                          color: on ? Colors.white : t.sub,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            item.$3,
+                            size: 18,
+                            color: on ? Colors.white : t.sub,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            item.$2,
+                            style: AgText.label.copyWith(
+                              fontSize: 14,
+                              color: on ? Colors.white : t.sub,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          );
-        }).toList(growable: false),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }
@@ -560,8 +562,9 @@ class _VersionRow extends StatelessWidget {
       future: _packageInfoFuture,
       builder: (context, snapshot) {
         final info = snapshot.data;
-        final version =
-            info == null ? '—' : '${info.version} (${info.buildNumber})';
+        final version = info == null
+            ? '—'
+            : '${info.version} (${info.buildNumber})';
         return _InfoRow(
           icon: Icons.info_outline_rounded,
           title: 'Version',

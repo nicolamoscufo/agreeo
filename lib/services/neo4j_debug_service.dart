@@ -240,7 +240,8 @@ class Neo4jDebugService {
             labelsOrTypes: _asStringList(entry['labelsOrTypes']),
             properties: _asStringList(entry['properties']),
             state: entry['state']?.toString() ?? '?',
-            populationPercent: (entry['populationPercent'] as num?)?.toDouble() ?? 0,
+            populationPercent:
+                (entry['populationPercent'] as num?)?.toDouble() ?? 0,
             provider: entry['provider']?.toString() ?? '?',
             options: entry['options'] as Map<String, dynamic>? ?? const {},
           ),
@@ -258,6 +259,10 @@ class Neo4jDebugService {
     );
   }
 
+  Future<Map<String, dynamic>> getRecommendationEngine() {
+    return _getJson('/me/recommendations/debug-stats');
+  }
+
   /// Runs a read-only Cypher query. [mode] is `null`, `explain` or `profile`.
   Future<Neo4jQueryResult> runQuery(String query, {String? mode}) async {
     final body = await _postJson('/debug/neo4j/query', {
@@ -268,13 +273,16 @@ class Neo4jDebugService {
     return Neo4jQueryResult(
       columns: _asStringList(body['columns']),
       rows: [
-        for (final row in body['rows'] as List? ?? const []) row as List<dynamic>,
+        for (final row in body['rows'] as List? ?? const [])
+          row as List<dynamic>,
       ],
       truncated: body['truncated'] == true,
       totalRows: _asInt(body['totalRows']),
       wallTimeMs: _asInt(body['wallTimeMs']),
-      resultAvailableAfterMs: (summary['resultAvailableAfterMs'] as num?)?.toInt(),
-      resultConsumedAfterMs: (summary['resultConsumedAfterMs'] as num?)?.toInt(),
+      resultAvailableAfterMs: (summary['resultAvailableAfterMs'] as num?)
+          ?.toInt(),
+      resultConsumedAfterMs: (summary['resultConsumedAfterMs'] as num?)
+          ?.toInt(),
       queryType: summary['queryType']?.toString(),
       plan: _decodePlan(summary['plan']),
     );
@@ -292,7 +300,8 @@ class Neo4jDebugService {
       rows: raw['rows'] as num?,
       dbHits: raw['dbHits'] as num?,
       children: [
-        for (final child in raw['children'] as List? ?? const []) ?_decodePlan(child),
+        for (final child in raw['children'] as List? ?? const [])
+          ?_decodePlan(child),
       ],
     );
   }
@@ -302,7 +311,10 @@ class Neo4jDebugService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> _postJson(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     final response = await _authorizedRequest('POST', path, body: body);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -363,7 +375,11 @@ class Neo4jDebugService {
     switch (method) {
       case 'POST':
         return _client
-            .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
+            .post(
+              uri,
+              headers: headers,
+              body: body == null ? null : jsonEncode(body),
+            )
             .timeout(_requestTimeout);
       case 'GET':
         return _client.get(uri, headers: headers).timeout(_requestTimeout);

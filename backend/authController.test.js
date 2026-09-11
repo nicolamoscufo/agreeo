@@ -215,16 +215,26 @@ test('deleteAccount requires the password and verifies it', async (t) => {
 
 test('deleteAccount detaches and deletes the user node on success', async (t) => {
   const passwordHash = await bcrypt.hash('rightpass1', 10);
-  const calls = stubRun(t, (query, params, callIndex) =>
-    callIndex === 1 ? { records: [record({ passwordHash })] } : { records: [] }
-  );
+  const calls = stubRun(t, () => ({ records: [record({ passwordHash })] }));
+  const originalExecuteWrite = neo4jService.executeWrite;
+  t.after(() => {
+    neo4jService.executeWrite = originalExecuteWrite;
+  });
+  neo4jService.executeWrite = async (actions) => actions({
+    run: async (query, params) => {
+      calls.push({ query, params });
+      return { records: [] };
+    },
+  });
 
   const res = mockRes();
   await authController.deleteAccount(mockReq({ password: 'rightpass1' }), res);
 
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { ok: true });
-  assert.equal(calls.length, 2);
-  assert.match(calls[1].query, /DETACH DELETE u/);
-  assert.equal(calls[1].params.uid, 'u1');
+  assert.equal(calls.length, 4);
+  assert.match(calls[1].query, /RecommendationBatch/);
+  assert.match(calls[2].query, /DailySwipeQuota/);
+  assert.match(calls[3].query, /DETACH DELETE u/);
+  assert.equal(calls[3].params.uid, 'u1');
 });

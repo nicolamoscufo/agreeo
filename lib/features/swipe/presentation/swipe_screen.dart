@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:agreeo/features/movie_details/presentation/movie_details_screen.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
+import 'package:agreeo/shared/state/nav_index_provider.dart';
 import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
 import 'package:agreeo/shared/ui/ag_ui.dart';
@@ -27,6 +28,9 @@ int _swipeImageCacheWidth(BuildContext context) {
       .round();
 }
 
+@visibleForTesting
+bool shouldReportSwipeImpression(int activeTab) => activeTab == AgNavTab.swipe;
+
 class AgreeoSwipeScreen extends ConsumerStatefulWidget {
   const AgreeoSwipeScreen({super.key, this.onNavigateTab});
 
@@ -41,13 +45,19 @@ enum SwipeDirection { left, right, up, down }
 class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   bool _queueRefillScheduled = false;
   final Set<String> _precachedSwipeImages = <String>{};
+  final Set<String> _reportedImpressions = <String>{};
+  Timer? _limitResetTimer;
+  DateTime? _scheduledLimitResetAt;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduleRefillIfNeeded(0);
-    });
+  }
+
+  @override
+  void dispose() {
+    _limitResetTimer?.cancel();
+    super.dispose();
   }
 
   void _scheduleRefillIfNeeded(int queueLength) {
@@ -71,13 +81,17 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
     Future<String> Function() action;
     switch (direction) {
       case SwipeDirection.left:
-        action = () => controller.dislikeMovie(movieId);
+        action = () =>
+            controller.dislikeMovie(movieId, fromDailySuggestions: true);
       case SwipeDirection.right:
-        action = () => controller.likeMovie(movieId);
+        action = () =>
+            controller.likeMovie(movieId, fromDailySuggestions: true);
       case SwipeDirection.up:
-        action = () => controller.markAsWatched(movieId);
+        action = () =>
+            controller.markAsWatched(movieId, fromDailySuggestions: true);
       case SwipeDirection.down:
-        action = () => controller.addToWatchlist(movieId);
+        action = () =>
+            controller.addToWatchlist(movieId, fromDailySuggestions: true);
     }
     try {
       await action();
@@ -88,6 +102,51 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(error.toString())));
     }
+  }
+
+  void _scheduleImpression(AgreeoAppState state, Movie? movie) {
+    if (movie == null) return;
+    final context = state.dailySuggestionContextFor(movie.id);
+    if (context == null) return;
+    final key = '${context.batchId}:${movie.id}';
+    if (!_reportedImpressions.add(key)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      try {
+        await ref
+            .read(agreeoAppControllerProvider.notifier)
+            .recordDailySuggestionImpression(movie.id, context: context);
+      } catch (_) {
+        _reportedImpressions.remove(key);
+      }
+    });
+  }
+
+  void _scheduleLimitReset(AgreeoAppState state) {
+    final resetAt = state.dailySwipeResetAt;
+    if (!state.dailySwipeLimitReached || resetAt == null) {
+      _limitResetTimer?.cancel();
+      _limitResetTimer = null;
+      _scheduledLimitResetAt = null;
+      return;
+    }
+    if (_scheduledLimitResetAt == resetAt && _limitResetTimer != null) return;
+    _limitResetTimer?.cancel();
+    _scheduledLimitResetAt = resetAt;
+    final delay = resetAt.difference(DateTime.now());
+    _limitResetTimer = Timer(
+      delay.isNegative ? Duration.zero : delay + const Duration(seconds: 1),
+      () {
+        if (!mounted) return;
+        _scheduledLimitResetAt = null;
+        setState(() {});
+        unawaited(
+          ref
+              .read(agreeoAppControllerProvider.notifier)
+              .refreshMovieSuggestions(),
+        );
+      },
+    );
   }
 
   void _scheduleSwipeImagePrecache(BuildContext context, List<Movie> queue) {
@@ -126,11 +185,21 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final state = ref.watch(agreeoAppControllerProvider);
+    final activeTab = ref.watch(navIndexProvider);
+    final isActive = shouldReportSwipeImpression(activeTab);
     final queue = state.remainingDailySuggestions;
-    _scheduleSwipeImagePrecache(context, queue);
-    _scheduleRefillIfNeeded(queue.length);
+    _scheduleLimitReset(state);
+    if (isActive) {
+      _scheduleSwipeImagePrecache(context, queue);
+    }
+    if (isActive && !state.dailySwipeLimitReached) {
+      _scheduleRefillIfNeeded(queue.length);
+    }
     final currentMovie = queue.isNotEmpty ? queue.first : null;
     final nextMovie = queue.length > 1 ? queue[1] : null;
+    if (isActive) {
+      _scheduleImpression(state, currentMovie);
+    }
 
     if (currentMovie == null) {
       // Cold start: the deck is empty because data hasn't hydrated yet, not
@@ -142,6 +211,8 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
         );
       }
       return _SwipeEmptyState(
+        limitReached: state.dailySwipeLimitReached,
+        resetAt: state.dailySwipeResetAt,
         onRefresh: () {
           HapticFeedback.mediumImpact();
           ref
@@ -165,22 +236,34 @@ class _AgreeoSwipeScreenState extends ConsumerState<AgreeoSwipeScreen> {
             ),
           Positioned.fill(
             child: RepaintBoundary(
-              child: SwipeableCard(
-                key: ValueKey<String>(currentMovie.id),
-                movie: currentMovie,
-                canUndo: state.undoStack.isNotEmpty,
-                onSwiped: (direction) =>
-                    _handleSwiped(currentMovie.id, direction),
-                onUndo: () async {
-                  HapticFeedback.lightImpact();
-                  await ref
-                      .read(agreeoAppControllerProvider.notifier)
-                      .undoLastAction();
-                },
-                onInfoTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        AgreeoMovieDetailsScreen(movieId: currentMovie.id),
+              child: IgnorePointer(
+                ignoring: state.movieMutationInProgress,
+                child: SwipeableCard(
+                  key: ValueKey<String>(currentMovie.id),
+                  movie: currentMovie,
+                  canUndo: state.undoStack.isNotEmpty,
+                  onSwiped: (direction) =>
+                      _handleSwiped(currentMovie.id, direction),
+                  onUndo: () async {
+                    HapticFeedback.lightImpact();
+                    try {
+                      await ref
+                          .read(agreeoAppControllerProvider.notifier)
+                          .undoLastAction();
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          SnackBar(content: Text(error.toString())),
+                        );
+                    }
+                  },
+                  onInfoTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AgreeoMovieDetailsScreen(movieId: currentMovie.id),
+                    ),
                   ),
                 ),
               ),
@@ -266,9 +349,16 @@ class _GlassPill extends StatelessWidget {
 }
 
 class _SwipeEmptyState extends StatelessWidget {
-  const _SwipeEmptyState({required this.onRefresh, required this.onLibrary});
+  const _SwipeEmptyState({
+    required this.onRefresh,
+    required this.onLibrary,
+    required this.limitReached,
+    this.resetAt,
+  });
   final VoidCallback onRefresh;
   final VoidCallback onLibrary;
+  final bool limitReached;
+  final DateTime? resetAt;
 
   @override
   Widget build(BuildContext context) {
@@ -300,22 +390,26 @@ class _SwipeEmptyState extends StatelessWidget {
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  'All caught up',
+                  limitReached ? 'Daily limit reached' : 'All caught up',
                   style: AgText.h2.copyWith(letterSpacing: -0.5, color: t.text),
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  "You've swiped through every suggestion.\nRefresh for new picks or browse your library.",
+                  limitReached
+                      ? 'Your next daily picks unlock${resetAt == null ? ' tomorrow.' : ' at ${TimeOfDay.fromDateTime(resetAt!.toLocal()).format(context)}.'}'
+                      : "You've swiped through every suggestion.\nRefresh for new picks or browse your library.",
                   textAlign: TextAlign.center,
                   style: AgText.body.copyWith(height: 1.5, color: t.sub),
                 ),
                 const SizedBox(height: 24),
-                AgButton(
-                  label: 'Refresh suggestions',
-                  icon: AgIcons.refresh,
-                  onPressed: onRefresh,
-                ),
-                const SizedBox(height: 12),
+                if (!limitReached) ...[
+                  AgButton(
+                    label: 'Refresh suggestions',
+                    icon: AgIcons.refresh,
+                    onPressed: onRefresh,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 AgButton.secondary(
                   label: 'Go to Library',
                   icon: AgIcons.library,

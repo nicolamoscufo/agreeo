@@ -2,7 +2,13 @@ const path = require('path');
 const fs = require('fs');
 const neo4jService = require('./neo4jService');
 
-const CACHE_FILE = path.join(__dirname, 'data', 'tag_embeddings_multilingual_cache.json');
+const MODEL_ID = process.env.EMBEDDING_MODEL_ID || 'Xenova/multilingual-e5-small';
+const MODEL_REVISION = process.env.EMBEDDING_MODEL_REVISION || '761b726dd34fb83930e26aab4e9ac3899aa1fa78';
+const CACHE_FILE = path.join(
+  __dirname,
+  'data',
+  `tag_embeddings_${MODEL_REVISION.slice(0, 12)}.json`
+);
 let tagEmbeddings = {};
 // We cache the in-flight promises (not the resolved values) so that concurrent
 // first requests share a single import/model-load instead of each starting their
@@ -35,8 +41,10 @@ function getExtractor() {
   if (!extractorPromise) {
     extractorPromise = (async () => {
       const pipeline = await loadTransformers();
-      console.log('[EmbeddingService] Loading Xenova/multilingual-e5-small model...');
-      const ext = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+      console.log(`[EmbeddingService] Loading ${MODEL_ID}@${MODEL_REVISION}...`);
+      const ext = await pipeline('feature-extraction', MODEL_ID, {
+        revision: MODEL_REVISION,
+      });
       console.log('[EmbeddingService] Model loaded successfully.');
       return ext;
     })().catch((err) => {
@@ -135,6 +143,7 @@ async function initialize() {
     console.log('[EmbeddingService] Saved tag embeddings cache to disk.');
   } catch (err) {
     console.error('[EmbeddingService] Initialization query/embedding failed:', err);
+    throw err;
   }
 }
 
@@ -174,6 +183,9 @@ async function findSimilarTags(queryText, topK = 15, similarityThreshold = 0.3) 
 }
 
 module.exports = {
+  CACHE_FILE,
+  MODEL_ID,
+  MODEL_REVISION,
   initialize,
   findSimilarTags,
   getEmbedding,

@@ -56,6 +56,54 @@ For Docker local development, the repo expects those files under
 docker compose up neo4j-init
 ```
 
+Semantic recommendations also require materialized `Tag` nodes, embeddings,
+and `HAS_TAG` relationships. Generate and verify them with:
+
+```bash
+docker compose up --build semantic-init
+```
+
+`docker compose up --build` runs both initialization jobs before starting the
+backend. The semantic job fails if embeddings or graph relationships are
+incomplete, rather than leaving an online but empty vector index.
+
+## Recommendation events and daily limits
+
+Daily suggestions are returned with a `batchId`. The client records card
+impressions against that batch and sends the same context with swipe actions.
+Neo4j stores batch position, recommendation source, score, impression, and
+action on `RecommendationBatch-[:INCLUDED]->Movie` relationships.
+
+Set the server-enforced daily limit with:
+
+```bash
+ENABLE_DAILY_SWIPE_LIMIT=true
+DAILY_SWIPE_LIMIT=20
+```
+
+Only actions from the Daily Suggestions deck consume this limit; likes and
+watchlist changes from details or library screens do not. Usage resets at
+midnight UTC. Recommendation event data is retained for 90 days.
+
+With `ENABLE_RECOMMENDATION_DEBUG=true`, authenticated diagnostics are
+available from `GET /me/recommendations/metrics?days=30`.
+
+Ranking parameters and the deterministic A/B split are controlled by the
+variables documented in `.env.example`. Evaluate observed batches with:
+
+```bash
+cd backend
+npm run evaluate:recommendations -- 30
+```
+
+This reports Precision@10, MRR, NDCG@10, catalog coverage, and per-variant
+results. `MOVIELENS_DATA_DIR` can point to a larger compatible MovieLens export
+when broader recent-film coverage is required.
+
+MovieLens data has its own license and is not automatically cleared for
+commercial use. Confirm the intended deployment with GroupLens before using
+the dataset in a revenue-bearing product.
+
 Without this import, authenticated swipe suggestions can be empty because
 Neo4j has no `MovieLensMovie`, `MATCHES_TMDB`, or `RATED` recommendation data.
 
@@ -74,6 +122,8 @@ The app follows a feature-first `lib/` layout:
 - `lib/models/` — data models shared with the backend contract.
 
 Navigation is documented in `docs/ROUTING_MAP.md`.
+The exam-oriented live recommendation walkthrough is documented in
+`docs/RECOMMENDATION_ENGINE_EXAM_GUIDE.md`.
 
 ## Getting started
 

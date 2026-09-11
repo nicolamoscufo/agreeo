@@ -1,4 +1,36 @@
 const neo4j = require('neo4j-driver');
+const { AsyncLocalStorage } = require('node:async_hooks');
+
+const queryTraceStorage = new AsyncLocalStorage();
+
+function traceValue(value, key = '') {
+  if (key === 'uid') return '<current-user>';
+  if (Array.isArray(value)) {
+    if (value.length > 20) return `<array:${value.length}>`;
+    return value.map((entry) => traceValue(entry));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        traceValue(entryValue, entryKey),
+      ])
+    );
+  }
+  return value;
+}
+
+function classifyQuery(query) {
+  if (query.includes("'personalized' AS source")) return 'Collaborative filtering';
+  if (query.includes("queryNodes('tag_embeddings'")) return 'Vector similarity search';
+  if (query.includes('t.embedding AS embedding')) return 'User semantic profile';
+  if (query.includes("'exploratory' AS source")) return 'Exploratory candidates';
+  if (query.includes('RecommendationBatch') && query.includes('INCLUDED')) return 'Recommendation events';
+  if (query.includes('PREFERS_GENRE')) return 'Genre preferences';
+  if (query.includes('REQUESTED_RECOMMENDATIONS')) return 'Exposure signals';
+  if (query.includes('WHERE m.tmdbId IN $tmdbIds')) return 'Movie hydration cache';
+  return 'Neo4j query';
+}
 
 class Neo4jService {
   constructor() {
@@ -47,12 +79,43 @@ class Neo4jService {
 
   async run(query, params = {}) {
     const session = this.session();
+    const trace = queryTraceStorage.getStore();
+    const traceEntry = trace
+      ? {
+          order: trace.length + 1,
+          name: classifyQuery(query),
+          query: query.trim(),
+          params: traceValue(params),
+          durationMs: null,
+          records: null,
+          error: null,
+        }
+      : null;
+    if (traceEntry) trace.push(traceEntry);
+    const startedAt = Date.now();
 
     try {
-      return await session.run(query, params);
+      const result = await session.run(query, params);
+      if (traceEntry) {
+        traceEntry.durationMs = Date.now() - startedAt;
+        traceEntry.records = result.records.length;
+      }
+      return result;
+    } catch (error) {
+      if (traceEntry) {
+        traceEntry.durationMs = Date.now() - startedAt;
+        traceEntry.error = error instanceof Error ? error.message : String(error);
+      }
+      throw error;
     } finally {
       await session.close();
     }
+  }
+
+  async captureQueryTrace(actions) {
+    const queries = [];
+    const value = await queryTraceStorage.run(queries, actions);
+    return { value, queries };
   }
 
   async executeWrite(actions) {
@@ -149,6 +212,24 @@ class Neo4jService {
     `);
 
     await this.run(`
+      CREATE CONSTRAINT recommendation_batch_id IF NOT EXISTS
+      FOR (b:RecommendationBatch)
+      REQUIRE b.id IS UNIQUE
+    `);
+
+    await this.run(`
+      CREATE INDEX recommendation_batch_created_at IF NOT EXISTS
+      FOR (b:RecommendationBatch)
+      ON (b.createdAt)
+    `);
+
+    await this.run(`
+      CREATE CONSTRAINT daily_swipe_quota_key IF NOT EXISTS
+      FOR (q:DailySwipeQuota)
+      REQUIRE q.key IS UNIQUE
+    `);
+
+    await this.run(`
       CREATE INDEX movie_title IF NOT EXISTS
       FOR (m:Movie)
       ON (m.title)
@@ -166,6 +247,30 @@ class Neo4jService {
       CREATE INDEX movie_ml_rating_count IF NOT EXISTS
       FOR (m:Movie)
       ON (m.movieLensRatingCount)
+    `);
+
+    // Older TMDB cache writes stored genre names only as a property. Keep the
+    // graph representation used by recommendation queries in sync on startup.
+    await this.run(`
+      MATCH (m:Movie)
+      WHERE size(coalesce(m.genres, [])) > 0
+      UNWIND m.genres AS genreName
+      MERGE (g:Genre {name: genreName})
+      MERGE (m)-[:IN_GENRE]->(g)
+    `);
+
+    // Recommendation events are operational analytics, not permanent user
+    // profile data. Keep a bounded window for diagnostics and ranking metrics.
+    await this.run(`
+      MATCH (batch:RecommendationBatch)
+      WHERE batch.createdAt < datetime() - duration({days: 90})
+      DETACH DELETE batch
+    `);
+
+    await this.run(`
+      MATCH (quota:DailySwipeQuota)
+      WHERE quota.day < date() - duration({days: 90})
+      DETACH DELETE quota
     `);
   }
 

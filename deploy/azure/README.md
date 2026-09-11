@@ -215,7 +215,18 @@ Usa `down -v` solo se vuoi eliminare anche i dati del database.
 
 ## Note per demo pubblica
 
-Per una demo rapida basta `http://<vm-public-ip>`. Prima di condividere l'app pubblicamente, aggiungi dominio e HTTPS con Caddy o Nginx. In quel caso aggiorna `BACKEND_BASE_URL` con l'URL HTTPS del backend e ricostruisci il frontend.
+Per una demo rapida basta `http://<vm-public-ip>`. Prima di condividere l'app pubblicamente, aggiungi dominio e HTTPS con Caddy o Nginx. In quel caso aggiorna `BACKEND_BASE_URL` con l'URL HTTPS del backend e ricostruisci il frontend. Conserva le credenziali esclusivamente in `.env.azure` e ruota immediatamente qualsiasi segreto pubblicato per errore.
 
-app_agreeo
-Agreeoapp123!
+## Upgrade Neo4j
+
+Locale e Azure usano lo stesso digest Neo4j. Prima di aggiornare quel digest,
+crea un dump o snapshot del volume e prova il ripristino su un volume separato.
+Non tentare downgrade del formato store. La procedura minima è:
+
+```bash
+docker compose --env-file .env.azure -f docker-compose.azure.yml stop
+```
+
+Con i container fermi, crea uno snapshot del disco gestito Azure che contiene il
+volume `neo4j_data` e verifica il ripristino su una VM separata. Conserva lo
+snapshot fino al completamento dei test di lettura e scrittura sul nuovo digest.

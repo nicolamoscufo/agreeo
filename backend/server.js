@@ -174,6 +174,8 @@ app.get('/me/recommendations', verifyMiddleware, movieController.recommendations
 app.get('/me/recommendations/for-you', verifyMiddleware, movieController.recommendationsForYou);
 app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestionsAuthenticated);
 app.get('/me/recommendations/debug-stats', verifyMiddleware, movieController.recommendationDebugStats);
+app.get('/me/recommendations/metrics', verifyMiddleware, movieController.recommendationMetrics);
+app.post('/me/recommendations/:batchId/impressions', verifyMiddleware, movieController.recordRecommendationImpressions);
 
 app.get('/friends', verifyMiddleware, socialController.listFriends);
 app.get('/friends/search', verifyMiddleware, socialController.searchFriends);
@@ -279,4 +281,3 @@ async function shutdown(signal) {
 start();
 
 module.exports = server;
-

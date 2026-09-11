@@ -1,6 +1,6 @@
 services:
   neo4j:
-    image: neo4j:5-community
+    image: neo4j@sha256:6ea87e9f43d1cf6c6a00a709d05aab626c9a5128aded8673804d087c0232434e
     restart: unless-stopped
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env.azure}
@@ -9,7 +9,7 @@ services:
       - "${NEO4J_BOLT_BIND:-127.0.0.1}:7687:7687"
     volumes:
       - neo4j_data:/data
-      - ./backend/data/ml-latest-small:/var/lib/neo4j/import:ro
+      - ${MOVIELENS_DATA_DIR:-./backend/data/ml-latest-small}:/var/lib/neo4j/import:ro
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env.azure}", "RETURN 1"]
       interval: 10s
@@ -20,7 +20,7 @@ services:
       - agreeo_net
 
   neo4j-init:
-    image: neo4j:5-community
+    image: neo4j@sha256:6ea87e9f43d1cf6c6a00a709d05aab626c9a5128aded8673804d087c0232434e
     depends_on:
       neo4j:
         condition: service_healthy
@@ -34,6 +34,30 @@ services:
       - |
         cypher-shell -a bolt://neo4j:7687 -u neo4j -p "$$NEO4J_PASSWORD" -f /scripts/import_movielens.cypher
         echo 'MovieLens dataset imported successfully.'
+    networks:
+      - agreeo_net
+
+  semantic-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env.azure}
+      NEO4J_DATABASE: neo4j
+      EMBEDDING_MODEL_ID: ${EMBEDDING_MODEL_ID:-Xenova/multilingual-e5-small}
+      EMBEDDING_MODEL_REVISION: ${EMBEDDING_MODEL_REVISION:-761b726dd34fb83930e26aab4e9ac3899aa1fa78}
+    command: npm run migrate:embeddings
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      neo4j-init:
+        condition: service_completed_successfully
+    volumes:
+      - embedding_cache:/usr/src/app/data
+      - model_cache:/usr/src/app/node_modules/@xenova/transformers/.cache
     networks:
       - agreeo_net
 
@@ -51,9 +75,21 @@ services:
       NEO4J_DATABASE: neo4j
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.azure}
       TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN:?Set TMDB_ACCESS_TOKEN in .env.azure}
-      ENABLE_DAILY_SWIPE_LIMIT: ${ENABLE_DAILY_SWIPE_LIMIT:-false}
-      DAILY_SWIPE_LIMIT: ${DAILY_SWIPE_LIMIT:-999999}
+      ENABLE_DAILY_SWIPE_LIMIT: ${ENABLE_DAILY_SWIPE_LIMIT:-true}
+      DAILY_SWIPE_LIMIT: ${DAILY_SWIPE_LIMIT:-20}
       ENABLE_RECOMMENDATION_DEBUG: ${ENABLE_RECOMMENDATION_DEBUG:-false}
+      ENABLE_RECOMMENDATION_AB_TEST: ${ENABLE_RECOMMENDATION_AB_TEST:-false}
+      SEMANTIC_TOP_K: ${SEMANTIC_TOP_K:-25}
+      SEMANTIC_SIMILARITY_THRESHOLD: ${SEMANTIC_SIMILARITY_THRESHOLD:-0.35}
+      SEMANTIC_NEGATIVE_PENALTY: ${SEMANTIC_NEGATIVE_PENALTY:-0.75}
+      SEMANTIC_RRF_WEIGHT: ${SEMANTIC_RRF_WEIGHT:-0.85}
+      AB_SEMANTIC_WEIGHT: ${AB_SEMANTIC_WEIGHT:-1.0}
+      RECIPROCAL_RANK_K: ${RECIPROCAL_RANK_K:-60}
+      COLLABORATIVE_NEIGHBOR_LIMIT: ${COLLABORATIVE_NEIGHBOR_LIMIT:-50}
+      COLLABORATIVE_SUPPORT_SHRINKAGE: ${COLLABORATIVE_SUPPORT_SHRINKAGE:-5.0}
+      RECOMMENDATION_CACHE_TTL_MS: ${RECOMMENDATION_CACHE_TTL_MS:-5000}
+      EMBEDDING_MODEL_ID: ${EMBEDDING_MODEL_ID:-Xenova/multilingual-e5-small}
+      EMBEDDING_MODEL_REVISION: ${EMBEDDING_MODEL_REVISION:-761b726dd34fb83930e26aab4e9ac3899aa1fa78}
     ports:
       - "${BACKEND_PUBLIC_PORT:-3000}:3000"
     depends_on:
@@ -61,6 +97,11 @@ services:
         condition: service_healthy
       neo4j-init:
         condition: service_completed_successfully
+      semantic-init:
+        condition: service_completed_successfully
+    volumes:
+      - embedding_cache:/usr/src/app/data
+      - model_cache:/usr/src/app/node_modules/@xenova/transformers/.cache
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health/db').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
@@ -91,3 +132,5 @@ networks:
 
 volumes:
   neo4j_data:
+  embedding_cache:
+  model_cache:

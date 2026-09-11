@@ -1,5 +1,13 @@
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
+class TmdbHttpError extends Error {
+  constructor(status, body) {
+    super(`TMDB error ${status}: ${body}`);
+    this.name = 'TmdbHttpError';
+    this.status = status;
+  }
+}
+
 async function tmdbGet(path, query = {}) {
   const token = process.env.TMDB_ACCESS_TOKEN;
 
@@ -24,12 +32,13 @@ async function tmdbGet(path, query = {}) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`TMDB error ${response.status}: ${body}`);
+    throw new TmdbHttpError(response.status, body);
   }
 
   return response.json();
 }
 
 module.exports = {
+  TmdbHttpError,
   tmdbGet,
 };

@@ -12,6 +12,24 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      neo4j:
+        image: neo4j@sha256:6ea87e9f43d1cf6c6a00a709d05aab626c9a5128aded8673804d087c0232434e
+        env:
+          NEO4J_AUTH: neo4j/integration_password
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p integration_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 12
+    env:
+      NEO4J_INTEGRATION: 'true'
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: integration_password
+      NEO4J_DATABASE: neo4j
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,6 +43,13 @@ jobs:
         run: npm audit --audit-level=high
       - name: Run tests
         run: npm test
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
 
   frontend:
     name: Flutter (analyze, test)

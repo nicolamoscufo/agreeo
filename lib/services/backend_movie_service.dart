@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:agreeo/config/backend_config.dart';
 import 'package:agreeo/services/auth_service.dart';
 import 'package:agreeo/shared/models/agreeo_models.dart';
+import 'package:agreeo/shared/services/movie_service.dart';
 import 'package:http/http.dart' as http;
 
 class UserLibrary {
@@ -37,6 +38,22 @@ class MovieDetails {
   final Map<String, dynamic> images;
 }
 
+class MovieBackendRequestException implements Exception {
+  const MovieBackendRequestException({
+    required this.statusCode,
+    required this.responseBody,
+    this.dailyUsage,
+  });
+
+  final int statusCode;
+  final String responseBody;
+  final DailySwipeUsage? dailyUsage;
+
+  @override
+  String toString() =>
+      'Movie backend request failed: $statusCode $responseBody';
+}
+
 class BackendMovieService {
   BackendMovieService({
     BackendConfig? config,
@@ -51,18 +68,18 @@ class BackendMovieService {
   final http.Client _client;
 
   Future<List<Movie>> getPopularMovies() async {
-    final response = await _client.get(
-      Uri.parse('${_config.baseUrl}/movies/popular'),
-    );
+    final response = await _client
+        .get(Uri.parse('${_config.baseUrl}/movies/popular'))
+        .timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
   }
 
   Future<Movie> getRandomMovie() async {
-    final response = await _client.get(
-      Uri.parse('${_config.baseUrl}/movies/random'),
-    );
+    final response = await _client
+        .get(Uri.parse('${_config.baseUrl}/movies/random'))
+        .timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     return _decodeMovie(body);
@@ -72,7 +89,7 @@ class BackendMovieService {
     final uri = Uri.parse(
       '${_config.baseUrl}/movies/recommendations',
     ).replace(queryParameters: {'page': page.toString()});
-    final response = await _client.get(uri);
+    final response = await _client.get(uri).timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
@@ -82,13 +99,15 @@ class BackendMovieService {
     final uri = Uri.parse(
       '${_config.baseUrl}/movies/daily-suggestions',
     ).replace(queryParameters: {'page': page.toString()});
-    final response = await _client.get(uri);
+    final response = await _client.get(uri).timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
   }
 
-  Future<List<Movie>> getPersonalizedDailySuggestions({int? limit}) async {
+  Future<DailySuggestionBatch> getPersonalizedDailySuggestions({
+    int? limit,
+  }) async {
     final queryParameters = <String, String>{};
     if (limit != null && limit > 0) {
       queryParameters['limit'] = limit.toString();
@@ -100,7 +119,19 @@ class BackendMovieService {
     ).toString();
     final response = await _authorizedRequest('GET', path);
     final body = _decodeMap(response.body);
-    return _decodeMovieList(body['results']);
+    final meta = _castMap(body['meta']);
+    return DailySuggestionBatch(
+      movies: _decodeMovieList(body['results']),
+      batchId: body['batchId']?.toString(),
+      batchExpiresAt: DateTime.tryParse(
+        body['batchExpiresAt']?.toString() ?? '',
+      ),
+      swipeLimitEnabled: meta['swipeLimitEnabled'] == true,
+      swipeLimit: (meta['swipeLimit'] as num?)?.toInt(),
+      usedToday: (meta['usedToday'] as num?)?.toInt() ?? 0,
+      remainingToday: (meta['remainingToday'] as num?)?.toInt(),
+      resetAt: DateTime.tryParse(meta['resetAt']?.toString() ?? ''),
+    );
   }
 
   Future<List<Movie>> searchMovies(
@@ -127,20 +158,22 @@ class BackendMovieService {
       queryParameters['minRating'] = filters.minRating!.toStringAsFixed(1);
     }
 
-    final response = await _client.get(
-      Uri.parse(
-        '${_config.baseUrl}/movies/search',
-      ).replace(queryParameters: queryParameters),
-    );
+    final response = await _client
+        .get(
+          Uri.parse(
+            '${_config.baseUrl}/movies/search',
+          ).replace(queryParameters: queryParameters),
+        )
+        .timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     return _decodeMovieList(body['results']);
   }
 
   Future<MovieDetails> getMovieDetails(int tmdbId) async {
-    final response = await _client.get(
-      Uri.parse('${_config.baseUrl}/movies/$tmdbId'),
-    );
+    final response = await _client
+        .get(Uri.parse('${_config.baseUrl}/movies/$tmdbId'))
+        .timeout(_requestTimeout);
     _ensureSuccess(response);
     final body = _decodeMap(response.body);
     final movieMap = _castMap(body['movie']);
@@ -155,31 +188,67 @@ class BackendMovieService {
     );
   }
 
-  Future<void> likeMovie(Movie movie) async {
-    await _authorizedRequest(
+  Future<DailySwipeUsage?> likeMovie(
+    Movie movie, {
+    RecommendationActionContext? recommendationContext,
+  }) async {
+    final response = await _authorizedRequest(
       'POST',
       '/me/movies/${_resolveTmdbId(movie)}/like',
+      body: _recommendationContextBody(recommendationContext),
     );
+    return _decodeDailySwipeUsage(response.body);
   }
 
-  Future<void> dislikeMovie(Movie movie) async {
-    await _authorizedRequest(
+  Future<DailySwipeUsage?> dislikeMovie(
+    Movie movie, {
+    RecommendationActionContext? recommendationContext,
+  }) async {
+    final response = await _authorizedRequest(
       'POST',
       '/me/movies/${_resolveTmdbId(movie)}/dislike',
+      body: _recommendationContextBody(recommendationContext),
     );
+    return _decodeDailySwipeUsage(response.body);
   }
 
-  Future<void> addToWatchlist(Movie movie) async {
-    await _authorizedRequest(
+  Future<DailySwipeUsage?> addToWatchlist(
+    Movie movie, {
+    RecommendationActionContext? recommendationContext,
+  }) async {
+    final response = await _authorizedRequest(
       'POST',
       '/me/movies/${_resolveTmdbId(movie)}/watchlist',
+      body: _recommendationContextBody(recommendationContext),
     );
+    return _decodeDailySwipeUsage(response.body);
   }
 
-  Future<void> markAsSeen(Movie movie) async {
-    await _authorizedRequest(
+  Future<DailySwipeUsage?> markAsSeen(
+    Movie movie, {
+    RecommendationActionContext? recommendationContext,
+  }) async {
+    final response = await _authorizedRequest(
       'POST',
       '/me/movies/${_resolveTmdbId(movie)}/seen',
+      body: _recommendationContextBody(recommendationContext),
+    );
+    return _decodeDailySwipeUsage(response.body);
+  }
+
+  Future<void> recordRecommendationImpression({
+    required String batchId,
+    required int tmdbId,
+    required int position,
+  }) async {
+    await _authorizedRequest(
+      'POST',
+      '/me/recommendations/$batchId/impressions',
+      body: <String, dynamic>{
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{'tmdbId': tmdbId, 'position': position},
+        ],
+      },
     );
   }
 
@@ -253,19 +322,23 @@ class BackendMovieService {
 
   static const Duration _requestTimeout = Duration(seconds: 20);
 
-  Future<http.Response> _authorizedRequest(String method, String path) async {
+  Future<http.Response> _authorizedRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
     final token = await _authService.readToken();
     if (token == null || token.isEmpty) {
       throw StateError('Missing access token for authenticated movie request.');
     }
 
-    var response = await _send(method, path, token);
+    var response = await _send(method, path, token, body: body);
 
     // Transparently recover from an expired access token: refresh once and retry.
     if (response.statusCode == 401) {
       final refreshed = await _authService.refreshAccessToken();
       if (refreshed != null && refreshed.isNotEmpty) {
-        response = await _send(method, path, refreshed);
+        response = await _send(method, path, refreshed, body: body);
       }
     }
 
@@ -274,7 +347,12 @@ class BackendMovieService {
     return response;
   }
 
-  Future<http.Response> _send(String method, String path, String token) {
+  Future<http.Response> _send(
+    String method,
+    String path,
+    String token, {
+    Map<String, dynamic>? body,
+  }) {
     final uri = Uri.parse('${_config.baseUrl}$path');
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -283,7 +361,13 @@ class BackendMovieService {
 
     switch (method) {
       case 'POST':
-        return _client.post(uri, headers: headers).timeout(_requestTimeout);
+        return _client
+            .post(
+              uri,
+              headers: headers,
+              body: body == null ? null : jsonEncode(body),
+            )
+            .timeout(_requestTimeout);
       case 'DELETE':
         return _client.delete(uri, headers: headers).timeout(_requestTimeout);
       case 'GET':
@@ -293,10 +377,40 @@ class BackendMovieService {
     }
   }
 
+  Map<String, dynamic>? _recommendationContextBody(
+    RecommendationActionContext? context,
+  ) {
+    if (context == null) return null;
+    return <String, dynamic>{
+      'recommendationBatchId': context.batchId,
+      'source': context.source,
+      'position': context.position,
+    };
+  }
+
+  DailySwipeUsage? _decodeDailySwipeUsage(String responseBody) {
+    try {
+      final body = _decodeMap(responseBody);
+      final usage = body['dailyUsage'];
+      if (usage is! Map) return null;
+      final values = usage.cast<String, dynamic>();
+      return DailySwipeUsage(
+        usedToday: (values['usedToday'] as num?)?.toInt() ?? 0,
+        remainingToday: (values['remainingToday'] as num?)?.toInt(),
+        limit: (values['limit'] as num?)?.toInt(),
+        resetAt: DateTime.tryParse(values['resetAt']?.toString() ?? ''),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _ensureSuccess(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        'Movie backend request failed: ${response.statusCode} ${response.body}',
+      throw MovieBackendRequestException(
+        statusCode: response.statusCode,
+        responseBody: response.body,
+        dailyUsage: _decodeDailySwipeUsage(response.body),
       );
     }
   }
@@ -349,8 +463,16 @@ class BackendMovieService {
       originalTitle:
           json['originalTitle']?.toString() ?? json['title']?.toString() ?? '',
       overview: json['overview']?.toString() ?? '',
-      posterUrl: _resolveImageUrl(json['posterUrl'], json['posterPath'], 'w500'),
-      backdropUrl: _resolveImageUrl(json['backdropUrl'], json['backdropPath'], 'w780'),
+      posterUrl: _resolveImageUrl(
+        json['posterUrl'],
+        json['posterPath'],
+        'w500',
+      ),
+      backdropUrl: _resolveImageUrl(
+        json['backdropUrl'],
+        json['backdropPath'],
+        'w780',
+      ),
       releaseYear: year,
       runtime: (json['runtime'] as num?)?.toInt() ?? 0,
       genres: genres,
