@@ -1,4 +1,4 @@
-## vexp <!-- vexp v3.1.3 -->
+## vexp - Context-Aware AI Coding <!-- vexp v3.1.3 -->
 
 ### Context strategy: call run_pipeline ONCE at task start
 If the task already names the files/symbols to touch, SKIP vexp. Otherwise one
@@ -18,12 +18,3 @@ On `status: "degraded"` or 0 pivots the index is still building - use your own t
 For literal string sweeps use your native search - do NOT route text sweeps through vexp.
 Repo SOURCE only: logs, dist/, node_modules/ and files outside the repo are NOT indexed.
 <!-- /vexp -->
-
-## Graphify MCP
-
-Use the `graphify` MCP server for codebase graph queries when you need relationships, paths, or a full rebuild of the local knowledge graph.
-
-- `graphify_run` builds the graph for the workspace.
-- `graphify_update` refreshes it incrementally after code changes.
-- `graphify_query`, `graphify_explain`, `graphify_path`, and `graphify_stats` are the main inspection tools.
-- Graph artifacts live under `.graphify/` and stay out of git.
