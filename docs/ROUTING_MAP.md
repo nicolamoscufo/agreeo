@@ -1,9 +1,6 @@
-# Agreeo — Routing Map (Phase 0)
+# Agreeo — Routing & Navigation Map
 
-> How navigation works today. The new Daylight UI **reuses this same navigation
-> scheme** (no router package; `Navigator` + an `IndexedStack` shell driven by
-> `navIndexProvider`). Documented so each rewritten screen keeps the same entry/exit
-> points and auth guards.
+> Technical reference documenting Flutter navigation architecture, authentication gates, and tab hierarchy.
 
 ---
 

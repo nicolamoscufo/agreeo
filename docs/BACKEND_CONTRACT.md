@@ -1,10 +1,6 @@
-# Agreeo — Backend Contract (Phase 0)
+# Agreeo — Backend & State Contract
 
-> **Read-only artifact.** Documents the existing backend surface (services, providers,
-> state, models) that the new "Daylight" UI must reuse **without modification**.
-> Every new screen connects only to the members listed here. If a screen needs data
-> the backend does not expose, it appears under **§4 Gaps (DA CHIARIRE)** — do not
-> invent methods.
+> Technical reference documenting the backend API surface, Flutter Riverpod providers, shared state, and models.
 
 ---
 
