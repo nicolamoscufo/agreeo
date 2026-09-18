@@ -19,14 +19,14 @@ ENABLE_RECOMMENDATION_DEBUG=true
 Accedi con un utente che abbia completato onboarding e alcuni swipe. Apri:
 
 ```text
-Settings -> Developer -> Recommendation Lab -> Motore
+Settings -> Developer -> Recommendation Lab -> Engine
 ```
 
 ## Sequenza consigliata (8-10 minuti)
 
 ### 1. Mostra il grafo
 
-Nei tab `DB`, `Schema` e `Indici` mostra:
+Nei tab `Info`, `Schema` e `Indexes` mostra:
 
 - `AppUser`, `Movie`, `MovieLensMovie`, `MovieLensUser`, `Tag`, `Genre`;
 - `LIKED`, `DISLIKED`, `WATCHLISTED`, `RATED`, `MATCHES_TMDB`, `HAS_TAG`;
@@ -37,7 +37,7 @@ Frase chiave:
 
 > Neo4j non e usato come semplice key-value store: il ranking attraversa relazioni tra l'utente Agreeo, il catalogo TMDB e il grafo storico MovieLens.
 
-### 2. Apri `Motore` e parti dagli input
+### 2. Apri `Engine` e parti dagli input
 
 Mostra i contatori e i segnali positivi/negativi. Spiega i pesi:
 
@@ -110,7 +110,7 @@ Mostra:
 
 ### 6. Mostra il Cypher reale
 
-Apri `Cypher realmente eseguito`. Ogni card contiene:
+Apri `Cypher actually executed`. Ogni card contiene:
 
 - query completa;
 - parametri sanitizzati;

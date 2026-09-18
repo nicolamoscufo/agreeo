@@ -1,5 +1,6 @@
 const neo4j = require('neo4j-driver');
 const neo4jService = require('./neo4jService');
+const { getHistory } = require('./neo4jLiveTrace');
 
 // Opt-in explicitly (same pattern as ENABLE_RECOMMENDATION_DEBUG): the console
 // exposes the whole graph to any authenticated user, so it must never be
@@ -243,7 +244,10 @@ exports.indexes = async (req, res) => {
 exports.query = async (req, res) => {
   if (!guard(req, res)) return;
 
-  const { query, mode } = req.body || {};
+  const { query, mode, params = {} } = req.body || {};
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return res.status(400).json({ error: 'params must be a JSON object' });
+  }
   if (typeof query !== 'string' || query.trim().length === 0) {
     return res.status(400).json({ error: 'Missing Cypher query' });
   }
@@ -258,7 +262,10 @@ exports.query = async (req, res) => {
   const startedAt = Date.now();
 
   try {
-    const result = await neo4jService.executeRead((tx) => tx.run(statement));
+    const result = await neo4jService.executeRead((tx) => tx.run(statement, {
+      ...params,
+      uid: req.user?.uid || req.user?.sub,
+    }));
     const wallTimeMs = Date.now() - startedAt;
 
     return res.json({
@@ -280,3 +287,107 @@ exports.query = async (req, res) => {
 exports.serializeValue = serializeValue;
 exports.serializePlan = serializePlan;
 exports.neo4jDebugEnabled = neo4jDebugEnabled;
+
+// GET /debug/neo4j/recommendation-path — one real 5-relation collaborative
+// path for the current user, with titles and ratings, for the Live demo.
+// It is a bounded, read-only illustration, not the production M23 ranking.
+exports.recommendationPath = async (req, res) => {
+  if (!guard(req, res)) return;
+  const uid = req.user?.uid || req.user?.sub;
+  if (!uid) return res.status(401).json({ error: 'Missing user context' });
+
+  try {
+    const result = await neo4jService.run(`
+      MATCH (me:AppUser {uid: $uid})-[sig:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(seed:Movie)
+      WITH me, seed, sig
+      ORDER BY coalesce(sig.createdAt, sig.updatedAt, datetime()) DESC
+      LIMIT 3
+      MATCH (seed)<-[:MATCHES_TMDB]-(seedMl:MovieLensMovie)<-[r1:RATED]-(similar:MovieLensUser)
+      WHERE r1.rating >= 4.0
+      WITH me, seed, seedMl, r1, similar
+      ORDER BY r1.rating DESC
+      LIMIT 20
+      MATCH (similar)-[r2:RATED]->(recMl:MovieLensMovie)-[:MATCHES_TMDB]->(rec:Movie)
+      WHERE r2.rating >= 4.0
+        AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(rec)
+      RETURN
+        coalesce(me.displayName, me.email, 'User') AS user,
+        seed.tmdbId AS seedTmdbId, seed.title AS seedTitle,
+        seedMl.movieLensId AS seedMovieLensId, seedMl.title AS seedMovieLensTitle,
+        similar.movieLensUserId AS neighborId, toFloat(r1.rating) AS seedRating,
+        toFloat(r2.rating) AS candidateRating,
+        rec.tmdbId AS candidateTmdbId, rec.title AS candidateTitle,
+        recMl.movieLensId AS candidateMovieLensId, recMl.title AS candidateMovieLensTitle
+      ORDER BY r2.rating DESC, r1.rating DESC
+      LIMIT 1
+    `, { uid });
+
+    if (result.records.length === 0) {
+      return res.json({
+        path: null,
+        reason: 'No path available: this needs at least one liked movie linked to MovieLens and one candidate you have not interacted with yet.',
+      });
+    }
+
+    const record = result.records[0];
+    const value = (key) => serializeValue(record.get(key));
+    return res.json({
+      path: {
+        user: value('user'),
+        seed: {
+          tmdbId: value('seedTmdbId'), title: value('seedTitle'),
+          movieLensId: value('seedMovieLensId'), movieLensTitle: value('seedMovieLensTitle'),
+          rating: value('seedRating'),
+        },
+        neighbor: { id: value('neighborId') },
+        candidate: {
+          tmdbId: value('candidateTmdbId'), title: value('candidateTitle'),
+          movieLensId: value('candidateMovieLensId'), movieLensTitle: value('candidateMovieLensTitle'),
+          rating: value('candidateRating'),
+        },
+      },
+      segments: [
+        { kind: 'user', label: value('user'), sub: 'AppUser' },
+        { kind: 'rel', label: 'LIKED', direction: 'out' },
+        { kind: 'movie', label: value('seedTitle'), sub: `Movie #${value('seedTmdbId')}` },
+        { kind: 'rel', label: 'MATCHES_TMDB', direction: 'in' },
+        { kind: 'movielens-movie', label: value('seedMovieLensTitle'), sub: `MovieLens #${value('seedMovieLensId')}` },
+        { kind: 'rel', label: 'RATED', direction: 'in', value: value('seedRating') },
+        { kind: 'movielens-user', label: `MovieLensUser #${value('neighborId')}`, sub: 'vicino collaborativo' },
+        { kind: 'rel', label: 'RATED', direction: 'out', value: value('candidateRating') },
+        { kind: 'movielens-movie', label: value('candidateMovieLensTitle'), sub: `MovieLens #${value('candidateMovieLensId')}` },
+        { kind: 'rel', label: 'MATCHES_TMDB', direction: 'out' },
+        { kind: 'movie', label: value('candidateTitle'), sub: `Movie #${value('candidateTmdbId')}` },
+      ],
+      observedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to load recommendation path' });
+  }
+};
+
+exports.live = async (req, res) => {
+  if (!guard(req, res)) return;
+  const uid = req.user?.uid || req.user?.sub;
+  if (!uid) return res.status(401).json({ error: 'Missing user context' });
+  try {
+    const result = await neo4jService.run(`
+      MATCH (u:AppUser {uid: $uid})
+      OPTIONAL MATCH (u)-[r:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m:Movie)
+      WITH u, r, m ORDER BY m.title, m.tmdbId, type(r)
+      RETURN u.displayName AS displayName,
+        collect(CASE WHEN m IS NOT NULL THEN {
+          tmdbId: m.tmdbId, title: m.title, type: type(r), createdAt: toString(r.createdAt)
+        } END) AS library
+    `, { uid });
+    const record = result.records[0];
+    return res.json({
+      displayName: record?.get('displayName') || 'Current user',
+      library: serializeValue(record?.get('library') || []),
+      entries: getHistory(uid),
+      observedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to load live trace' });
+  }
+};

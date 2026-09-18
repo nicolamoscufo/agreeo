@@ -60,6 +60,27 @@ test(
     }
 
     const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    // Exercise the live snapshots against the actual Neo4j engine before
+    // creating Daily contexts for these movies.
+    const probeMovie = { tmdbId: tmdbIds[0], title: 'Trace probe', genres: ['Drama'] };
+    async function traceInteraction(action) {
+      const queries = [];
+      queries.captureState = true;
+      await neo4jService.captureQueryTrace(action, queries);
+      assert.equal(queries.transactions[0].status, 'committed');
+      return queries.transactions[0];
+    }
+    const likeTrace = await traceInteraction(() => movieRepository.likeMovie(uid, probeMovie));
+    assert.deepEqual(likeTrace.before.relationships, []);
+    assert.deepEqual(likeTrace.after.relationships.map((r) => r.type), ['LIKED']);
+    const watchTrace = await traceInteraction(() => movieRepository.watchlistMovie(uid, probeMovie));
+    assert.deepEqual(watchTrace.after.relationships.map((r) => r.type).sort(), ['LIKED', 'WATCHLISTED']);
+    const dislikeTrace = await traceInteraction(() => movieRepository.dislikeMovie(uid, probeMovie));
+    assert.deepEqual(dislikeTrace.before.relationships.map((r) => r.type).sort(), ['LIKED', 'WATCHLISTED']);
+    assert.deepEqual(dislikeTrace.after.relationships.map((r) => r.type), ['DISLIKED']);
+    const removalTrace = await traceInteraction(() => movieRepository.removeDislike(uid, tmdbIds[0]));
+    assert.deepEqual(removalTrace.after.relationships, []);
+
     const batches = [randomUUID(), randomUUID()];
     await Promise.all(tmdbIds.map((tmdbId, index) =>
       movieRepository.recordRecommendationBatch(uid, {

@@ -161,15 +161,16 @@ app.patch('/me/privacy', verifyMiddleware, authController.updatePrivacy);
 app.post('/me/password', verifyMiddleware, authLimiter, authController.changePassword);
 app.delete('/me', verifyMiddleware, authLimiter, authController.deleteAccount);
 
-app.post('/me/movies/:tmdbId/like', verifyMiddleware, movieController.like);
-app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.dislike);
-app.post('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.watchlist);
-app.post('/me/movies/:tmdbId/seen', verifyMiddleware, movieController.markSeen);
-app.delete('/me/movies/:tmdbId/watchlist', verifyMiddleware, movieController.removeFromWatchlist);
-app.delete('/me/movies/:tmdbId/like', verifyMiddleware, movieController.removeLike);
-app.delete('/me/movies/:tmdbId/dislike', verifyMiddleware, movieController.removeDislike);
-app.delete('/me/movies/:tmdbId/seen', verifyMiddleware, movieController.removeSeen);
-app.get('/me/library', verifyMiddleware, movieController.library);
+const { traceAction } = require('./neo4jLiveTrace');
+app.post('/me/movies/:tmdbId/like', verifyMiddleware, traceAction('Like', movieController.like));
+app.post('/me/movies/:tmdbId/dislike', verifyMiddleware, traceAction('Dislike', movieController.dislike));
+app.post('/me/movies/:tmdbId/watchlist', verifyMiddleware, traceAction('Watchlist', movieController.watchlist));
+app.post('/me/movies/:tmdbId/seen', verifyMiddleware, traceAction('Seen', movieController.markSeen));
+app.delete('/me/movies/:tmdbId/watchlist', verifyMiddleware, traceAction('Remove watchlist', movieController.removeFromWatchlist));
+app.delete('/me/movies/:tmdbId/like', verifyMiddleware, traceAction('Remove like', movieController.removeLike));
+app.delete('/me/movies/:tmdbId/dislike', verifyMiddleware, traceAction('Remove dislike', movieController.removeDislike));
+app.delete('/me/movies/:tmdbId/seen', verifyMiddleware, traceAction('Remove seen', movieController.removeSeen));
+app.get('/me/library', verifyMiddleware, traceAction('Library', movieController.library));
 app.get('/me/recommendations', verifyMiddleware, movieController.recommendationsForYou);
 app.get('/me/recommendations/for-you', verifyMiddleware, movieController.recommendationsForYou);
 app.get('/me/recommendations/daily-suggestions', verifyMiddleware, movieController.dailySuggestionsAuthenticated);
@@ -212,6 +213,8 @@ app.get('/debug/neo4j/overview', verifyMiddleware, neo4jDebugController.overview
 app.get('/debug/neo4j/schema', verifyMiddleware, neo4jDebugController.schema);
 app.get('/debug/neo4j/indexes', verifyMiddleware, neo4jDebugController.indexes);
 app.post('/debug/neo4j/query', verifyMiddleware, neo4jDebugController.query);
+app.get('/debug/neo4j/live', verifyMiddleware, neo4jDebugController.live);
+app.get('/debug/neo4j/recommendation-path', verifyMiddleware, neo4jDebugController.recommendationPath);
 
 // Lightweight liveness probe: no DB round-trip, safe for orchestrators.
 app.get('/health', (_, res) => {

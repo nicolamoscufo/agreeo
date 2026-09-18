@@ -47,7 +47,7 @@ void main() {
         'experimentVariant': 'control-v1',
         'stages': <Map<String, dynamic>>[
           <String, dynamic>{
-            'title': '1. Profilo utente',
+            'title': '1. User profile',
             'description': 'Signals',
             'outputCount': 4,
           },
@@ -81,7 +81,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Recommendation Engine · Live trace'), findsOneWidget);
-    expect(find.text('Pipeline live'), findsOneWidget);
+    expect(find.text('Live pipeline'), findsOneWidget);
     final reportScroll = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.text('Arrival'),

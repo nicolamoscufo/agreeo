@@ -2,9 +2,12 @@ const neo4j = require('neo4j-driver');
 const { AsyncLocalStorage } = require('node:async_hooks');
 
 const queryTraceStorage = new AsyncLocalStorage();
+const tracedTransactions = new WeakMap();
 
 function traceValue(value, key = '') {
+  if (/password|token|secret|authorization/i.test(key)) return '<redacted>';
   if (key === 'uid') return '<current-user>';
+  if (neo4j.isInt(value)) return value.inSafeRange() ? value.toNumber() : value.toString();
   if (Array.isArray(value)) {
     if (value.length > 20) return `<array:${value.length}>`;
     return value.map((entry) => traceValue(entry));
@@ -21,6 +24,18 @@ function traceValue(value, key = '') {
 }
 
 function classifyQuery(query) {
+  if (query.includes('AS debugState')) return 'Diagnostic snapshot';
+  if (query.includes('RETURN liked, disliked, watchlist, alreadySeen')) return 'M22 · User library';
+  if (query.includes('DELETE old')) return 'M08 · Remove incompatible states';
+  // \b avoids matching "DELETE relationship" in the M01 genre pruning.
+  if (/\bDELETE\s+r\b/.test(query) && query.includes('tmdbId: $tmdbId')) return 'M18–M21 · Remove interaction';
+  if (query.includes('MERGE (u)-[r:')) return 'M09 · Create interaction';
+  if (query.includes('quota.used =')) return 'M06 · Daily quota';
+  if (query.includes('AS existingSwipe')) return 'M05 · Batch check';
+  if (query.includes('AS pendingContexts')) return 'M07 · Daily contexts';
+  if (query.includes('included.swipedAt =')) return 'M10 · Swipe telemetry';
+  if (query.includes('MERGE (m:Movie')) return 'M01 · Movie upsert';
+  if (query.includes('MATCH (m:Movie {tmdbId: $tmdbId})')) return 'M03 · Single movie read';
   if (query.includes("'personalized' AS source")) return 'Collaborative filtering';
   if (query.includes("queryNodes('tag_embeddings'")) return 'Vector similarity search';
   if (query.includes('t.embedding AS embedding')) return 'User semantic profile';
@@ -79,8 +94,16 @@ class Neo4jService {
 
   async run(query, params = {}) {
     const session = this.session();
+    try {
+      return await this._tracedRun(session, query, params);
+    } finally {
+      await session.close();
+    }
+  }
+
+  async _tracedRun(runner, query, params = {}, transaction = null) {
     const trace = queryTraceStorage.getStore();
-    const traceEntry = trace
+    const traceEntry = trace && trace.length < 100
       ? {
           order: trace.length + 1,
           name: classifyQuery(query),
@@ -89,57 +112,109 @@ class Neo4jService {
           durationMs: null,
           records: null,
           error: null,
+          transactionId: transaction?.id || null,
+          status: 'running',
+          counters: {},
         }
       : null;
     if (traceEntry) trace.push(traceEntry);
     const startedAt = Date.now();
 
     try {
-      const result = await session.run(query, params);
+      const result = await runner.run(query, params);
       if (traceEntry) {
         traceEntry.durationMs = Date.now() - startedAt;
         traceEntry.records = result.records.length;
+        traceEntry.status = 'completed';
+        traceEntry.counters = traceValue(Object.fromEntries(
+          Object.entries(result.summary?.counters?.updates?.() || {})
+            .filter(([, count]) => count > 0)
+        ));
       }
       return result;
     } catch (error) {
       if (traceEntry) {
         traceEntry.durationMs = Date.now() - startedAt;
         traceEntry.error = error instanceof Error ? error.message : String(error);
+        traceEntry.status = 'error';
       }
+      throw error;
+    }
+  }
+
+  async captureQueryTrace(actions, queries = []) {
+    const value = await queryTraceStorage.run(queries, actions);
+    return { value, queries };
+  }
+
+  async _executeTransaction(actions, write) {
+    const session = this.session();
+    const trace = queryTraceStorage.getStore();
+    let attempt = null;
+    let callbackCompleted = false;
+    try {
+      const value = await session[write ? 'writeTransaction' : 'readTransaction'](async (tx) => {
+        if (!trace) return actions(tx);
+        if (attempt) attempt.status = 'rolled_back';
+        callbackCompleted = false;
+        trace.transactions ||= [];
+        attempt = {
+          id: `tx-${trace.transactions.length + 1}`,
+          mode: write ? 'write' : 'read',
+          status: 'pending',
+        };
+        trace.transactions.push(attempt);
+        const currentAttempt = attempt;
+        // Preserve the driver's transaction API while intercepting only run().
+        const tracedTx = new Proxy(tx, {
+          get: (target, property) => property === 'run'
+            ? (query, params) => this._tracedRun(target, query, params, currentAttempt)
+            : typeof target[property] === 'function'
+              ? target[property].bind(target)
+              : target[property],
+        });
+        tracedTransactions.set(tracedTx, currentAttempt);
+        const value = await actions(tracedTx);
+        callbackCompleted = true;
+        return value;
+      });
+      if (attempt) attempt.status = 'committed';
+      return value;
+    } catch (error) {
+      // A lost commit acknowledgement is not proof of a rollback.
+      if (attempt) attempt.status = callbackCompleted ? 'commit_unknown' : 'rolled_back';
       throw error;
     } finally {
       await session.close();
     }
   }
 
-  async captureQueryTrace(actions) {
-    const queries = [];
-    const value = await queryTraceStorage.run(queries, actions);
-    return { value, queries };
-  }
-
   async executeWrite(actions) {
-    const session = this.session();
-
-    try {
-      return await session.writeTransaction(async (tx) => {
-        return await actions(tx);
-      });
-    } finally {
-      await session.close();
-    }
+    return this._executeTransaction(actions, true);
   }
 
   async executeRead(actions) {
-    const session = this.session();
+    return this._executeTransaction(actions, false);
+  }
 
-    try {
-      return await session.readTransaction(async (tx) => {
-        return await actions(tx);
-      });
-    } finally {
-      await session.close();
-    }
+  async captureInteractionState(tx, uid, tmdbId, phase) {
+    const trace = queryTraceStorage.getStore();
+    if (!trace?.captureState) return;
+    const attempt = tracedTransactions.get(tx);
+    const result = await tx.run(`
+        MATCH (u:AppUser {uid: $uid})
+        OPTIONAL MATCH (m:Movie {tmdbId: $tmdbId})
+        OPTIONAL MATCH (u)-[r:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)
+        WITH u, m, collect(CASE WHEN r IS NOT NULL THEN {
+          type: type(r), createdAt: toString(r.createdAt)
+        } END) AS relationships
+        OPTIONAL MATCH (q:DailySwipeQuota {key: $quotaKey})
+        OPTIONAL MATCH (u)-[:REQUESTED_RECOMMENDATIONS]->(:RecommendationBatch {id: $batchId})-[i:INCLUDED]->(m)
+        RETURN {title: m.title, relationships: relationships,
+          quotaUsed: coalesce(q.used, 0), batchAction: i.action,
+          swipedAt: toString(i.swipedAt)} AS debugState
+      `, { uid, tmdbId, quotaKey: `${uid}:${new Date().toISOString().slice(0, 10)}`, batchId: trace.batchId || '' });
+    if (attempt) attempt[phase] = traceValue(result.records[0]?.get('debugState') || {});
   }
 
   async createConstraints() {
@@ -280,3 +355,4 @@ class Neo4jService {
 }
 
 module.exports = new Neo4jService();
+module.exports.classifyQuery = classifyQuery;

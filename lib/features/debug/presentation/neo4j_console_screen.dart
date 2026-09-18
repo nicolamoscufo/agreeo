@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:agreeo/features/debug/presentation/neo4j_live_tab.dart';
 import 'package:agreeo/services/neo4j_debug_service.dart';
+import 'package:agreeo/services/neo4j_live_push.dart';
 import 'package:agreeo/features/debug/presentation/recommendation_engine_tab.dart';
 import 'package:agreeo/shared/theme/ag_text.dart';
 import 'package:agreeo/shared/theme/agreeo_tokens.dart';
@@ -19,12 +23,14 @@ class Neo4jConsoleScreen extends StatefulWidget {
 
 class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
   final Neo4jDebugService _service = Neo4jDebugService();
+  final Neo4jLivePush _push = Neo4jLivePush();
   int _tab = 0;
 
   late Future<Neo4jOverview> _overviewFuture;
   late Future<List<Neo4jSchemaPattern>> _schemaFuture;
   late Future<Neo4jIndexReport> _indexesFuture;
-  late Future<Map<String, dynamic>> _recommendationFuture;
+  Future<Map<String, dynamic>>? _recommendationFuture;
+  _QueryDraft? _queryDraft;
 
   @override
   void initState() {
@@ -32,13 +38,27 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
     _reload();
   }
 
+  @override
+  void dispose() {
+    _push.dispose();
+    super.dispose();
+  }
+
   void _reload() {
     setState(() {
       _overviewFuture = _service.getOverview();
       _schemaFuture = _service.getSchema();
       _indexesFuture = _service.getIndexes();
-      _recommendationFuture = _service.getRecommendationEngine();
+      if (_tab == 4) _recommendationFuture = _service.getRecommendationEngine();
     });
+  }
+
+  void _openInQuery(String query, Map<String, dynamic> params, String note) {
+    setState(() {
+      _queryDraft = _QueryDraft(query: query, params: params, note: note);
+      _tab = 3;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(note)));
   }
 
   @override
@@ -76,9 +96,22 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _TabSelector(
-                tabs: const ['Info', 'Schema', 'Indici', 'Query', 'Motore'],
+                tabs: const [
+                  'Info',
+                  'Schema',
+                  'Indexes',
+                  'Query',
+                  'Engine',
+                  'Live',
+                ],
                 selected: _tab,
-                onChanged: (index) => setState(() => _tab = index),
+                onChanged: (index) => setState(() {
+                  _tab = index;
+                  if (index == 4) {
+                    _recommendationFuture ??= _service
+                        .getRecommendationEngine();
+                  }
+                }),
               ),
             ),
             const SizedBox(height: 12),
@@ -89,10 +122,19 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
                   _OverviewTab(future: _overviewFuture, onRetry: _reload),
                   _SchemaTab(future: _schemaFuture, onRetry: _reload),
                   _IndexesTab(future: _indexesFuture, onRetry: _reload),
-                  _QueryTab(service: _service),
-                  RecommendationEngineTab(
-                    future: _recommendationFuture,
-                    onRetry: _reload,
+                  _QueryTab(service: _service, draft: _queryDraft),
+                  if (_recommendationFuture != null)
+                    RecommendationEngineTab(
+                      future: _recommendationFuture!,
+                      onRetry: _reload,
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  Neo4jLiveTab(
+                    service: _service,
+                    active: _tab == 5,
+                    push: _push,
+                    onOpenQuery: _openInQuery,
                   ),
                 ],
               ),
@@ -267,7 +309,7 @@ class _ErrorCard extends StatelessWidget {
                 Icon(AgIcons.wifiOff, size: 18, color: t.red),
                 const SizedBox(width: 8),
                 Text(
-                  'Console non disponibile',
+                  'Console unavailable',
                   style: AgText.label.copyWith(fontSize: 14, color: t.red),
                 ),
               ],
@@ -279,7 +321,7 @@ class _ErrorCard extends StatelessWidget {
               GestureDetector(
                 onTap: onRetry,
                 child: Text(
-                  'Riprova',
+                  'Retry',
                   style: AgText.label.copyWith(color: t.purple),
                 ),
               ),
@@ -384,10 +426,10 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                _StatCard(label: 'Nodi', value: _formatCount(data.nodeCount)),
+                _StatCard(label: 'Nodes', value: _formatCount(data.nodeCount)),
                 const SizedBox(width: 10),
                 _StatCard(
-                  label: 'Relazioni',
+                  label: 'Relationships',
                   value: _formatCount(data.relationshipCount),
                 ),
                 const SizedBox(width: 10),
@@ -398,7 +440,7 @@ class _OverviewTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            _SectionTitle(icon: AgIcons.library, title: 'Nodi per label'),
+            _SectionTitle(icon: AgIcons.library, title: 'Nodes per label'),
             const SizedBox(height: 9),
             _Card(
               child: Column(
@@ -409,7 +451,7 @@ class _OverviewTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            _SectionTitle(icon: AgIcons.share, title: 'Relazioni per tipo'),
+            _SectionTitle(icon: AgIcons.share, title: 'Relationships per type'),
             const SizedBox(height: 9),
             _Card(
               child: Column(
@@ -505,7 +547,7 @@ class _SchemaTab extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 30),
           children: [
             Text(
-              'Pattern reali del grafo, con il numero di relazioni per ciascuno.',
+              'Real graph patterns, with the number of relationships for each.',
               style: AgText.caption.copyWith(color: t.faint),
             ),
             const SizedBox(height: 10),
@@ -563,7 +605,7 @@ class _IndexesTab extends StatelessWidget {
           children: [
             _SectionTitle(
               icon: AgIcons.sparkle,
-              title: 'Indici (${report.indexes.length})',
+              title: 'Indexes (${report.indexes.length})',
             ),
             const SizedBox(height: 9),
             for (final index in report.indexes) ...[
@@ -677,57 +719,77 @@ class _IndexCard extends StatelessWidget {
 
 const List<(String, String)> _presetQueries = [
   (
-    'Top film',
-    'MATCH (m:Movie)\n'
-        'WHERE m.movieLensRatingCount IS NOT NULL\n'
-        'RETURN m.title AS titolo, m.movieLensAvgRating AS rating,\n'
-        '       m.movieLensRatingCount AS voti\n'
-        'ORDER BY voti DESC LIMIT 10',
+    'My library',
+    'MATCH (u:AppUser {uid: \$uid})-[r:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m:Movie)\n'
+        'RETURN m.tmdbId AS tmdbId, m.title AS title,\n'
+        '       type(r) AS relationship, toString(r.createdAt) AS created\n'
+        'ORDER BY relationship, title LIMIT 100',
   ),
   (
-    'Like utenti',
+    'Top movies',
+    'MATCH (m:Movie)\n'
+        'WHERE m.movieLensRatingCount IS NOT NULL\n'
+        'RETURN m.title AS title, m.movieLensAvgRating AS rating,\n'
+        '       m.movieLensRatingCount AS votes\n'
+        'ORDER BY votes DESC LIMIT 10',
+  ),
+  (
+    'User likes',
     'MATCH (u:AppUser)-[:LIKED]->(m:Movie)\n'
-        'RETURN u.displayName AS utente, count(m) AS like,\n'
-        '       collect(m.title)[..5] AS esempi\n'
-        'ORDER BY like DESC LIMIT 10',
+        'RETURN u.displayName AS user, count(m) AS likes,\n'
+        '       collect(m.title)[..5] AS examples\n'
+        'ORDER BY likes DESC LIMIT 10',
   ),
   (
     'Collaborative filtering',
-    'MATCH (me:AppUser)-[:LIKED]->(:Movie)<-[:MATCHES_TMDB]-(seed:MovieLensMovie)\n'
+    'MATCH (me:AppUser {uid: \$uid})-[:LIKED|SELECTED_FAVORITE|WATCHLISTED]->(:Movie)<-[:MATCHES_TMDB]-(seed:MovieLensMovie)\n'
         'MATCH (seed)<-[r1:RATED]-(sim:MovieLensUser)-[r2:RATED]->\n'
         '      (rec:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)\n'
         'WHERE r1.rating >= 4 AND r2.rating >= 4\n'
-        '  AND NOT (me)-[:LIKED|ALREADY_SEEN]->(m)\n'
-        'RETURN m.title AS consiglio, count(DISTINCT sim) AS utentiSimili,\n'
-        '       round(avg(r2.rating), 2) AS ratingMedio\n'
-        'ORDER BY utentiSimili DESC, ratingMedio DESC LIMIT 10',
+        '  AND NOT (me)-[:LIKED|DISLIKED|WATCHLISTED|ALREADY_SEEN|SELECTED_FAVORITE]->(m)\n'
+        'RETURN m.title AS suggestion, count(DISTINCT sim) AS similarUsers,\n'
+        '       round(avg(r2.rating), 2) AS avgRating\n'
+        'ORDER BY similarUsers DESC, avgRating DESC LIMIT 10',
   ),
   (
     'Vector search',
     "MATCH (t:Tag {name: 'funny'})\n"
         "CALL db.index.vector.queryNodes('tag_embeddings', 8, t.embedding)\n"
         'YIELD node, score\n'
-        'RETURN node.name AS tag, round(score, 3) AS similarita\n'
+        'RETURN node.name AS tag, round(score, 3) AS similarity\n'
         'ORDER BY score DESC',
   ),
   (
     'Bridge TMDB-MovieLens',
     'MATCH (ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)\n'
-        'RETURN m.title AS titolo, m.tmdbId AS tmdbId,\n'
+        'RETURN m.title AS title, m.tmdbId AS tmdbId,\n'
         '       ml.movieLensId AS movieLensId\n'
         'LIMIT 10',
   ),
   (
-    'Tag frequenti',
+    'Frequent tags',
     'MATCH (ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)\n'
-        'RETURN t.name AS tag, sum(h.frequency) AS frequenza\n'
-        'ORDER BY frequenza DESC LIMIT 15',
+        'RETURN t.name AS tag, sum(h.frequency) AS frequency\n'
+        'ORDER BY frequency DESC LIMIT 15',
   ),
 ];
 
+class _QueryDraft {
+  const _QueryDraft({
+    required this.query,
+    required this.params,
+    required this.note,
+  });
+
+  final String query;
+  final Map<String, dynamic> params;
+  final String note;
+}
+
 class _QueryTab extends StatefulWidget {
-  const _QueryTab({required this.service});
+  const _QueryTab({required this.service, this.draft});
   final Neo4jDebugService service;
+  final _QueryDraft? draft;
 
   @override
   State<_QueryTab> createState() => _QueryTabState();
@@ -738,13 +800,33 @@ class _QueryTabState extends State<_QueryTab> {
     text: _presetQueries.first.$2,
   );
   String? _mode; // null | 'explain' | 'profile'
+  final _paramsController = TextEditingController(text: '{}');
   bool _running = false;
   Neo4jQueryResult? _result;
   String? _error;
+  _QueryDraft? _appliedDraft;
+
+  @override
+  void didUpdateWidget(covariant _QueryTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final draft = widget.draft;
+    if (draft != null && !identical(draft, _appliedDraft)) {
+      _appliedDraft = draft;
+      _controller.text = draft.query;
+      _paramsController.text = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(draft.params);
+      setState(() {
+        _result = null;
+        _error = null;
+      });
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _paramsController.dispose();
     super.dispose();
   }
 
@@ -759,15 +841,25 @@ class _QueryTabState extends State<_QueryTab> {
       _error = null;
     });
     try {
-      final result = await widget.service.runQuery(query, mode: _mode);
+      final params = jsonDecode(_paramsController.text);
+      if (params is! Map<String, dynamic>) {
+        throw const FormatException('Parameters must be a JSON object.');
+      }
+      final result = await widget.service.runQuery(
+        query,
+        mode: _mode,
+        params: params,
+      );
+      if (!mounted) return;
       setState(() => _result = result);
     } catch (error) {
+      if (!mounted) return;
       setState(() {
         _result = null;
         _error = error.toString();
       });
     } finally {
-      setState(() => _running = false);
+      if (mounted) setState(() => _running = false);
     }
   }
 
@@ -824,6 +916,17 @@ class _QueryTabState extends State<_QueryTab> {
           ),
         ),
         const SizedBox(height: 10),
+        TextField(
+          controller: _paramsController,
+          minLines: 1,
+          maxLines: 5,
+          style: _monoStyle.copyWith(color: t.text),
+          decoration: const InputDecoration(
+            labelText: 'JSON params',
+            helperText: r'$uid is always bound to the authenticated user.',
+          ),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: [
             _ModeChip(
@@ -868,7 +971,7 @@ class _QueryTabState extends State<_QueryTab> {
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            'Esegui',
+                            'Run',
                             style: AgText.label.copyWith(
                               fontSize: 14,
                               color: Colors.white,
@@ -938,12 +1041,12 @@ class _QueryResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final timing = [
-      '${result.totalRows} righe${result.truncated ? ' (troncate)' : ''}',
-      '${result.wallTimeMs} ms totali',
+      '${result.totalRows} rows${result.truncated ? ' (truncated)' : ''}',
+      '${result.wallTimeMs} ms total',
       if (result.resultAvailableAfterMs != null)
-        '${result.resultAvailableAfterMs} ms disponibile',
+        '${result.resultAvailableAfterMs} ms available',
       if (result.resultConsumedAfterMs != null)
-        '${result.resultConsumedAfterMs} ms consumo',
+        '${result.resultConsumedAfterMs} ms consumed',
     ].join(' · ');
 
     return Column(
@@ -952,7 +1055,7 @@ class _QueryResultView extends StatelessWidget {
         Text(timing, style: AgText.micro.copyWith(color: t.faint)),
         const SizedBox(height: 8),
         if (result.plan != null) ...[
-          _SectionTitle(icon: AgIcons.sliders, title: 'Piano di esecuzione'),
+          _SectionTitle(icon: AgIcons.sliders, title: 'Execution plan'),
           const SizedBox(height: 8),
           _Card(child: _PlanNode(plan: result.plan!, depth: 0)),
           const SizedBox(height: 12),
@@ -1000,7 +1103,7 @@ class _QueryResultView extends StatelessWidget {
         ] else if (result.plan == null)
           _Card(
             child: Text(
-              'Nessuna riga restituita.',
+              'No rows returned.',
               style: _monoStyle.copyWith(color: t.sub),
             ),
           ),
@@ -1018,7 +1121,7 @@ class _QueryResultView extends StatelessWidget {
         case 'relationship':
           return '[:${value['relType']} ${_shortMap(value['properties'])}]';
         case 'path':
-          return 'path(${(value['segments'] as List? ?? const []).length} segmenti)';
+          return 'path(${(value['segments'] as List? ?? const []).length} segments)';
         default:
           return _shortMap(value);
       }
@@ -1044,7 +1147,7 @@ class _QueryResultView extends StatelessWidget {
       return value.length > 28 ? "'${value.substring(0, 25)}…'" : "'$value'";
     }
     if (value is List && value.length > 4) {
-      return '[${value.length} elementi]';
+      return '[${value.length} items]';
     }
     return value.toString();
   }

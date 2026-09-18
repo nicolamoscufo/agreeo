@@ -346,6 +346,7 @@ function assertInteractionRelTypes(...types) {
 async function setMovieInteraction(uid, movie, { newRel, removeRels, recommendationContext = null }) {
   assertInteractionRelTypes(newRel, ...removeRels);
   const interaction = await neo4jService.executeWrite(async (tx) => {
+    await neo4jService.captureInteractionState(tx, uid, movie.tmdbId, 'before');
     let dailyUsage = null;
     let recommendationAlreadyRecorded = false;
     if (recommendationContext) {
@@ -476,6 +477,7 @@ async function setMovieInteraction(uid, movie, { newRel, removeRels, recommendat
       );
     }
 
+    await neo4jService.captureInteractionState(tx, uid, movie.tmdbId, 'after');
     return { updated: result.records.length > 0, dailyUsage };
   });
   if (interaction.updated) invalidateRecommendationCache(uid);
@@ -706,48 +708,33 @@ async function savePreferredGenres(uid, genres) {
   return saved;
 }
 
-async function removeFromWatchlist(uid, tmdbId) {
-  await neo4jService.run(
-    `
-    MATCH (:AppUser {uid: $uid})-[r:WATCHLISTED]->(:Movie {tmdbId: $tmdbId})
-    DELETE r
-    `,
-    { uid, tmdbId }
-  );
+async function removeMovieInteraction(uid, tmdbId, relType) {
+  assertInteractionRelTypes(relType);
+  await neo4jService.executeWrite(async (tx) => {
+    await neo4jService.captureInteractionState(tx, uid, tmdbId, 'before');
+    await tx.run(`
+      MATCH (:AppUser {uid: $uid})-[r:${relType}]->(:Movie {tmdbId: $tmdbId})
+      DELETE r
+    `, { uid, tmdbId });
+    await neo4jService.captureInteractionState(tx, uid, tmdbId, 'after');
+  });
   invalidateRecommendationCache(uid);
+}
+
+async function removeFromWatchlist(uid, tmdbId) {
+  return removeMovieInteraction(uid, tmdbId, 'WATCHLISTED');
 }
 
 async function removeLike(uid, tmdbId) {
-  await neo4jService.run(
-    `
-    MATCH (:AppUser {uid: $uid})-[r:LIKED]->(:Movie {tmdbId: $tmdbId})
-    DELETE r
-    `,
-    { uid, tmdbId }
-  );
-  invalidateRecommendationCache(uid);
+  return removeMovieInteraction(uid, tmdbId, 'LIKED');
 }
 
 async function removeDislike(uid, tmdbId) {
-  await neo4jService.run(
-    `
-    MATCH (:AppUser {uid: $uid})-[r:DISLIKED]->(:Movie {tmdbId: $tmdbId})
-    DELETE r
-    `,
-    { uid, tmdbId }
-  );
-  invalidateRecommendationCache(uid);
+  return removeMovieInteraction(uid, tmdbId, 'DISLIKED');
 }
 
 async function removeSeen(uid, tmdbId) {
-  await neo4jService.run(
-    `
-    MATCH (:AppUser {uid: $uid})-[r:ALREADY_SEEN]->(:Movie {tmdbId: $tmdbId})
-    DELETE r
-    `,
-    { uid, tmdbId }
-  );
-  invalidateRecommendationCache(uid);
+  return removeMovieInteraction(uid, tmdbId, 'ALREADY_SEEN');
 }
 
 async function getUserLibrary(uid) {

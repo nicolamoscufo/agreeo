@@ -263,11 +263,23 @@ class Neo4jDebugService {
     return _getJson('/me/recommendations/debug-stats');
   }
 
+  Future<Map<String, dynamic>> getLiveTrace() => _getJson('/debug/neo4j/live');
+
+  Future<Map<String, dynamic>> getRecommendationPath() =>
+      _getJson('/debug/neo4j/recommendation-path');
+
+  Future<String?> accessToken() => _authService.readToken();
+
   /// Runs a read-only Cypher query. [mode] is `null`, `explain` or `profile`.
-  Future<Neo4jQueryResult> runQuery(String query, {String? mode}) async {
+  Future<Neo4jQueryResult> runQuery(
+    String query, {
+    String? mode,
+    Map<String, dynamic> params = const {},
+  }) async {
     final body = await _postJson('/debug/neo4j/query', {
       'query': query,
       'mode': ?mode,
+      'params': params,
     });
     final summary = body['summary'] as Map<String, dynamic>? ?? const {};
     return Neo4jQueryResult(
@@ -348,7 +360,7 @@ class Neo4jDebugService {
     }
     if (response.statusCode == 404) {
       throw const Neo4jQueryException(
-        'Console disabilitata: imposta ENABLE_NEO4J_DEBUG=true sul backend.',
+        'Console disabled: set ENABLE_NEO4J_DEBUG=true on the backend.',
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {

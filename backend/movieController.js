@@ -303,7 +303,7 @@ function diversifyRecommendations(candidates, limit = 30) {
   const seenTitles = new Set();
   const genreCounts = new Map();
   
-  // Ora che idratiamo prima, i generi ci sono sempre!
+  // Since we hydrate first, genres are always present now.
   const hasGenreData = ordered.some(
     (candidate) => Array.isArray(candidate.genreIds) && candidate.genreIds.length > 0
   );
@@ -1694,22 +1694,22 @@ exports.recommendationDebugStats = async (req, res) => {
         stages: [
           {
             id: 'signals',
-            title: '1. Profilo utente',
-            description: 'Neo4j raccoglie preferiti, like, watchlist, dislike, generi e tag collegati ai film.',
+            title: '1. User profile',
+            description: 'Neo4j collects favorites, likes, watchlist, dislikes, genres and tags linked to movies.',
             outputCount: userProfile.totalFeedbackActions || 0,
           },
           {
             id: 'collaborative',
             title: '2. Collaborative filtering',
-            description: 'Trova utenti MovieLens vicini, centra tutti i rating e applica shrinkage sul supporto.',
+            description: 'Finds nearby MovieLens users, centers all ratings and applies support shrinkage.',
             outputCount: forYouData.candidates.filter((candidate) =>
               candidate.source === 'personalized' || candidate.source === 'hybrid'
             ).length,
           },
           {
             id: 'semantic',
-            title: '3. Profilo semantico',
-            description: 'Costruisce centroidi positivi/negativi, usa cosine similarity, frequenza logaritmica e IDF.',
+            title: '3. Semantic profile',
+            description: 'Builds positive/negative centroids using cosine similarity, logarithmic frequency and IDF.',
             outputCount: forYouData.candidates.filter((candidate) =>
               candidate.source === 'semantic-tag' || candidate.source === 'hybrid'
             ).length,
@@ -1717,13 +1717,13 @@ exports.recommendationDebugStats = async (req, res) => {
           {
             id: 'fusion',
             title: '4. Reciprocal Rank Fusion',
-            description: 'Combina le posizioni delle sorgenti, poi penalizza esposizioni ignorate e diversifica i generi.',
+            description: 'Combines source ranks, then penalizes ignored exposures and diversifies genres.',
             outputCount: forYouData.results.length,
           },
           {
             id: 'daily',
             title: '5. Daily learning queue',
-            description: 'Mescola candidati personalizzati ed esplorativi e registra impressioni, posizione e azione.',
+            description: 'Mixes personalized and exploratory candidates and records impressions, position and action.',
             outputCount: dailySuggestionData.results.length,
           },
         ],
