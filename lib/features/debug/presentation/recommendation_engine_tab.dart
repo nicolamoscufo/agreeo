@@ -67,17 +67,17 @@ class _EngineReport extends StatelessWidget {
         const SizedBox(height: 14),
         _SectionHeader(
           index: 'A',
-          title: 'Input: cosa sa il sistema di me?',
+          title: 'Input: What does the system know about me?',
           subtitle:
-              'Questi sono i nodi e le relazioni che alimentano il ranking.',
+              'These are the nodes and relationships powering the ranking.',
         ),
         const SizedBox(height: 8),
         _SignalOverview(profile: profile, signals: signals),
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'B',
-          title: 'Pipeline live',
-          subtitle: 'Segui questi passaggi durante la discussione.',
+          title: 'Live Pipeline',
+          subtitle: 'Follow these steps during the presentation.',
         ),
         const SizedBox(height: 8),
         for (var index = 0; index < stages.length; index++) ...[
@@ -87,9 +87,9 @@ class _EngineReport extends StatelessWidget {
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'C',
-          title: 'Formule usate',
+          title: 'Formulas Used',
           subtitle:
-              'Non sono descrizioni: corrispondono ai punteggi del backend.',
+              'Live formulas matching the exact backend scoring logic.',
         ),
         const SizedBox(height: 8),
         for (final entry in formulas.entries)
@@ -97,22 +97,22 @@ class _EngineReport extends StatelessWidget {
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'D',
-          title: 'Filtri e dimensione del pool',
-          subtitle: 'Mostra quanti film entrano e quanti vengono esclusi.',
+          title: 'Filters & Pool Size',
+          subtitle: 'Shows candidate counts entering and filtered out.',
         ),
         const SizedBox(height: 8),
         _PoolCard(pool: pool, feed: feed, daily: daily),
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'E',
-          title: 'Perché questi film?',
+          title: 'Why These Movies?',
           subtitle:
-              'Apri un candidato per leggere ogni componente del punteggio.',
+              'Expand a candidate to inspect every score component.',
         ),
         const SizedBox(height: 8),
         if (recommendations.isEmpty)
           const _EmptyCard(
-            message: 'Nessun candidato disponibile: aggiungi like o preferiti.',
+            message: 'No candidates available: add likes or favorites.',
           )
         else
           for (var index = 0; index < recommendations.length; index++)
@@ -120,21 +120,21 @@ class _EngineReport extends StatelessWidget {
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'F',
-          title: 'Cypher realmente eseguito',
+          title: 'Executed Cypher Queries',
           subtitle:
-              'Query, parametri sanitizzati, righe e durata della trace corrente.',
+              'Queries, sanitized parameters, rows, and runtime of the current trace.',
         ),
         const SizedBox(height: 8),
         if (queries.isEmpty)
-          const _EmptyCard(message: 'Nessuna query catturata.')
+          const _EmptyCard(message: 'No queries captured.')
         else
           for (final query in queries) _QueryTraceCard(query: query),
         const SizedBox(height: 18),
         _SectionHeader(
           index: 'G',
-          title: 'Feedback loop e metriche',
+          title: 'Feedback Loop & Metrics',
           subtitle:
-              'Impressioni e swipe servono a valutare e correggere il motore.',
+              'Impressions and swipes used to evaluate and tune the engine.',
         ),
         const SizedBox(height: 8),
         _MetricsCard(metrics: metrics),
@@ -184,7 +184,7 @@ class _ExamHero extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Questa vista ricalcola il feed dell’utente autenticato e intercetta le query Neo4j effettivamente eseguite. Usala dall’alto verso il basso come scaletta per l’esame.',
+            'This view recalculates the authenticated user feed and intercepts executed Neo4j queries. Use it from top to bottom as a presentation walkthrough.',
             style: AgText.body.copyWith(color: t.sub, height: 1.45),
           ),
           const SizedBox(height: 12),
@@ -192,13 +192,13 @@ class _ExamHero extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _Pill(text: '$queryCount query', color: t.gold),
+              _Pill(text: '$queryCount queries', color: t.gold),
               _Pill(
                 text: 'compute ${computation['forYou'] ?? '?'}',
                 color: t.purple,
               ),
               _Pill(text: _shortDate(generatedAt), color: t.green),
-              _Pill(text: 'dati reali', color: t.red),
+              _Pill(text: 'live data', color: t.red),
             ],
           ),
         ],
@@ -227,21 +227,24 @@ class _SignalOverview extends StatelessWidget {
             runSpacing: 8,
             children: [
               _Metric(
-                label: 'Preferiti',
+                label: 'Favorites',
                 value: _int(profile['favoriteMoviesCount']),
               ),
-              _Metric(label: 'Like', value: _int(profile['likedMoviesCount'])),
+              _Metric(label: 'Likes', value: _int(profile['likedMoviesCount'])),
               _Metric(
-                label: 'Dislike',
+                label: 'Dislikes',
                 value: _int(profile['dislikedMoviesCount']),
               ),
-              _Metric(label: 'Visti', value: _int(profile['alreadySeenCount'])),
+              _Metric(
+                label: 'Already seen',
+                value: _int(profile['alreadySeenCount']),
+              ),
               _Metric(
                 label: 'Watchlist',
                 value: _int(profile['watchlistCount']),
               ),
               _Metric(
-                label: 'Feedback totali',
+                label: 'Total feedback',
                 value: _int(profile['totalFeedbackActions']),
               ),
             ],
@@ -249,13 +252,13 @@ class _SignalOverview extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _SignalList(
-          title: 'Segnali positivi',
+          title: 'Positive signals',
           color: context.tokens.green,
           entries: [...positiveGenres, ...positiveTags].take(12).toList(),
         ),
         const SizedBox(height: 8),
         _SignalList(
-          title: 'Segnali negativi',
+          title: 'Negative signals',
           color: context.tokens.red,
           entries: [...negativeGenres, ...negativeTags].take(12).toList(),
         ),
@@ -286,7 +289,7 @@ class _SignalList extends StatelessWidget {
           const SizedBox(height: 9),
           if (entries.isEmpty)
             Text(
-              'Nessun segnale ancora.',
+              'No signals yet.',
               style: AgText.caption.copyWith(color: t.faint),
             )
           else
@@ -427,26 +430,26 @@ class _PoolCard extends StatelessWidget {
       runSpacing: 8,
       children: [
         _Metric(
-          label: 'Catalogo',
+          label: 'Catalog',
           value: _int(pool['totalCandidatesConsidered']),
         ),
-        _Metric(label: 'Già visti', value: _int(pool['filteredAlreadySeen'])),
-        _Metric(label: 'Dislike', value: _int(pool['filteredDisliked'])),
+        _Metric(label: 'Already seen', value: _int(pool['filteredAlreadySeen'])),
+        _Metric(label: 'Dislikes', value: _int(pool['filteredDisliked'])),
         _Metric(
-          label: 'Già valutati',
+          label: 'Already swiped',
           value: _int(pool['filteredAlreadySwiped']),
         ),
         _Metric(
-          label: 'Dopo filtri',
+          label: 'After filters',
           value: _int(pool['remainingAfterFiltering']),
         ),
         _Metric(label: 'Made for you', value: _int(feed['resultCount'])),
         _Metric(
-          label: 'Daily personalizzati',
+          label: 'Daily personalized',
           value: _int(daily['personalizedCandidateCount']),
         ),
         _Metric(
-          label: 'Daily esplorativi',
+          label: 'Daily exploratory',
           value: _int(daily['exploratoryCandidateCount']),
         ),
       ],
@@ -493,12 +496,12 @@ class _RecommendationCard extends StatelessWidget {
                 _ScorePill(label: 'semantic', value: movie['semanticScore']),
                 _ScorePill(label: 'RRF', value: movie['rankFusionScore']),
                 _ScorePill(
-                  label: 'popolarità',
+                  label: 'popularity',
                   value: movie['popularityScore'],
                 ),
-                _ScorePill(label: 'penalità', value: movie['negativePenalty']),
+                _ScorePill(label: 'penalty', value: movie['negativePenalty']),
                 _ScorePill(
-                  label: 'esposizioni',
+                  label: 'exposures',
                   value: movie['unactedExposureCount'],
                 ),
               ],
@@ -557,23 +560,23 @@ class _QueryTraceCard extends StatelessWidget {
             style: AgText.label.copyWith(color: t.text),
           ),
           subtitle: Text(
-            '${query['durationMs'] ?? '?'} ms · ${query['records'] ?? '?'} righe',
+            '${query['durationMs'] ?? '?'} ms · ${query['records'] ?? '?'} rows',
             style: AgText.micro.copyWith(
               color: error == null ? t.faint : t.red,
             ),
           ),
           trailing: IconButton(
-            tooltip: 'Copia Cypher',
+            tooltip: 'Copy Cypher',
             icon: const Icon(Icons.copy_rounded, size: 18),
             onPressed: () => Clipboard.setData(ClipboardData(text: cypher)),
           ),
           children: [
             _CodeBlock(label: 'CYPHER', value: cypher),
             const SizedBox(height: 8),
-            _CodeBlock(label: 'PARAMETRI', value: params),
+            _CodeBlock(label: 'PARAMETERS', value: params),
             if (error != null) ...[
               const SizedBox(height: 8),
-              _CodeBlock(label: 'ERRORE', value: error, error: true),
+              _CodeBlock(label: 'ERROR', value: error, error: true),
             ],
           ],
         ),
@@ -592,7 +595,7 @@ class _MetricsCard extends StatelessWidget {
     if (metrics.isEmpty) {
       return const _EmptyCard(
         message:
-            'Nessun batch osservato: usa Discover per generare impressioni e swipe.',
+            'No batches observed: use Discover to generate impressions and swipes.',
       );
     }
     return _Panel(
@@ -828,7 +831,7 @@ class _EngineError extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Trace non disponibile',
+              'Trace unavailable',
               style: AgText.h4.copyWith(color: context.tokens.red),
             ),
             const SizedBox(height: 8),
@@ -837,7 +840,7 @@ class _EngineError extends StatelessWidget {
               style: AgText.caption.copyWith(color: context.tokens.sub),
             ),
             const SizedBox(height: 12),
-            TextButton(onPressed: onRetry, child: const Text('Riprova')),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

@@ -250,7 +250,7 @@ class AgreeoSettingsScreen extends ConsumerWidget {
                       _NavRow(
                         icon: AgIcons.sparkle,
                         title: 'Recommendation Lab',
-                        subtitle: 'Motore, score e query Cypher live',
+                        subtitle: 'Engine, scoring and live Cypher queries',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const Neo4jConsoleScreen(),

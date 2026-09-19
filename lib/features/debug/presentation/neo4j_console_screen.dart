@@ -76,7 +76,7 @@ class _Neo4jConsoleScreenState extends State<Neo4jConsoleScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _TabSelector(
-                tabs: const ['Info', 'Schema', 'Indici', 'Query', 'Motore'],
+                tabs: const ['Info', 'Schema', 'Indexes', 'Queries', 'Engine'],
                 selected: _tab,
                 onChanged: (index) => setState(() => _tab = index),
               ),
@@ -267,7 +267,7 @@ class _ErrorCard extends StatelessWidget {
                 Icon(AgIcons.wifiOff, size: 18, color: t.red),
                 const SizedBox(width: 8),
                 Text(
-                  'Console non disponibile',
+                  'Console unavailable',
                   style: AgText.label.copyWith(fontSize: 14, color: t.red),
                 ),
               ],
@@ -279,7 +279,7 @@ class _ErrorCard extends StatelessWidget {
               GestureDetector(
                 onTap: onRetry,
                 child: Text(
-                  'Riprova',
+                  'Retry',
                   style: AgText.label.copyWith(color: t.purple),
                 ),
               ),
@@ -384,21 +384,21 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                _StatCard(label: 'Nodi', value: _formatCount(data.nodeCount)),
+                _StatCard(label: 'Nodes', value: _formatCount(data.nodeCount)),
                 const SizedBox(width: 10),
                 _StatCard(
-                  label: 'Relazioni',
+                  label: 'Relationships',
                   value: _formatCount(data.relationshipCount),
                 ),
                 const SizedBox(width: 10),
                 _StatCard(
-                  label: 'Property key',
+                  label: 'Property keys',
                   value: _formatCount(data.propertyKeyCount),
                 ),
               ],
             ),
             const SizedBox(height: 18),
-            _SectionTitle(icon: AgIcons.library, title: 'Nodi per label'),
+            _SectionTitle(icon: AgIcons.library, title: 'Nodes by label'),
             const SizedBox(height: 9),
             _Card(
               child: Column(
@@ -409,7 +409,7 @@ class _OverviewTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            _SectionTitle(icon: AgIcons.share, title: 'Relazioni per tipo'),
+            _SectionTitle(icon: AgIcons.share, title: 'Relationships by type'),
             const SizedBox(height: 9),
             _Card(
               child: Column(
@@ -505,7 +505,7 @@ class _SchemaTab extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 30),
           children: [
             Text(
-              'Pattern reali del grafo, con il numero di relazioni per ciascuno.',
+              'Real graph patterns, with relationship counts for each.',
               style: AgText.caption.copyWith(color: t.faint),
             ),
             const SizedBox(height: 10),
@@ -563,7 +563,7 @@ class _IndexesTab extends StatelessWidget {
           children: [
             _SectionTitle(
               icon: AgIcons.sparkle,
-              title: 'Indici (${report.indexes.length})',
+              title: 'Indexes (${report.indexes.length})',
             ),
             const SizedBox(height: 9),
             for (final index in report.indexes) ...[
@@ -573,7 +573,7 @@ class _IndexesTab extends StatelessWidget {
             const SizedBox(height: 12),
             _SectionTitle(
               icon: AgIcons.shield,
-              title: 'Constraint (${report.constraints.length})',
+              title: 'Constraints (${report.constraints.length})',
             ),
             const SizedBox(height: 9),
             _Card(
@@ -677,51 +677,51 @@ class _IndexCard extends StatelessWidget {
 
 const List<(String, String)> _presetQueries = [
   (
-    'Top film',
+    'Top Movies',
     'MATCH (m:Movie)\n'
         'WHERE m.movieLensRatingCount IS NOT NULL\n'
-        'RETURN m.title AS titolo, m.movieLensAvgRating AS rating,\n'
-        '       m.movieLensRatingCount AS voti\n'
-        'ORDER BY voti DESC LIMIT 10',
+        'RETURN m.title AS title, m.movieLensAvgRating AS rating,\n'
+        '       m.movieLensRatingCount AS votes\n'
+        'ORDER BY votes DESC LIMIT 10',
   ),
   (
-    'Like utenti',
+    'User Likes',
     'MATCH (u:AppUser)-[:LIKED]->(m:Movie)\n'
-        'RETURN u.displayName AS utente, count(m) AS like,\n'
-        '       collect(m.title)[..5] AS esempi\n'
-        'ORDER BY like DESC LIMIT 10',
+        'RETURN u.displayName AS user, count(m) AS likes,\n'
+        '       collect(m.title)[..5] AS examples\n'
+        'ORDER BY likes DESC LIMIT 10',
   ),
   (
-    'Collaborative filtering',
+    'Collaborative Filtering',
     'MATCH (me:AppUser)-[:LIKED]->(:Movie)<-[:MATCHES_TMDB]-(seed:MovieLensMovie)\n'
         'MATCH (seed)<-[r1:RATED]-(sim:MovieLensUser)-[r2:RATED]->\n'
         '      (rec:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)\n'
         'WHERE r1.rating >= 4 AND r2.rating >= 4\n'
         '  AND NOT (me)-[:LIKED|ALREADY_SEEN]->(m)\n'
-        'RETURN m.title AS consiglio, count(DISTINCT sim) AS utentiSimili,\n'
-        '       round(avg(r2.rating), 2) AS ratingMedio\n'
-        'ORDER BY utentiSimili DESC, ratingMedio DESC LIMIT 10',
+        'RETURN m.title AS recommendation, count(DISTINCT sim) AS similarUsers,\n'
+        '       round(avg(r2.rating), 2) AS avgRating\n'
+        'ORDER BY similarUsers DESC, avgRating DESC LIMIT 10',
   ),
   (
-    'Vector search',
+    'Vector Search',
     "MATCH (t:Tag {name: 'funny'})\n"
         "CALL db.index.vector.queryNodes('tag_embeddings', 8, t.embedding)\n"
         'YIELD node, score\n'
-        'RETURN node.name AS tag, round(score, 3) AS similarita\n'
+        'RETURN node.name AS tag, round(score, 3) AS similarity\n'
         'ORDER BY score DESC',
   ),
   (
     'Bridge TMDB-MovieLens',
     'MATCH (ml:MovieLensMovie)-[:MATCHES_TMDB]->(m:Movie)\n'
-        'RETURN m.title AS titolo, m.tmdbId AS tmdbId,\n'
+        'RETURN m.title AS title, m.tmdbId AS tmdbId,\n'
         '       ml.movieLensId AS movieLensId\n'
         'LIMIT 10',
   ),
   (
-    'Tag frequenti',
+    'Frequent Tags',
     'MATCH (ml:MovieLensMovie)-[h:HAS_TAG]->(t:Tag)\n'
-        'RETURN t.name AS tag, sum(h.frequency) AS frequenza\n'
-        'ORDER BY frequenza DESC LIMIT 15',
+        'RETURN t.name AS tag, sum(h.frequency) AS frequency\n'
+        'ORDER BY frequency DESC LIMIT 15',
   ),
 ];
 
@@ -868,7 +868,7 @@ class _QueryTabState extends State<_QueryTab> {
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            'Esegui',
+                            'Run',
                             style: AgText.label.copyWith(
                               fontSize: 14,
                               color: Colors.white,
@@ -938,12 +938,12 @@ class _QueryResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final timing = [
-      '${result.totalRows} righe${result.truncated ? ' (troncate)' : ''}',
-      '${result.wallTimeMs} ms totali',
+      '${result.totalRows} rows${result.truncated ? ' (truncated)' : ''}',
+      '${result.wallTimeMs} ms total',
       if (result.resultAvailableAfterMs != null)
-        '${result.resultAvailableAfterMs} ms disponibile',
+        '${result.resultAvailableAfterMs} ms available',
       if (result.resultConsumedAfterMs != null)
-        '${result.resultConsumedAfterMs} ms consumo',
+        '${result.resultConsumedAfterMs} ms consumed',
     ].join(' · ');
 
     return Column(
@@ -952,7 +952,7 @@ class _QueryResultView extends StatelessWidget {
         Text(timing, style: AgText.micro.copyWith(color: t.faint)),
         const SizedBox(height: 8),
         if (result.plan != null) ...[
-          _SectionTitle(icon: AgIcons.sliders, title: 'Piano di esecuzione'),
+          _SectionTitle(icon: AgIcons.sliders, title: 'Execution plan'),
           const SizedBox(height: 8),
           _Card(child: _PlanNode(plan: result.plan!, depth: 0)),
           const SizedBox(height: 12),
@@ -1000,7 +1000,7 @@ class _QueryResultView extends StatelessWidget {
         ] else if (result.plan == null)
           _Card(
             child: Text(
-              'Nessuna riga restituita.',
+              'No rows returned.',
               style: _monoStyle.copyWith(color: t.sub),
             ),
           ),
@@ -1018,7 +1018,7 @@ class _QueryResultView extends StatelessWidget {
         case 'relationship':
           return '[:${value['relType']} ${_shortMap(value['properties'])}]';
         case 'path':
-          return 'path(${(value['segments'] as List? ?? const []).length} segmenti)';
+          return 'path(${(value['segments'] as List? ?? const []).length} segments)';
         default:
           return _shortMap(value);
       }
@@ -1044,7 +1044,7 @@ class _QueryResultView extends StatelessWidget {
       return value.length > 28 ? "'${value.substring(0, 25)}…'" : "'$value'";
     }
     if (value is List && value.length > 4) {
-      return '[${value.length} elementi]';
+      return '[${value.length} items]';
     }
     return value.toString();
   }

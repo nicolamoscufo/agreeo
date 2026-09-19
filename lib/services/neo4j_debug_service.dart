@@ -348,7 +348,7 @@ class Neo4jDebugService {
     }
     if (response.statusCode == 404) {
       throw const Neo4jQueryException(
-        'Console disabilitata: imposta ENABLE_NEO4J_DEBUG=true sul backend.',
+        'Debug console disabled: set ENABLE_NEO4J_DEBUG=true on backend.',
       );
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {

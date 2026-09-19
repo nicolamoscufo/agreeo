@@ -1694,22 +1694,22 @@ exports.recommendationDebugStats = async (req, res) => {
         stages: [
           {
             id: 'signals',
-            title: '1. Profilo utente',
-            description: 'Neo4j raccoglie preferiti, like, watchlist, dislike, generi e tag collegati ai film.',
+            title: '1. User Profile',
+            description: 'Neo4j collects favorites, likes, watchlist, dislikes, genres, and tags linked to movies.',
             outputCount: userProfile.totalFeedbackActions || 0,
           },
           {
             id: 'collaborative',
-            title: '2. Collaborative filtering',
-            description: 'Trova utenti MovieLens vicini, centra tutti i rating e applica shrinkage sul supporto.',
+            title: '2. Collaborative Filtering',
+            description: 'Finds nearest MovieLens users, mean-centers ratings, and applies shrinkage on support.',
             outputCount: forYouData.candidates.filter((candidate) =>
               candidate.source === 'personalized' || candidate.source === 'hybrid'
             ).length,
           },
           {
             id: 'semantic',
-            title: '3. Profilo semantico',
-            description: 'Costruisce centroidi positivi/negativi, usa cosine similarity, frequenza logaritmica e IDF.',
+            title: '3. Semantic Profile',
+            description: 'Builds positive/negative centroids, uses cosine similarity, log frequency, and IDF.',
             outputCount: forYouData.candidates.filter((candidate) =>
               candidate.source === 'semantic-tag' || candidate.source === 'hybrid'
             ).length,
@@ -1717,13 +1717,13 @@ exports.recommendationDebugStats = async (req, res) => {
           {
             id: 'fusion',
             title: '4. Reciprocal Rank Fusion',
-            description: 'Combina le posizioni delle sorgenti, poi penalizza esposizioni ignorate e diversifica i generi.',
+            description: 'Combines source ranks, penalizes unacted exposures, and diversifies genres.',
             outputCount: forYouData.results.length,
           },
           {
             id: 'daily',
-            title: '5. Daily learning queue',
-            description: 'Mescola candidati personalizzati ed esplorativi e registra impressioni, posizione e azione.',
+            title: '5. Daily Learning Queue',
+            description: 'Blends personalized and exploratory candidates, tracking impressions, position, and action.',
             outputCount: dailySuggestionData.results.length,
           },
         ],
