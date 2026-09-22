@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:agreeo/shared/services/backend_auth_session_service.dart';
 import 'package:agreeo/shared/state/agreeo_app_controller.dart';
 import 'package:agreeo/shared/theme/ag_text.dart';
@@ -95,7 +97,10 @@ class _AgreeoAuthWelcomeScreenState
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: MediaQuery.sizeOf(context).height - 80,
+                  minHeight: math.max(
+                    0.0,
+                    MediaQuery.sizeOf(context).height - 80,
+                  ),
                 ),
                 child: Form(
                   key: _formKey,

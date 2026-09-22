@@ -390,8 +390,8 @@ class AgreeoAppState {
 }
 
 class AgreeoAppController extends StateNotifier<AgreeoAppState> {
-  static const int swipeQueueRefillThreshold = 8;
-  static const int dailySuggestionBatchSize = 20;
+  static const int swipeQueueRefillThreshold = 2;
+  static const int dailySuggestionBatchSize = 5;
 
   AgreeoAppController(
     this._ref,
@@ -1012,9 +1012,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         state.undoStack,
         movieId,
       ),
-      recommendationContext: fromDailySuggestions
-          ? _dailyRecommendationContext(movieId)
-          : null,
+      recommendationContext: _dailyRecommendationContext(movieId),
     );
   }
 
@@ -1028,9 +1026,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         state.undoStack,
         movieId,
       ),
-      recommendationContext: fromDailySuggestions
-          ? _dailyRecommendationContext(movieId)
-          : null,
+      recommendationContext: _dailyRecommendationContext(movieId),
     );
   }
 
@@ -1044,9 +1040,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         state.undoStack,
         movieId,
       ),
-      recommendationContext: fromDailySuggestions
-          ? _dailyRecommendationContext(movieId)
-          : null,
+      recommendationContext: _dailyRecommendationContext(movieId),
     );
   }
 
@@ -1070,9 +1064,7 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
         state.undoStack,
         movieId,
       ),
-      recommendationContext: fromDailySuggestions
-          ? _dailyRecommendationContext(movieId)
-          : null,
+      recommendationContext: _dailyRecommendationContext(movieId),
     );
   }
 
@@ -1533,7 +1525,29 @@ class AgreeoAppController extends StateNotifier<AgreeoAppState> {
       return null;
     }
 
-    final movie = state.movieById(movieId);
+    var movie = state.movieById(movieId);
+    if (movie == null) {
+      final tmdbId = _parseTmdbId(movieId);
+      if (tmdbId != null && tmdbId > 0) {
+        movie = Movie(
+          id: movieId,
+          tmdbId: tmdbId,
+          title: '',
+          originalTitle: '',
+          overview: '',
+          posterUrl: '',
+          backdropUrl: '',
+          releaseYear: 0,
+          runtime: 0,
+          genres: const <String>[],
+          director: '',
+          cast: const <String>[],
+          rating: 0,
+          mediaType: CatalogMediaType.movie,
+          trailerUrl: '',
+        );
+      }
+    }
     if (movie?.tmdbId == null) {
       return null;
     }

@@ -33,13 +33,13 @@ app.set('trust proxy', 1);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60_000,
-  max: 10,
+  max: Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10000', 10),
   standardHeaders: true,
   legacyHeaders: false,
 });
 const apiLimiter = rateLimit({
   windowMs: 15 * 60_000,
-  max: 300,
+  max: Number.parseInt(process.env.API_RATE_LIMIT_MAX || '100000', 10),
   standardHeaders: true,
   legacyHeaders: false,
 });

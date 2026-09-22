@@ -489,6 +489,50 @@ void main() {
     expect(controller.state.remainingDailySuggestions, isEmpty);
   });
 
+  test('details screen like attaches daily context when movie is in daily queue', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final movie = _movie('tmdb-750');
+    final backend = _RecommendationBackendMovieService();
+    final controller = AgreeoAppController(
+      _FakeRef(),
+      _FakeMovieService(const <Movie>[], const <List<Movie>>[]),
+      BackendAuthSessionService(),
+      LocalUserMovieStateService(),
+      backend,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    controller.state = controller.state.copyWith(
+      hydrated: true,
+      session: AgreeoUserSession(
+        id: 'user-1',
+        displayName: 'User',
+        email: 'user@example.com',
+        bio: '',
+        joinedAt: DateTime(2026, 4, 11),
+      ),
+      catalog: <Movie>[movie],
+      dailySuggestionIds: <String>[movie.id],
+      dailySuggestionsGeneratedAt: DateTime.now(),
+      dailySuggestionBatchId: 'batch-750',
+      dailySuggestionContexts: const <String, RecommendationActionContext>{
+        'tmdb-750': RecommendationActionContext(
+          batchId: 'batch-750',
+          position: 2,
+        ),
+      },
+    );
+
+    await controller.likeMovie(movie.id);
+
+    expect(backend.receivedContext?.batchId, 'batch-750');
+    expect(backend.receivedContext?.position, 2);
+    expect(
+      controller.state.userMovieStateFor(movie.id).preference,
+      MoviePreference.liked,
+    );
+  });
+
   test('daily limit rejection rolls back the optimistic swipe', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final movie = _movie('tmdb-800');
