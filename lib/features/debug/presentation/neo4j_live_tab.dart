@@ -606,7 +606,7 @@ class _Neo4jLiveTabState extends State<Neo4jLiveTab> {
             _PathChain(segments: segments),
             const SizedBox(height: 8),
             Text(
-              'Illustrative, demo-bounded path: the full score aggregates many neighbors and includes the semantic component.',
+              'Sample traversal path: the full score aggregates multiple neighbors and includes the semantic component.',
               style: TextStyle(color: t.faint, fontSize: 12),
             ),
           ],

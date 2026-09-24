@@ -58,7 +58,7 @@ class _EngineReport extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
       children: [
-        _ExamHero(
+        _TraceHero(
           variant: trace['experimentVariant']?.toString() ?? '?',
           generatedAt: trace['generatedAt']?.toString() ?? '',
           queryCount: queries.length,
@@ -77,7 +77,7 @@ class _EngineReport extends StatelessWidget {
         _SectionHeader(
           index: 'B',
           title: 'Live pipeline',
-          subtitle: 'Follow these steps during the discussion.',
+          subtitle: 'Execution stages from candidate retrieval to final ranking.',
         ),
         const SizedBox(height: 8),
         for (var index = 0; index < stages.length; index++) ...[
@@ -142,8 +142,8 @@ class _EngineReport extends StatelessWidget {
   }
 }
 
-class _ExamHero extends StatelessWidget {
-  const _ExamHero({
+class _TraceHero extends StatelessWidget {
+  const _TraceHero({
     required this.variant,
     required this.generatedAt,
     required this.queryCount,
@@ -183,7 +183,7 @@ class _ExamHero extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'This view recomputes the authenticated user feed and captures the Neo4j queries actually executed. Use it top to bottom as your exam walkthrough.',
+            'This view recomputes the authenticated user feed and captures the Neo4j queries actually executed across ranking stages.',
             style: AgText.body.copyWith(color: t.sub, height: 1.45),
           ),
           const SizedBox(height: 12),
